@@ -57,8 +57,10 @@ function ReservationCard({ item, isSelected, onSelect }) {
   )
 }
 
-function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasActiveMembership, membership }) {
-  const canConfirm = selectedClass && !selectedClass.isFull && !selectedClass.isReserved && hasActiveMembership
+function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasActiveMembership, membership, remainingTokens }) {
+  const isUnlimitedPlan = Boolean(membership?.is_unlimited)
+  const hasTokens = isUnlimitedPlan || remainingTokens === null || Number(remainingTokens) > 0
+  const canConfirm = selectedClass && !selectedClass.isFull && !selectedClass.isReserved && hasActiveMembership && hasTokens
 
   if (!selectedClass) {
     return (
@@ -101,13 +103,20 @@ function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasA
         <p className="mb-4 text-sm leading-6 text-white/70">
           {currentUser
             ? hasActiveMembership
-              ? 'Confirma tu cupo y queda listo para entrenar fuerte con la comunidad.'
+              ? hasTokens
+                ? 'Confirma tu cupo y queda listo para entrenar fuerte con la comunidad.'
+                : 'Tu plan esta activo, pero ya usaste todos tus tokens. Para seguir reservando debes renovar.'
               : `Para reservar necesitas membresía activa. Estado actual: ${membership?.status ?? 'sin plan activo'}.`
             : 'Inicia sesión para tomar este cupo y mantener tu reserva guardada.'}
         </p>
+        {currentUser && hasActiveMembership ? (
+          <p className="mb-4 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs font-black uppercase tracking-[0.14em] text-white/70">
+            Tokens disponibles: {isUnlimitedPlan ? 'Ilimitado' : remainingTokens ?? 0}
+          </p>
+        ) : null}
         {currentUser ? (
           <button type="button" className={`w-full ${canConfirm ? 'k-button' : 'k-button-secondary opacity-60'}`} disabled={!canConfirm} onClick={() => onConfirm(selectedClass)}>
-            {!hasActiveMembership ? 'Membresía requerida' : selectedClass.isFull ? 'Clase completa' : selectedClass.isReserved ? 'Ya tienes esta reserva' : 'Confirmar reserva'}
+            {!hasActiveMembership ? 'Membresía requerida' : !hasTokens ? 'Sin tokens disponibles' : selectedClass.isFull ? 'Clase completa' : selectedClass.isReserved ? 'Ya tienes esta reserva' : 'Confirmar reserva'}
           </button>
         ) : (
           <button type="button" className="k-button w-full" onClick={onGoLogin}>
@@ -183,6 +192,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   const [userActiveReservations, setUserActiveReservations] = useState([])
   const [membership, setMembership] = useState(null)
   const [hasActiveMembership, setHasActiveMembership] = useState(false)
+  const [remainingTokens, setRemainingTokens] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [reservationMessage, setReservationMessage] = useState('')
   const [selectedDayId, setSelectedDayId] = useState('all')
@@ -221,6 +231,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     })))
     setMembership(result.membership)
     setHasActiveMembership(result.hasActiveMembership)
+    setRemainingTokens(result.remainingTokens)
     setReservationMessage('')
   }, [currentUser?.id])
 
@@ -310,6 +321,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
         onGoLogin={() => setActivePage('login')}
         hasActiveMembership={hasActiveMembership}
         membership={membership}
+        remainingTokens={remainingTokens}
       />
 
       <section>

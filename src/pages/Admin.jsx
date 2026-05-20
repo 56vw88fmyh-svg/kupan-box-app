@@ -21,8 +21,19 @@ const adminTabs = [
 ]
 
 const emptyPlan = { id: '', name: '', price: '', classes_per_week: '', is_unlimited: false, active: true }
-const emptyMembership = { profile_id: '', plan_id: '', start_date: '', end_date: '', status: 'active', notes: '' }
-const emptyMembershipEdit = { id: '', profile_id: '', plan_id: '', start_date: '', end_date: '', status: 'active', notes: '' }
+const emptyMembership = {
+  profile_id: '',
+  plan_id: '',
+  start_date: new Date().toISOString().slice(0, 10),
+  end_date: '',
+  status: 'active',
+  classes_total: '',
+  payment_status: 'paid',
+  payment_provider: 'manual_admin',
+  payment_reference: '',
+  notes: '',
+}
+const emptyMembershipEdit = { id: '', profile_id: '', plan_id: '', start_date: '', end_date: '', status: 'active', classes_total: '', classes_used: 0, payment_status: 'paid', notes: '' }
 const emptyWod = { date: new Date().toISOString().slice(0, 10), title: '', warmup: '', strength: '', workout: '', time_cap: '', notes: '' }
 const emptySchedule = { id: '', day_of_week: 1, time: '18:00', class_name: 'CrossFit', coach: 'Coach KUPAN', max_spots: 12, active: true }
 const emptyPost = { id: '', type: 'noticia', title: '', content: '', event_date: '', active: true }
@@ -159,6 +170,30 @@ function toTime(value) {
   return value ? value.slice(0, 5) : ''
 }
 
+function addDays(dateText, days) {
+  const date = dateText ? new Date(`${dateText}T00:00:00`) : new Date()
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+function getPlanTokenTotal(plan) {
+  if (!plan || plan.is_unlimited) return ''
+  const match = String(plan.name ?? '').match(/\d+/)
+  if (match) return Number(match[0])
+  return plan.classes_per_week ? Number(plan.classes_per_week) * 4 : ''
+}
+
+function getMembershipTokens(membership) {
+  const isUnlimited = Boolean(membership.plan?.is_unlimited)
+  const total = membership.classes_total
+  const used = Number(membership.classes_used ?? 0)
+  return {
+    total: isUnlimited ? 'Ilimitado' : total ?? 0,
+    used: isUnlimited ? 'No descuenta' : used,
+    remaining: isUnlimited ? 'Ilimitado' : Math.max(Number(total ?? 0) - used, 0),
+  }
+}
+
 async function loadAdminData() {
   if (!isSupabaseConfigured || !supabase) {
     return { ok: false, message: 'Supabase aun no esta configurado. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.' }
@@ -176,20 +211,22 @@ async function loadAdminData() {
     settings,
     birthdays,
     prs,
+    tokenMovements,
   ] = await Promise.all([
     supabase.from('profiles').select('id, full_name, email, phone, birth_date, level, role, status, created_at').order('created_at', { ascending: false }),
     supabase.from('plans').select('id, name, price, classes_per_week, is_unlimited, active, created_at').order('price', { ascending: true }),
-    supabase.from('memberships').select('id, profile_id, plan_id, start_date, end_date, status, notes, profile:profiles(full_name, email), plan:plans(name, price)').order('end_date', { ascending: false }),
-    supabase.from('reservations').select('id, profile_id, class_schedule_id, reservation_date, status, created_at, profile:profiles(full_name, email), class_schedule:class_schedule(day_of_week, time, class_name, coach)').gte('reservation_date', today).order('reservation_date', { ascending: true }),
+    supabase.from('memberships').select('id, profile_id, plan_id, start_date, end_date, status, notes, classes_total, classes_used, expires_at, payment_status, payment_provider, payment_reference, activated_at, auto_activated, profile:profiles(full_name, email), plan:plans(name, price, classes_per_week, is_unlimited)').order('end_date', { ascending: false }),
+    supabase.from('reservations').select('id, profile_id, class_schedule_id, membership_id, reservation_date, status, token_charged, cancelled_at, created_at, profile:profiles(full_name, email), class_schedule:class_schedule(day_of_week, time, class_name, coach)').gte('reservation_date', today).order('reservation_date', { ascending: true }),
     supabase.from('wod').select('id, date, title, warmup, strength, workout, time_cap, notes').order('date', { ascending: false }).limit(14),
     supabase.from('class_schedule').select('id, day_of_week, time, class_name, coach, max_spots, active').order('day_of_week', { ascending: true }).order('time', { ascending: true }),
     supabase.from('community_posts').select('id, type, title, content, event_date, active, created_at').order('created_at', { ascending: false }),
     supabase.from('app_settings').select('key, value'),
     supabase.rpc('birthdays_this_month'),
     supabase.from('personal_records').select('id, movement, value, unit, record_date, notes, profile:profiles(full_name, email)').order('value', { ascending: false }).limit(20),
+    supabase.from('membership_token_movements').select('id, membership_id, profile_id, reservation_id, movement_type, quantity, reason, created_at, created_by, profile:profiles(full_name, email)').order('created_at', { ascending: false }).limit(80),
   ])
 
-  const firstError = [profiles, plans, memberships, reservations, wod, schedule, posts, birthdays, prs].find((result) => result.error)
+  const firstError = [profiles, plans, memberships, reservations, wod, schedule, posts, birthdays, prs, tokenMovements].find((result) => result.error)
   if (firstError?.error) {
     return { ok: false, message: 'No pudimos cargar datos admin desde Supabase. Revisa RLS, role admin y tablas.' }
   }
@@ -208,6 +245,7 @@ async function loadAdminData() {
       birthdays: birthdays.data ?? [],
       upcomingBirthdays: [],
       prs: prs.data ?? [],
+      tokenMovements: tokenMovements.data ?? [],
     },
   }
 }
@@ -226,6 +264,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     birthdays: [],
     upcomingBirthdays: [],
     prs: [],
+    tokenMovements: [],
   })
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('error')
@@ -336,8 +375,23 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveMembership(event) {
     event.preventDefault()
+    const selectedPlan = adminData.plans.find((plan) => plan.id === membershipDraft.plan_id)
+    const startDate = membershipDraft.start_date || new Date().toISOString().slice(0, 10)
+    const endDate = membershipDraft.end_date || addDays(startDate, 30)
     const payload = {
-      ...membershipDraft,
+      profile_id: membershipDraft.profile_id,
+      plan_id: membershipDraft.plan_id,
+      start_date: startDate,
+      end_date: endDate,
+      expires_at: endDate,
+      status: membershipDraft.status,
+      classes_total: selectedPlan?.is_unlimited ? null : Number(membershipDraft.classes_total || getPlanTokenTotal(selectedPlan) || 0),
+      classes_used: 0,
+      payment_status: membershipDraft.payment_status,
+      payment_provider: membershipDraft.payment_provider || 'manual_admin',
+      payment_reference: membershipDraft.payment_reference || `manual-${membershipDraft.profile_id}-${Date.now()}`,
+      activated_at: membershipDraft.status === 'active' ? new Date().toISOString() : null,
+      auto_activated: false,
       notes: membershipDraft.notes || null,
     }
 
@@ -371,6 +425,9 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       start_date: membership.start_date,
       end_date: membership.end_date,
       status: membership.status,
+      classes_total: membership.classes_total ?? '',
+      classes_used: membership.classes_used ?? 0,
+      payment_status: membership.payment_status ?? 'paid',
       notes: membership.notes ?? '',
     })
     setMessage('')
@@ -389,7 +446,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       plan_id: membershipEditDraft.plan_id,
       start_date: membershipEditDraft.start_date,
       end_date: membershipEditDraft.end_date,
+      expires_at: membershipEditDraft.end_date,
       status: membershipEditDraft.status,
+      classes_total: membershipEditDraft.classes_total === '' ? null : Number(membershipEditDraft.classes_total),
+      classes_used: Number(membershipEditDraft.classes_used ?? 0),
+      payment_status: membershipEditDraft.payment_status,
+      activated_at: membershipEditDraft.status === 'active' ? new Date().toISOString() : null,
       notes: membershipEditDraft.notes || null,
     }
 
@@ -416,6 +478,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function updateMembershipStatus(membership, status) {
+    const payload = { status }
     if (status === 'active') {
       await supabase
         .from('memberships')
@@ -423,9 +486,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         .eq('profile_id', membership.profile_id)
         .eq('status', 'active')
         .neq('id', membership.id)
+      payload.payment_status = membership.payment_status === 'paid' ? membership.payment_status : 'paid'
+      payload.activated_at = membership.activated_at ?? new Date().toISOString()
     }
 
-    const { error } = await supabase.from('memberships').update({ status }).eq('id', membership.id)
+    const { error } = await supabase.from('memberships').update(payload).eq('id', membership.id)
     if (error) return setMessage('No pudimos actualizar la membresia.')
     refreshData()
   }
@@ -539,16 +604,50 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function updateReservationStatus(reservationId, status) {
-    const { error } = await supabase.from('reservations').update({ status }).eq('id', reservationId)
+    const result = status === 'cancelled'
+      ? await supabase.rpc('cancel_reservation', { target_reservation_id: reservationId })
+      : await supabase.from('reservations').update({ status }).eq('id', reservationId)
+    const { error } = result
 
     if (error) {
       setMessageType('error')
-      setMessage('No pudimos actualizar la reserva.')
+      setMessage(error.message || 'No pudimos actualizar la reserva.')
       return
     }
 
     setMessageType('success')
-    setMessage('Reserva actualizada.')
+    setMessage(status === 'cancelled' ? 'Reserva cancelada. Si correspondia, el token fue devuelto.' : 'Reserva actualizada. El token queda consumido.')
+    refreshData()
+  }
+
+  async function simulateApprovedPayment() {
+    setMessage('')
+    setMessageType('error')
+
+    if (!membershipDraft.profile_id || !membershipDraft.plan_id) {
+      setMessage('Selecciona alumno y plan para simular un pago aprobado.')
+      return
+    }
+
+    const { data, error } = await supabase.functions.invoke('payment-webhook', {
+      body: {
+        provider: 'manual_test',
+        payment_reference: `test-${membershipDraft.profile_id}-${membershipDraft.plan_id}-${Date.now()}`,
+        profile_id: membershipDraft.profile_id,
+        plan_id: membershipDraft.plan_id,
+        status: 'paid',
+        simulated: true,
+      },
+    })
+
+    if (error || !data?.ok) {
+      setMessage(data?.message || 'No pudimos simular el pago. Revisa la Edge Function payment-webhook.')
+      return
+    }
+
+    setMessageType('success')
+    setMessage('Pago simulado aprobado. Membresia activada por 30 dias.')
+    setMembershipDraft(emptyMembership)
     refreshData()
   }
 
@@ -800,12 +899,13 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           <div className="grid gap-3 md:grid-cols-2">
             {adminData.profiles.map((profile) => {
               const activeMembership = activeMembershipByProfile.get(profile.id)
+              const tokens = activeMembership ? getMembershipTokens(activeMembership) : null
               return (
                 <SmallRow
                   key={profile.id}
                   title={profile.full_name}
                   meta={activeMembership ? `Plan actual: ${activeMembership.plan?.name ?? 'Plan'}` : 'Sin plan activo'}
-                  detail={activeMembership ? `Vence ${formatDate(activeMembership.end_date)} · ${activeMembership.status}` : profile.email}
+                  detail={activeMembership ? `Vence ${formatDate(activeMembership.end_date)} · ${activeMembership.status} · tokens ${tokens.remaining}/${tokens.total}` : profile.email}
                   action={activeMembership ? (
                     <button type="button" className="k-button-secondary shrink-0 px-3 py-2 text-xs" onClick={() => startEditMembership(activeMembership)}>
                       Editar
@@ -819,23 +919,35 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           <form className="k-panel grid gap-3 p-4 sm:grid-cols-2" onSubmit={saveMembership}>
             <div className="sm:col-span-2">
               <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Activar plan</p>
-              <p className="mt-1 text-sm leading-6 text-white/60">Al crear una membresia activa, cualquier plan activo anterior del alumno pasa a historial como expired.</p>
+              <p className="mt-1 text-sm leading-6 text-white/60">Los planes duran 30 dias. Al activar una membresia, cualquier plan activo anterior del alumno pasa a historial como expired.</p>
             </div>
             <SelectField label="Alumno" value={membershipDraft.profile_id} onChange={(value) => setMembershipDraft((current) => ({ ...current, profile_id: value }))}>
               <option className="bg-kupan-black" value="">Seleccionar alumno</option>
               {adminData.profiles.map((profile) => <option key={profile.id} className="bg-kupan-black" value={profile.id}>{profile.full_name}</option>)}
             </SelectField>
-            <SelectField label="Plan" value={membershipDraft.plan_id} onChange={(value) => setMembershipDraft((current) => ({ ...current, plan_id: value }))}>
+            <SelectField label="Plan" value={membershipDraft.plan_id} onChange={(value) => {
+              const selectedPlan = adminData.plans.find((plan) => plan.id === value)
+              setMembershipDraft((current) => ({ ...current, plan_id: value, classes_total: getPlanTokenTotal(selectedPlan) }))
+            }}>
               <option className="bg-kupan-black" value="">Seleccionar plan</option>
               {adminData.plans.map((plan) => <option key={plan.id} className="bg-kupan-black" value={plan.id}>{plan.name}</option>)}
             </SelectField>
-            <Field label="Inicio" type="date" value={membershipDraft.start_date} required onChange={(value) => setMembershipDraft((current) => ({ ...current, start_date: value }))} />
-            <Field label="Vencimiento" type="date" value={membershipDraft.end_date} required onChange={(value) => setMembershipDraft((current) => ({ ...current, end_date: value }))} />
+            <Field label="Inicio" type="date" value={membershipDraft.start_date} required onChange={(value) => setMembershipDraft((current) => ({ ...current, start_date: value, end_date: current.end_date || addDays(value, 30) }))} />
+            <Field label="Vencimiento" type="date" value={membershipDraft.end_date || addDays(membershipDraft.start_date, 30)} required onChange={(value) => setMembershipDraft((current) => ({ ...current, end_date: value }))} />
+            <Field label="Tokens del plan" type="number" value={membershipDraft.classes_total} onChange={(value) => setMembershipDraft((current) => ({ ...current, classes_total: value }))} />
+            <SelectField label="Pago" value={membershipDraft.payment_status} onChange={(value) => setMembershipDraft((current) => ({ ...current, payment_status: value }))}>
+              {['pending', 'paid', 'failed', 'refunded'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
+            </SelectField>
             <SelectField label="Estado" value={membershipDraft.status} onChange={(value) => setMembershipDraft((current) => ({ ...current, status: value }))}>
               {['active', 'expired', 'paused', 'cancelled'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
             </SelectField>
+            <Field label="Proveedor pago" value={membershipDraft.payment_provider} onChange={(value) => setMembershipDraft((current) => ({ ...current, payment_provider: value }))} />
+            <Field label="Referencia pago" value={membershipDraft.payment_reference} onChange={(value) => setMembershipDraft((current) => ({ ...current, payment_reference: value }))} />
             <Field label="Notas" value={membershipDraft.notes} onChange={(value) => setMembershipDraft((current) => ({ ...current, notes: value }))} />
             <button type="submit" className="k-button sm:col-span-2">Activar plan</button>
+            <button type="button" className="k-button-secondary sm:col-span-2" onClick={simulateApprovedPayment}>
+              Simular pago aprobado
+            </button>
           </form>
 
           {membershipEditDraft.id ? (
@@ -852,6 +964,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
               </SelectField>
               <Field label="Inicio" type="date" value={membershipEditDraft.start_date} required onChange={(value) => setMembershipEditDraft((current) => ({ ...current, start_date: value }))} />
               <Field label="Vencimiento" type="date" value={membershipEditDraft.end_date} required onChange={(value) => setMembershipEditDraft((current) => ({ ...current, end_date: value }))} />
+              <Field label="Tokens totales" type="number" value={membershipEditDraft.classes_total} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, classes_total: value }))} />
+              <Field label="Tokens usados" type="number" value={membershipEditDraft.classes_used} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, classes_used: value }))} />
+              <SelectField label="Pago" value={membershipEditDraft.payment_status} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, payment_status: value }))}>
+                {['pending', 'paid', 'failed', 'refunded'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
+              </SelectField>
               <div className="sm:col-span-2">
                 <Field label="Observaciones" value={membershipEditDraft.notes} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, notes: value }))} />
               </div>
@@ -863,27 +980,44 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           <div>
             <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Historial de membresias</p>
             <div className="space-y-3">
-          {adminData.memberships.map((membership) => (
-            <SmallRow
-              key={membership.id}
-              title={`${membership.profile?.full_name ?? 'Alumno'} · ${membership.plan?.name ?? 'Plan'}`}
-              meta={`${membership.status} · vence ${formatDate(membership.end_date)}`}
-              detail={`Inicio ${formatDate(membership.start_date)}${membership.notes ? ` · ${membership.notes}` : ''}`}
-              action={(
-                <div className="grid shrink-0 gap-2">
-                  <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => startEditMembership(membership)}>Editar</button>
-                  {membership.status === 'active' ? (
-                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(membership, 'paused')}>Pausar</button>
-                  ) : (
-                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(membership, 'active')}>Activar</button>
-                  )}
-                  {membership.status !== 'cancelled' ? (
-                    <button type="button" className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white" onClick={() => updateMembershipStatus(membership, 'cancelled')}>Cancelar</button>
-                  ) : null}
-                </div>
-              )}
-            />
-          ))}
+          {adminData.memberships.map((membership) => {
+            const tokens = getMembershipTokens(membership)
+            return (
+              <SmallRow
+                key={membership.id}
+                title={`${membership.profile?.full_name ?? 'Alumno'} · ${membership.plan?.name ?? 'Plan'}`}
+                meta={`${membership.status} · pago ${membership.payment_status ?? 'sin estado'} · vence ${formatDate(membership.end_date)}`}
+                detail={`Inicio ${formatDate(membership.start_date)} · tokens ${tokens.used}/${tokens.total} · disponibles ${tokens.remaining}${membership.notes ? ` · ${membership.notes}` : ''}`}
+                action={(
+                  <div className="grid shrink-0 gap-2">
+                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => startEditMembership(membership)}>Editar</button>
+                    {membership.status === 'active' ? (
+                      <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(membership, 'paused')}>Pausar</button>
+                    ) : (
+                      <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(membership, 'active')}>Activar</button>
+                    )}
+                    {membership.status !== 'cancelled' ? (
+                      <button type="button" className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white" onClick={() => updateMembershipStatus(membership, 'cancelled')}>Cancelar</button>
+                    ) : null}
+                  </div>
+                )}
+              />
+            )
+          })}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Movimientos de tokens</p>
+            <div className="space-y-3">
+              {adminData.tokenMovements.map((movement) => (
+                <SmallRow
+                  key={movement.id}
+                  title={`${movement.profile?.full_name ?? 'Alumno'} · ${movement.movement_type}`}
+                  meta={`${movement.quantity > 0 ? '+' : ''}${movement.quantity} token · ${new Date(movement.created_at).toLocaleString('es-CL')}`}
+                  detail={movement.reason ?? 'Movimiento registrado'}
+                />
+              ))}
             </div>
           </div>
         </AdminSection>
@@ -896,7 +1030,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
               key={reservation.id}
               title={`${reservation.class_schedule?.class_name ?? 'Clase'} · ${toTime(reservation.class_schedule?.time)}`}
               meta={`${formatDate(reservation.reservation_date)} · ${reservation.status}`}
-              detail={`${reservation.profile?.full_name ?? 'Alumno'} · Coach ${reservation.class_schedule?.coach ?? 'KUPAN'}`}
+              detail={`${reservation.profile?.full_name ?? 'Alumno'} · Coach ${reservation.class_schedule?.coach ?? 'KUPAN'} · token ${reservation.token_charged ? 'cobrado' : 'no descuenta'}`}
               action={(
                 <div className="grid shrink-0 gap-2">
                   <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateReservationStatus(reservation.id, 'attended')}>Asistio</button>

@@ -133,6 +133,12 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
   const level = supabaseProfile?.level ?? currentUser?.level ?? 'Iniciado'
   const status = supabaseProfile?.status ?? currentUser?.status ?? 'active'
   const plan = activeMembership?.plan
+  const planName = plan?.name ?? activeMembership?.plan_name
+  const planPrice = plan?.price
+  const isUnlimitedPlan = Boolean(plan?.is_unlimited ?? activeMembership?.is_unlimited)
+  const classesTotal = activeMembership?.classes_total
+  const classesUsed = activeMembership?.classes_used ?? 0
+  const classesRemaining = isUnlimitedPlan ? null : Math.max(Number(classesTotal ?? 0) - Number(classesUsed), 0)
   const daysRemaining = calculateDaysRemaining(activeMembership?.end_date)
 
   const weeklyCompleted = weeklyProgress.filter((item) => item.done).length
@@ -341,15 +347,23 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
       </MotionCard>
 
       <MotionCard as="section" className="k-card p-5" delay={0.05}>
-        <SectionTitle eyebrow="Plan activo" title={plan?.name ?? 'Sin plan activo'} />
+        <SectionTitle eyebrow="Plan activo" title={planName ?? 'Sin plan activo'} />
         {activeMembership ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ProfileField label="Plan" value={`${plan?.name ?? 'Plan KUPAN'} ${plan?.price ? `· ${formatCurrency(plan.price)}` : ''}`} />
-            <ProfileField label="Inicio" value={formatDate(activeMembership.start_date)} />
-            <ProfileField label="Vencimiento" value={formatDate(activeMembership.end_date)} />
-            <ProfileField label="Dias restantes" value={daysRemaining !== null ? `${daysRemaining} dias` : 'Sin registrar'} />
-            <ProfileField label="Estado membresia" value={activeMembership.status === 'active' ? 'Activa' : activeMembership.status} />
-          </div>
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ProfileField label="Plan" value={`${planName ?? 'Plan KUPAN'} ${planPrice ? `· ${formatCurrency(planPrice)}` : ''}`} />
+              <ProfileField label="Inicio" value={formatDate(activeMembership.start_date)} />
+              <ProfileField label="Vencimiento" value={formatDate(activeMembership.end_date)} />
+              <ProfileField label="Dias restantes" value={daysRemaining !== null ? `${daysRemaining} dias` : 'Sin registrar'} />
+              <ProfileField label="Tokens totales" value={isUnlimitedPlan ? 'Ilimitado' : classesTotal} />
+              <ProfileField label="Tokens usados" value={isUnlimitedPlan ? 'No descuenta' : classesUsed} />
+              <ProfileField label="Tokens disponibles" value={isUnlimitedPlan ? 'Ilimitado' : classesRemaining} />
+              <ProfileField label="Estado membresia" value={activeMembership.status === 'active' ? 'Activa' : activeMembership.status} />
+            </div>
+            <p className="mt-4 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4 text-sm font-bold leading-6 text-white">
+              Los tokens no utilizados vencen al terminar el plan y no son acumulables.
+            </p>
+          </>
         ) : (
           <p className="text-sm leading-6 text-white/60">
             Aun no hay una membresia activa asociada a tu perfil. Escríbenos para activar tu plan y seguir entrenando.
@@ -449,9 +463,9 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
 
       <MotionCard as="section" className="k-card p-5" delay={0.08}>
         <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Gestion del box</p>
-        <h2 className="mt-2 text-2xl font-black uppercase text-white">Panel admin temporal</h2>
+        <h2 className="mt-2 text-2xl font-black uppercase text-white">Panel admin KUPAN</h2>
         <p className="mt-2 text-sm leading-6 text-white/60">
-          Edita WOD, horarios, cupos, comunidad y planes mientras conectamos toda la operacion a Supabase.
+          Gestiona alumnos, planes, reservas, WOD, horarios y comunidad desde Supabase.
         </p>
         <button type="button" className="k-button-secondary mt-4 w-full" onClick={() => setActivePage('admin')}>
           Entrar a admin

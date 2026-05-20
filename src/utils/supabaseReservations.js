@@ -53,12 +53,7 @@ export async function loadReservationData(profileId) {
       : Promise.resolve({ data: [], error: null }),
     profileId
       ? supabase
-        .from('memberships')
-        .select('id, status, start_date, end_date, plan:plans(name)')
-        .eq('profile_id', profileId)
-        .order('end_date', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+        .rpc('get_active_membership', { target_profile_id: profileId })
       : Promise.resolve({ data: null, error: null }),
   ])
 
@@ -67,12 +62,11 @@ export async function loadReservationData(profileId) {
   if (membershipResult.error) return getReservationError('No pudimos revisar tu membresia.')
 
   const userReservations = reservationsResult.data ?? []
-  const membership = membershipResult.data
-  const hasActiveMembership = Boolean(
-    membership?.status === 'active' &&
-    today >= membership.start_date &&
-    today <= membership.end_date,
-  )
+  const membership = Array.isArray(membershipResult.data) ? membershipResult.data[0] : membershipResult.data
+  const hasActiveMembership = Boolean(membership?.status === 'active' && membership?.payment_status === 'paid')
+  const { data: remainingTokens } = membership?.id
+    ? await supabase.rpc('membership_remaining_tokens', { target_membership_id: membership.id })
+    : { data: null }
 
   const classes = await Promise.all((scheduleResult.data ?? []).map(async (classItem) => {
     const reservationDate = getNextDateForDay(classItem.day_of_week)
@@ -111,48 +105,38 @@ export async function loadReservationData(profileId) {
     reservations: userReservations,
     membership,
     hasActiveMembership,
+    remainingTokens,
   }
 }
 
 export async function createSupabaseReservation(profileId, classItem, hasActiveMembership) {
   if (!profileId) return getReservationError('Inicia sesion para reservar.')
-  if (!hasActiveMembership) return getReservationError('Necesitas una membresia activa para reservar. Si tu plan esta vencido, pausado o cancelado, habla con KUPAN.')
-
-  const { data: spots } = await supabase.rpc('available_spots', {
-    class_id: classItem.classScheduleId,
-    target_date: classItem.reservationDate,
+  if (!hasActiveMembership) return getReservationError('Necesitas una membresia activa y pagada para reservar. Si tu plan esta vencido, pausado o sin pago confirmado, habla con KUPAN.')
+  const { data, error } = await supabase.rpc('reserve_class', {
+    target_profile_id: profileId,
+    target_class_schedule_id: classItem.classScheduleId,
+    target_reservation_date: classItem.reservationDate,
   })
-
-  if (Number(spots ?? 0) <= 0) return getReservationError('Clase completa.')
-
-  const { data, error } = await supabase
-    .from('reservations')
-    .insert({
-      profile_id: profileId,
-      class_schedule_id: classItem.classScheduleId,
-      reservation_date: classItem.reservationDate,
-      status: 'reserved',
-    })
-    .select('id, profile_id, class_schedule_id, reservation_date, status, created_at')
-    .single()
 
   if (error) {
     const message = error.message?.toLowerCase() ?? ''
     if (message.includes('duplicate') || message.includes('unique')) {
       return getReservationError('Ya tienes una reserva para esa clase y fecha.')
     }
-    return getReservationError('No pudimos confirmar tu reserva.')
+    if (message.includes('tokens')) return getReservationError('No tienes tokens disponibles. Debes renovar tu plan.')
+    if (message.includes('membresia') || message.includes('membresía')) return getReservationError('Necesitas una membresía activa y pagada para reservar.')
+    if (message.includes('completa')) return getReservationError('Clase completa.')
+    return getReservationError(error.message || 'No pudimos confirmar tu reserva.')
   }
 
   return { ok: true, reservation: { ...data, ...classItem } }
 }
 
 export async function cancelSupabaseReservation(reservationId) {
-  const { error } = await supabase
-    .from('reservations')
-    .update({ status: 'cancelled' })
-    .eq('id', reservationId)
+  const { error } = await supabase.rpc('cancel_reservation', {
+    target_reservation_id: reservationId,
+  })
 
-  if (error) return getReservationError('No pudimos cancelar la reserva.')
-  return { ok: true, message: 'Reserva cancelada.' }
+  if (error) return getReservationError(error.message || 'No pudimos cancelar la reserva.')
+  return { ok: true, message: 'Reserva cancelada. Si correspondia, el token fue devuelto.' }
 }

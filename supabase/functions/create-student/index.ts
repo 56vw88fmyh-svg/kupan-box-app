@@ -26,6 +26,13 @@ function cleanText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function getPlanClasses(plan: { name: string; classes_per_week: number | null; is_unlimited: boolean }) {
+  if (plan.is_unlimited) return null
+  const match = plan.name.match(/\d+/)
+  if (match) return Number(match[0])
+  return plan.classes_per_week ? plan.classes_per_week * 4 : 0
+}
+
 function getCreateUserMessage(message = '') {
   const normalizedMessage = message.toLowerCase()
 
@@ -155,12 +162,30 @@ serve(async (req) => {
   }
 
   if (planId) {
+    const { data: plan, error: planError } = await adminClient
+      .from('plans')
+      .select('id, name, classes_per_week, is_unlimited')
+      .eq('id', planId)
+      .maybeSingle()
+
+    if (planError || !plan) {
+      return jsonResponse({ ok: false, message: 'Alumno creado, pero el plan inicial no existe.' }, 404)
+    }
+
     const { error: membershipError } = await adminClient.from('memberships').insert({
       profile_id: createdUser.user.id,
       plan_id: planId,
       start_date: membershipStartDate,
       end_date: membershipEndDate,
+      expires_at: membershipEndDate,
       status: 'active',
+      classes_total: getPlanClasses(plan),
+      classes_used: 0,
+      payment_status: 'paid',
+      payment_provider: 'manual_admin',
+      payment_reference: `initial-${createdUser.user.id}-${Date.now()}`,
+      activated_at: new Date().toISOString(),
+      auto_activated: false,
       notes: internalNotes || null,
     })
 

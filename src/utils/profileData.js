@@ -51,14 +51,7 @@ export async function loadSupabaseProfileData(profileId) {
       .select('id, full_name, email, phone, birth_date, level, role, status')
       .eq('id', profileId)
       .maybeSingle(),
-    supabase
-      .from('memberships')
-      .select('id, start_date, end_date, status, notes, plan:plans(id, name, price, classes_per_week, is_unlimited)')
-      .eq('profile_id', profileId)
-      .eq('status', 'active')
-      .order('end_date', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.rpc('get_active_membership', { target_profile_id: profileId }),
     supabase
       .from('reservations')
       .select('id, reservation_date, status, created_at, class_schedule:class_schedule(id, day_of_week, time, class_name, coach, max_spots)')
@@ -83,7 +76,7 @@ export async function loadSupabaseProfileData(profileId) {
     ok: true,
     data: {
       profile: profileResult.data,
-      membership: membershipResult.data,
+      membership: Array.isArray(membershipResult.data) ? membershipResult.data[0] : membershipResult.data,
       reservations: reservationsResult.data ?? [],
       records: recordsResult.data ?? [],
     },
