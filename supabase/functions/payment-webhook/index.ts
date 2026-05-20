@@ -79,8 +79,14 @@ serve(async (req) => {
     if (adminProfile?.role !== 'admin' || adminProfile?.status !== 'active') {
       return jsonResponse({ ok: false, message: 'Solo admin puede simular pagos.' }, 403)
     }
-  } else if (webhookSecret && req.headers.get('x-kupan-webhook-secret') !== webhookSecret) {
-    return jsonResponse({ ok: false, message: 'Firma de webhook invalida.' }, 401)
+  } else {
+    if (!webhookSecret) {
+      return jsonResponse({ ok: false, message: 'PAYMENT_WEBHOOK_SECRET no esta configurado. No se aceptan pagos reales sin secreto.' }, 500)
+    }
+
+    if (req.headers.get('x-kupan-webhook-secret') !== webhookSecret) {
+      return jsonResponse({ ok: false, message: 'Firma de webhook invalida.' }, 401)
+    }
   }
 
   const { data: existingMembership } = await adminClient

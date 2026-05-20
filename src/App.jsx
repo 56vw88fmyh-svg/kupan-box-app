@@ -6,6 +6,7 @@ import { AppShell } from './components/AppShell.jsx'
 import { LoadingScreen } from './components/LoadingScreen.jsx'
 import { MotionPage } from './components/Motion.jsx'
 import { pages } from './data/pages.js'
+import { isSupabaseConfigured, supabase } from './lib/supabase.js'
 import { getCurrentSupabaseUser, loginWithSupabase, logoutFromSupabase, registerWithSupabase } from './utils/auth.js'
 import { defaultAdminContent } from './utils/adminContent.js'
 import { loadSharedContent } from './utils/sharedContent.js'
@@ -81,6 +82,23 @@ export default function App() {
 
     return () => {
       isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return undefined
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session?.user) {
+        setCurrentUser(null)
+        return
+      }
+
+      setCurrentUser(await getCurrentSupabaseUser())
+    })
+
+    return () => {
+      listener.subscription.unsubscribe()
     }
   }, [])
 

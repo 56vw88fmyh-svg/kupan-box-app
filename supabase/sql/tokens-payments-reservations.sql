@@ -12,6 +12,21 @@ alter table public.memberships
   add column if not exists activated_at timestamptz,
   add column if not exists auto_activated boolean not null default false;
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'memberships_exact_30_day_cycle_chk'
+      and conrelid = 'public.memberships'::regclass
+  ) then
+    alter table public.memberships
+      add constraint memberships_exact_30_day_cycle_chk
+      check (end_date = start_date + 30)
+      not valid;
+  end if;
+end $$;
+
 alter table public.reservations
   add column if not exists membership_id uuid references public.memberships(id),
   add column if not exists token_charged boolean not null default false,
@@ -170,7 +185,7 @@ begin
   end if;
 
   if active_membership.activated_at is not null
-    and active_membership.activated_at::date + interval '30 days' <= current_date then
+    and active_membership.activated_at::date + interval '30 days' < current_date then
     raise exception 'Tu plan vencio. Los tokens no utilizados no son acumulables.';
   end if;
 
@@ -416,26 +431,14 @@ with check (public.is_admin());
 
 drop policy if exists "Students can call own reservation insert through rpc" on public.reservations;
 drop policy if exists "Students can create own reservations" on public.reservations;
-create policy "Students can create own reservations"
-on public.reservations
-for insert
-to authenticated
-with check (
-  profile_id = auth.uid()
-  and status = 'reserved'
-  and membership_id in (
-    select id from public.get_active_membership(auth.uid())
-  )
-);
-
 drop policy if exists "Students can cancel own reservations" on public.reservations;
 drop policy if exists "Students can cancel own reservations only" on public.reservations;
-create policy "Students can cancel own reservations"
+drop policy if exists "Students can read own reservations with tokens" on public.reservations;
+create policy "Students can read own reservations with tokens"
 on public.reservations
-for update
+for select
 to authenticated
-using (profile_id = auth.uid() and status = 'reserved')
-with check (profile_id = auth.uid() and status = 'cancelled');
+using (profile_id = auth.uid() or public.is_admin());
 
 drop policy if exists "Admins can manage reservations with tokens" on public.reservations;
 create policy "Admins can manage reservations with tokens"
@@ -444,3 +447,7 @@ for all
 to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+-- Los alumnos NO tienen policy de insert/update/delete directa sobre reservations.
+-- Deben reservar/cancelar solo mediante public.reserve_class() y public.cancel_reservation(),
+-- para que el cobro/devolucion de tokens sea transaccional y auditable.

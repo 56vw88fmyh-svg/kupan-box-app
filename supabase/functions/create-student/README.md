@@ -63,7 +63,6 @@ const { data, error } = await supabase.functions.invoke('create-student', {
     internal_notes: 'Alumno creado desde panel admin',
     plan_id: 'UUID_DEL_PLAN',
     membership_start_date: '2026-05-20',
-    membership_end_date: '2026-06-20',
   },
 })
 

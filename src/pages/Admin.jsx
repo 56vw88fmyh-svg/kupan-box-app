@@ -377,7 +377,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     event.preventDefault()
     const selectedPlan = adminData.plans.find((plan) => plan.id === membershipDraft.plan_id)
     const startDate = membershipDraft.start_date || new Date().toISOString().slice(0, 10)
-    const endDate = membershipDraft.end_date || addDays(startDate, 30)
+    const endDate = addDays(startDate, 30)
     const payload = {
       profile_id: membershipDraft.profile_id,
       plan_id: membershipDraft.plan_id,
@@ -445,8 +445,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const payload = {
       plan_id: membershipEditDraft.plan_id,
       start_date: membershipEditDraft.start_date,
-      end_date: membershipEditDraft.end_date,
-      expires_at: membershipEditDraft.end_date,
+      end_date: addDays(membershipEditDraft.start_date, 30),
+      expires_at: addDays(membershipEditDraft.start_date, 30),
       status: membershipEditDraft.status,
       classes_total: membershipEditDraft.classes_total === '' ? null : Number(membershipEditDraft.classes_total),
       classes_used: Number(membershipEditDraft.classes_used ?? 0),
@@ -662,8 +662,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       return
     }
 
-    if (studentDraft.plan_id && (!studentDraft.membership_start_date || !studentDraft.membership_end_date)) {
-      setMessage('Si asignas plan inicial, agrega fecha de inicio y vencimiento.')
+    if (studentDraft.plan_id && !studentDraft.membership_start_date) {
+      setMessage('Si asignas plan inicial, agrega fecha de inicio. El vencimiento se calcula automaticamente a 30 dias.')
       return
     }
 
@@ -681,7 +681,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         internal_notes: studentDraft.internal_notes || null,
         plan_id: studentDraft.plan_id || null,
         membership_start_date: studentDraft.membership_start_date || null,
-        membership_end_date: studentDraft.membership_end_date || null,
+        membership_end_date: studentDraft.membership_start_date ? addDays(studentDraft.membership_start_date, 30) : null,
       },
     })
 
@@ -824,7 +824,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
                 {adminData.plans.filter((plan) => plan.active).map((plan) => <option key={plan.id} className="bg-kupan-black" value={plan.id}>{plan.name}</option>)}
               </SelectField>
               <Field label="Inicio plan" type="date" value={studentDraft.membership_start_date} onChange={(value) => setStudentDraft((current) => ({ ...current, membership_start_date: value }))} />
-              <Field label="Vencimiento plan" type="date" value={studentDraft.membership_end_date} onChange={(value) => setStudentDraft((current) => ({ ...current, membership_end_date: value }))} />
+              <Field label="Vencimiento plan" type="date" value={studentDraft.membership_start_date ? addDays(studentDraft.membership_start_date, 30) : ''} onChange={() => {}} />
             </div>
             <TextArea label="Observaciones internas" value={studentDraft.internal_notes} onChange={(value) => setStudentDraft((current) => ({ ...current, internal_notes: value }))} />
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
@@ -933,7 +933,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
               {adminData.plans.map((plan) => <option key={plan.id} className="bg-kupan-black" value={plan.id}>{plan.name}</option>)}
             </SelectField>
             <Field label="Inicio" type="date" value={membershipDraft.start_date} required onChange={(value) => setMembershipDraft((current) => ({ ...current, start_date: value, end_date: current.end_date || addDays(value, 30) }))} />
-            <Field label="Vencimiento" type="date" value={membershipDraft.end_date || addDays(membershipDraft.start_date, 30)} required onChange={(value) => setMembershipDraft((current) => ({ ...current, end_date: value }))} />
+            <Field label="Vencimiento" type="date" value={addDays(membershipDraft.start_date, 30)} required onChange={() => {}} />
             <Field label="Tokens del plan" type="number" value={membershipDraft.classes_total} onChange={(value) => setMembershipDraft((current) => ({ ...current, classes_total: value }))} />
             <SelectField label="Pago" value={membershipDraft.payment_status} onChange={(value) => setMembershipDraft((current) => ({ ...current, payment_status: value }))}>
               {['pending', 'paid', 'failed', 'refunded'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
@@ -963,7 +963,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
                 {['active', 'expired', 'paused', 'cancelled'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
               </SelectField>
               <Field label="Inicio" type="date" value={membershipEditDraft.start_date} required onChange={(value) => setMembershipEditDraft((current) => ({ ...current, start_date: value }))} />
-              <Field label="Vencimiento" type="date" value={membershipEditDraft.end_date} required onChange={(value) => setMembershipEditDraft((current) => ({ ...current, end_date: value }))} />
+              <Field label="Vencimiento" type="date" value={addDays(membershipEditDraft.start_date, 30)} required onChange={() => {}} />
               <Field label="Tokens totales" type="number" value={membershipEditDraft.classes_total} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, classes_total: value }))} />
               <Field label="Tokens usados" type="number" value={membershipEditDraft.classes_used} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, classes_used: value }))} />
               <SelectField label="Pago" value={membershipEditDraft.payment_status} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, payment_status: value }))}>

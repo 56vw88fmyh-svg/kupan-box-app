@@ -111,15 +111,14 @@ serve(async (req) => {
   const internalNotes = cleanText(body.internal_notes)
   const planId = cleanText(body.plan_id)
   const membershipStartDate = cleanText(body.membership_start_date)
-  const membershipEndDate = cleanText(body.membership_end_date)
   const temporaryPassword = cleanText(body.temporary_password) || generatePassword()
 
   if (!fullName || !email || !birthDate || !level || !status) {
     return jsonResponse({ ok: false, message: 'Nombre, email, fecha de nacimiento, nivel y estado son obligatorios.' }, 400)
   }
 
-  if (planId && (!membershipStartDate || !membershipEndDate)) {
-    return jsonResponse({ ok: false, message: 'Para asignar plan inicial debes enviar inicio y vencimiento.' }, 400)
+  if (planId && !membershipStartDate) {
+    return jsonResponse({ ok: false, message: 'Para asignar plan inicial debes enviar fecha de inicio.' }, 400)
   }
 
   const { data: createdUser, error: createUserError } = await adminClient.auth.admin.createUser({
@@ -162,6 +161,10 @@ serve(async (req) => {
   }
 
   if (planId) {
+    const endDate = new Date(`${membershipStartDate}T00:00:00`)
+    endDate.setDate(endDate.getDate() + 30)
+    const membershipEndDate = endDate.toISOString().slice(0, 10)
+
     const { data: plan, error: planError } = await adminClient
       .from('plans')
       .select('id, name, classes_per_week, is_unlimited')
