@@ -8,8 +8,6 @@ import {
   wod,
 } from '../data/mockData.js'
 
-export const ADMIN_CONTENT_STORAGE_KEY = 'kupan-admin-content'
-
 export const defaultAppText = {
   homeEyebrow: 'Entrena fuerte, entrena acompañado',
   homeTitle: 'Reserva tu clase y ven a darlo todo.',
@@ -47,16 +45,6 @@ function normalizeAdminContent(content) {
   }
 }
 
-export function loadAdminContent() {
-  try {
-    const storedContent = window.localStorage.getItem(ADMIN_CONTENT_STORAGE_KEY)
-    if (!storedContent) return defaultAdminContent
-    return normalizeAdminContent(JSON.parse(storedContent))
-  } catch {
-    return defaultAdminContent
-  }
-}
-
-export function saveAdminContent(content) {
-  window.localStorage.setItem(ADMIN_CONTENT_STORAGE_KEY, JSON.stringify(content))
+export function getDefaultAdminContent() {
+  return normalizeAdminContent(defaultAdminContent)
 }

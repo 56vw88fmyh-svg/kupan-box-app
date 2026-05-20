@@ -1,171 +1,135 @@
 # KUPAN
 
-App web progresiva para el box de CrossFit KUPAN. Funciona como sitio web instalable en celular y navegador, con secciones de inicio, horarios, reservas, WOD del día, planes, comunidad y perfil.
+App web progresiva para el box de CrossFit KUPAN. Incluye reservas, horarios, WOD del día, planes, comunidad, perfil de alumno, PRs y panel admin conectado a Supabase.
 
-## En Simple
+## Estado Actual
 
-Este proyecto es la app de KUPAN lista para publicarse en internet. Para subirla a Vercel o Netlify no necesitas configurar servidores: esas plataformas leen el proyecto, ejecutan el comando de construcción y publican la carpeta final automáticamente.
+- Frontend: React + Vite + Tailwind CSS.
+- Backend: Supabase Auth, tablas con RLS, RPC SQL y Edge Function `create-student`.
+- PWA instalable con manifest, iconos y service worker.
+- Deploy listo para Vercel y Netlify.
 
-## Qué Incluye
+## Variables De Entorno
 
-- Diseño mobile-first.
-- PWA instalable.
-- Navegación inferior tipo app móvil con rutas reales de React Router.
-- Datos editables sin backend, guardados en el navegador.
-- Flujo local de reserva de clases con persistencia en `localStorage`.
-- Planes con links de pago y WhatsApp.
-- Panel admin temporal protegido con clave simple.
-- Login y registro local de usuarios sin backend.
-- Configuración para Vercel y Netlify.
-
-## Requisitos
-
-Necesitas tener instalado:
-
-- Node.js 20 o superior
-- npm
-
-Para revisar si lo tienes:
+Crea `.env.local` a partir de `.env.example`:
 
 ```bash
-node -v
-npm -v
+VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+VITE_SUPABASE_ANON_KEY=tu_clave_anon_publica
 ```
 
-## Instalar El Proyecto
+No guardes `SUPABASE_SERVICE_ROLE_KEY` en React, Vercel, Netlify ni `.env.local`.
+Esa llave se configura solo como secreto de Supabase Edge Functions:
 
-Abre una terminal en la carpeta del proyecto y ejecuta:
+```bash
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=TU_SERVICE_ROLE_KEY
+```
+
+## Ejecutar Local
 
 ```bash
 npm install
-```
-
-Esto descarga las dependencias necesarias.
-
-## Ver La App En Tu Computador
-
-```bash
 npm run dev
 ```
 
-Luego abre la URL que aparezca en la terminal. Normalmente será:
+Luego abre la URL que indique la terminal, normalmente:
 
 ```bash
 http://localhost:5173/
 ```
 
-## Revisar Antes De Publicar
-
-Ejecuta:
-
-```bash
-npm run check
-```
-
-Ese comando revisa errores y crea la versión final de producción.
-
-También puedes ejecutar los pasos por separado:
+## Verificar
 
 ```bash
 npm run lint
 npm run build
 ```
 
-## Versión De Producción
-
-Para crear la versión final:
+O todo junto:
 
 ```bash
-npm run build
+npm run check
 ```
 
-La carpeta publicada será:
+## Supabase
+
+Ejecuta en Supabase SQL Editor los scripts SQL del proyecto:
 
 ```text
-dist/
+supabase/sql/app-settings.sql
+supabase/sql/birthdays-functions.sql
 ```
 
-## Probar La Versión Final
+Además, el esquema principal debe tener:
 
-Después de construir:
+- RLS activo en tablas públicas.
+- `profiles`, `plans`, `memberships`, `class_schedule`, `reservations`, `personal_records`, `wod`, `community_posts`.
+- Funciones `is_admin()`, `has_active_membership()`, `available_spots()`, `birthdays_this_month()`.
+- Trigger `handle_new_user()` para crear `profiles`.
+
+## Edge Function
+
+La función segura para crear alumnos está en:
+
+```text
+supabase/functions/create-student/index.ts
+```
+
+Deploy:
 
 ```bash
-npm run preview
+supabase login
+supabase link --project-ref TU_PROJECT_REF
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=TU_SERVICE_ROLE_KEY
+supabase functions deploy create-student
 ```
-
-Abre la URL que indique la terminal.
 
 ## Publicar En Vercel
 
-1. Sube este proyecto a GitHub.
-2. Entra a Vercel.
-3. Elige **Add New Project**.
-4. Selecciona el repositorio de KUPAN.
-5. Vercel debería detectar Vite automáticamente.
-6. Revisa que diga:
+1. Sube el proyecto a GitHub.
+2. Crea proyecto en Vercel.
+3. Configura:
 
 ```text
 Build Command: npm run build
 Output Directory: dist
 ```
 
-7. Presiona **Deploy**.
+4. Agrega variables:
 
-El archivo `vercel.json` ya deja lista la configuración básica.
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+```
+
+5. Deploy.
+
+`vercel.json` ya incluye rewrite a `index.html` para que React Router funcione al recargar rutas como `/admin`, `/perfil` o `/reservas`.
 
 ## Publicar En Netlify
 
-1. Sube este proyecto a GitHub.
-2. Entra a Netlify.
-3. Elige **Add new site**.
-4. Conecta el repositorio de KUPAN.
-5. Revisa que diga:
+Config:
 
 ```text
 Build command: npm run build
 Publish directory: dist
 ```
 
-6. Presiona **Deploy**.
+`netlify.toml` ya incluye redirect SPA a `index.html`.
 
-El archivo `netlify.toml` ya deja lista la configuración básica.
+## PWA
 
-## Probar Que La PWA Es Instalable
-
-Cuando la app esté publicada o corriendo en local:
-
-1. Abre la app en Chrome.
-2. Abre DevTools.
-3. Ve a **Application > Manifest**.
-4. Revisa que aparezca el nombre **KUPAN** y sus iconos.
-5. En Chrome móvil, abre la web y busca **Instalar app** o **Agregar a pantalla principal**.
-
-Importante: la instalación PWA funciona mejor en una URL segura `https://`, como Vercel o Netlify.
-
-## Estructura Del Proyecto
+Archivos:
 
 ```text
-src/
-  components/   Componentes compartidos
-  data/         Datos simulados
-  pages/        Páginas principales
-  App.jsx       Navegación y estado general
-  main.jsx      Entrada de React y registro PWA
-  styles.css    Tailwind y estilos base
-public/
-  icons/        Iconos temporales PWA
-  brand/        Copia pública de logos para PWA y navegador
-  manifest.webmanifest
-  sw.js
-  kupan-icon.svg
+public/manifest.webmanifest
+public/sw.js
+public/icons/
 ```
 
-## Notas Importantes
+Para probar instalación:
 
-- Las reservas se guardan en `localStorage`, por eso se mantienen al recargar en el mismo navegador.
-- Las cuentas de usuario y la sesión también se guardan temporalmente en `localStorage`.
-- El panel admin también guarda cambios en `localStorage`.
-- No hay backend todavía.
-- La autenticación local es solo para prototipo; las contraseñas deben moverse a un sistema seguro antes de producción.
-- La clave admin actual es temporal y no reemplaza autenticación real.
-- Para producción real, el siguiente paso natural es conectar usuarios, pagos, reservas y contenido admin a una base de datos.
+1. Publica en HTTPS, por ejemplo Vercel.
+2. Abre Chrome DevTools.
+3. Revisa `Application > Manifest`.
+4. En móvil, abre la web y usa “Agregar a pantalla principal”.

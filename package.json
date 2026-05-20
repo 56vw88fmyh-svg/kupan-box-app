@@ -11,6 +11,7 @@
     "check": "eslint . && vite build"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.0",
     "framer-motion": "^12.39.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

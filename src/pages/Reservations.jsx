@@ -1,25 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion as Motion } from 'framer-motion'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
-import { weeklySchedule as defaultWeeklySchedule } from '../data/mockData.js'
 import { createWhatsAppUrl, whatsappMessages } from '../utils/whatsapp.js'
-import { getClassKey, withReservationState } from '../utils/reservations.js'
+import {
+  cancelSupabaseReservation,
+  createSupabaseReservation,
+  formatReservationDate,
+  loadReservationData,
+} from '../utils/supabaseReservations.js'
 
-function getClassesWithReservationState(userReservations, weeklySchedule, currentUser) {
-  return weeklySchedule.flatMap((day) =>
-    ['AM', 'PM'].flatMap((block) =>
-      day.blocks[block]
-        .map((item) => ({
-          ...item,
-          block,
-          day: day.label,
-          dayId: day.id,
-        }))
-        .map((item) => withReservationState(item, userReservations, currentUser?.id)),
-    ),
-  )
-}
+const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
 
 function ReservationCard({ item, isSelected, onSelect }) {
   const maxSpots = item.maxSpots ?? 12
@@ -37,12 +28,13 @@ function ReservationCard({ item, isSelected, onSelect }) {
       transition={{ duration: 0.16 }}
       className={`k-panel w-full overflow-hidden p-4 text-left transition ${
         isSelected ? 'border-kupan-ember bg-kupan-ember/15 shadow-glow' : 'hover:border-kupan-flame/60'
-      } ${isDisabled ? 'opacity-70' : ''
-      }`}
+      } ${isDisabled ? 'opacity-70' : ''}`}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">{item.day} · {item.block}</p>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">
+            {item.day} · {formatReservationDate(item.reservationDate)} · {item.block}
+          </p>
           <p className="mt-2 text-3xl font-black leading-none text-white">{item.time}</p>
           <h3 className="mt-2 text-base font-black uppercase text-white">{item.name}</h3>
           <p className="mt-1 text-sm font-semibold text-white/60">Coach {item.coach}</p>
@@ -57,15 +49,16 @@ function ReservationCard({ item, isSelected, onSelect }) {
       </div>
       <div className={`mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-black uppercase ${
         isSelected ? 'bg-kupan-ember text-white' : 'border border-white/15 bg-white/10 text-white'
-      }`}>
+      }`}
+      >
         {item.isFull ? 'Clase completa' : item.isReserved ? 'Ya reservada' : isSelected ? 'Lista para confirmar' : 'Reservar clase'}
       </div>
     </Motion.button>
   )
 }
 
-function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin }) {
-  const canConfirm = selectedClass && !selectedClass.isFull && !selectedClass.isReserved
+function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasActiveMembership, membership }) {
+  const canConfirm = selectedClass && !selectedClass.isFull && !selectedClass.isReserved && hasActiveMembership
 
   if (!selectedClass) {
     return (
@@ -85,7 +78,7 @@ function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin }) {
         <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Reserva tu cupo</p>
         <h2 className="mt-2 text-3xl font-black uppercase text-white">{selectedClass.name}</h2>
         <p className="mt-2 text-sm text-white/60">
-          {selectedClass.day} · {selectedClass.time} · Coach {selectedClass.coach}
+          {selectedClass.day} · {formatReservationDate(selectedClass.reservationDate)} · {selectedClass.time} · Coach {selectedClass.coach}
         </p>
       </div>
       <div className="grid grid-cols-3 gap-0 border-b border-white/10">
@@ -100,21 +93,21 @@ function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin }) {
         <div className="border-l border-white/10 p-4">
           <p className="text-xs font-black uppercase text-white/60">Estado</p>
           <p className="mt-1 text-lg font-black text-kupan-flame">
-            {selectedClass.isFull ? 'Completa' : selectedClass.isReserved ? 'Ya reservada' : 'A tiempo'}
+            {selectedClass.isFull ? 'Completa' : selectedClass.isReserved ? 'Ya reservada' : 'Disponible'}
           </p>
         </div>
       </div>
       <div className="p-5">
         <p className="mb-4 text-sm leading-6 text-white/70">
-          {canConfirm
-            ? currentUser
+          {currentUser
+            ? hasActiveMembership
               ? 'Confirma tu cupo y queda listo para entrenar fuerte con la comunidad.'
-              : 'Inicia sesión para tomar este cupo y mantener tu reserva guardada.'
-            : 'Esta clase no permite nuevas reservas desde la app en este momento.'}
+              : `Para reservar necesitas membresía activa. Estado actual: ${membership?.status ?? 'sin plan activo'}.`
+            : 'Inicia sesión para tomar este cupo y mantener tu reserva guardada.'}
         </p>
         {currentUser ? (
           <button type="button" className={`w-full ${canConfirm ? 'k-button' : 'k-button-secondary opacity-60'}`} disabled={!canConfirm} onClick={() => onConfirm(selectedClass)}>
-            {selectedClass.isFull ? 'Clase completa' : selectedClass.isReserved ? 'Ya tienes esta reserva' : 'Confirmar reserva'}
+            {!hasActiveMembership ? 'Membresía requerida' : selectedClass.isFull ? 'Clase completa' : selectedClass.isReserved ? 'Ya tienes esta reserva' : 'Confirmar reserva'}
           </button>
         ) : (
           <button type="button" className="k-button w-full" onClick={onGoLogin}>
@@ -137,7 +130,7 @@ function SuccessMessage({ reservation, onGoProfile, onNewReservation }) {
       <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Reserva lista</p>
       <h2 className="mt-2 text-3xl font-black uppercase text-white">Nos vemos en el box.</h2>
       <p className="mt-2 text-sm leading-6 text-white/80">
-        Tu cupo quedó tomado para {reservation.name}, {reservation.day} a las {reservation.time}. Llega con ganas, acá entrenamos acompañados.
+        Tu cupo quedó tomado para {reservation.name}, {reservation.day} {formatReservationDate(reservation.reservationDate)} a las {reservation.time}.
       </p>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <button type="button" className="k-button" onClick={onGoProfile}>
@@ -167,9 +160,11 @@ function ReservationList({ reservations, onCancelReservation }) {
         <MotionCard key={item.id} as="article" className="k-panel p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">{item.day} · {item.block}</p>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">
+                {item.day} · {formatReservationDate(item.reservationDate)} · {item.block}
+              </p>
               <p className="font-black uppercase text-white">{item.name}</p>
-              <p className="text-sm text-white/60">{item.day} · {item.time} · Coach {item.coach}</p>
+              <p className="text-sm text-white/60">{item.time} · Coach {item.coach}</p>
               <span className="k-pill mt-3 inline-flex text-kupan-flame">{item.status}</span>
             </div>
             <button type="button" className="k-button-secondary shrink-0 px-3 py-2 text-xs" onClick={() => onCancelReservation(item.id)}>
@@ -182,32 +177,18 @@ function ReservationList({ reservations, onCancelReservation }) {
   )
 }
 
-export function Reservations({
-  pendingReservation,
-  currentUser,
-  userReservations,
-  onConfirmReservation,
-  onCancelReservation,
-  onClearPendingReservation,
-  setActivePage,
-  appContent,
-}) {
+export function Reservations({ pendingReservation, currentUser, onClearPendingReservation, setActivePage, appContent }) {
   const text = appContent.appText
-  const weeklySchedule = Array.isArray(appContent?.weeklySchedule) && appContent.weeklySchedule.length > 0
-    ? appContent.weeklySchedule
-    : defaultWeeklySchedule
-  const availableClasses = useMemo(() => getClassesWithReservationState(userReservations, weeklySchedule, currentUser), [currentUser, userReservations, weeklySchedule])
-  const userActiveReservations = currentUser
-    ? userReservations.filter((reservation) => reservation.userId === currentUser.id)
-    : []
+  const [availableClasses, setAvailableClasses] = useState([])
+  const [userActiveReservations, setUserActiveReservations] = useState([])
+  const [membership, setMembership] = useState(null)
+  const [hasActiveMembership, setHasActiveMembership] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [reservationMessage, setReservationMessage] = useState('')
   const [selectedDayId, setSelectedDayId] = useState('all')
-  const pendingClass = useMemo(
-    () => (pendingReservation ? withReservationState(pendingReservation, userReservations, currentUser?.id) : null),
-    [currentUser?.id, pendingReservation, userReservations],
-  )
-  const [selectedClass, setSelectedClass] = useState(pendingClass)
+  const [selectedClass, setSelectedClass] = useState(null)
   const [successReservation, setSuccessReservation] = useState(null)
-  const selectedClassKey = selectedClass ? getClassKey(selectedClass) : null
+  const selectedClassKey = selectedClass ? `${selectedClass.classScheduleId}-${selectedClass.reservationDate}` : null
   const filteredClasses = selectedDayId === 'all'
     ? availableClasses
     : availableClasses.filter((classItem) => classItem.dayId === selectedDayId)
@@ -215,28 +196,74 @@ export function Reservations({
   const totalSpots = availableClasses.reduce((sum, item) => sum + item.spots, 0)
   const reservedCount = userActiveReservations.length
 
-  useEffect(() => {
-    setSelectedClass(pendingClass)
-  }, [pendingClass])
+  const refreshReservations = useCallback(async () => {
+    setIsLoading(true)
+    const result = await loadReservationData(currentUser?.id)
+    setIsLoading(false)
+
+    if (!result.ok) {
+      setReservationMessage(result.message)
+      return
+    }
+
+    setAvailableClasses(result.classes)
+    setUserActiveReservations(result.reservations.map((reservation) => ({
+      id: reservation.id,
+      classScheduleId: reservation.class_schedule_id,
+      reservationDate: reservation.reservation_date,
+      status: reservation.status,
+      dayId: String(reservation.class_schedule?.day_of_week),
+      day: reservation.class_schedule?.day_of_week ? dayNames[reservation.class_schedule.day_of_week] : '',
+      block: reservation.class_schedule?.time && Number(reservation.class_schedule.time.slice(0, 2)) < 12 ? 'AM' : 'PM',
+      time: reservation.class_schedule?.time?.slice(0, 5) ?? '',
+      name: reservation.class_schedule?.class_name ?? 'Clase KUPAN',
+      coach: reservation.class_schedule?.coach ?? 'Coach KUPAN',
+    })))
+    setMembership(result.membership)
+    setHasActiveMembership(result.hasActiveMembership)
+    setReservationMessage('')
+  }, [currentUser?.id])
 
   useEffect(() => {
-    if (!selectedClassKey) return
+    refreshReservations()
+  }, [refreshReservations])
 
-    const updatedClass = availableClasses.find((classItem) => getClassKey(classItem) === selectedClassKey)
-    setSelectedClass(updatedClass?.isReserved || updatedClass?.isFull ? null : updatedClass ?? null)
-  }, [availableClasses, selectedClassKey])
+  useEffect(() => {
+    if (!pendingReservation) return
+    const matchedClass = availableClasses.find((classItem) => (
+      classItem.time === pendingReservation.time &&
+      classItem.name === pendingReservation.name &&
+      classItem.day === pendingReservation.day
+    ))
+    setSelectedClass(matchedClass ?? null)
+  }, [availableClasses, pendingReservation])
 
   function handleSelect(classItem) {
     if (classItem.isFull || classItem.isReserved) return
     setSelectedClass(classItem)
     setSuccessReservation(null)
+    setReservationMessage('')
   }
 
-  function handleConfirm(classItem) {
-    const confirmed = onConfirmReservation(classItem)
-    if (!confirmed) return
-    setSuccessReservation(confirmed)
+  async function handleConfirm(classItem) {
+    const result = await createSupabaseReservation(currentUser?.id, classItem, hasActiveMembership)
+    if (!result.ok) {
+      setReservationMessage(result.message)
+      return
+    }
+    setSuccessReservation(result.reservation)
     setSelectedClass(null)
+    refreshReservations()
+  }
+
+  async function handleCancelReservation(reservationId) {
+    const result = await cancelSupabaseReservation(reservationId)
+    if (!result.ok) {
+      setReservationMessage(result.message)
+      return
+    }
+    setReservationMessage(result.message)
+    refreshReservations()
   }
 
   function handleNewReservation() {
@@ -245,15 +272,15 @@ export function Reservations({
     setSuccessReservation(null)
   }
 
+  const dayFilters = useMemo(() => [...new Map(availableClasses.map((classItem) => [classItem.dayId, classItem])).values()], [availableClasses])
+
   return (
     <div className="space-y-6">
       <MotionCard as="section" className="k-card overflow-hidden p-0">
         <div className="border-b border-white/10 bg-black/25 p-5">
           <p className="k-pill inline-flex text-kupan-flame">Reserva KUPAN</p>
           <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">{text.reservationsTitle}</h2>
-          <p className="mt-3 text-sm leading-6 text-white/60">
-            {text.reservationsBody}
-          </p>
+          <p className="mt-3 text-sm leading-6 text-white/60">{text.reservationsBody}</p>
           <a className="k-button-secondary mt-5 w-full" href={createWhatsAppUrl(whatsappMessages.reservation)} target="_blank" rel="noreferrer">
             Reservar por WhatsApp
           </a>
@@ -274,16 +301,21 @@ export function Reservations({
         </div>
       </MotionCard>
 
-      <SuccessMessage
-        reservation={successReservation}
-        onGoProfile={() => setActivePage('profile')}
-        onNewReservation={handleNewReservation}
-      />
+      <SuccessMessage reservation={successReservation} onGoProfile={() => setActivePage('profile')} onNewReservation={handleNewReservation} />
 
-      <BookingSummary selectedClass={selectedClass} currentUser={currentUser} onConfirm={handleConfirm} onGoLogin={() => setActivePage('login')} />
+      <BookingSummary
+        selectedClass={selectedClass}
+        currentUser={currentUser}
+        onConfirm={handleConfirm}
+        onGoLogin={() => setActivePage('login')}
+        hasActiveMembership={hasActiveMembership}
+        membership={membership}
+      />
 
       <section>
         <SectionTitle eyebrow="Disponibles" title="Clases para entrar al WOD" />
+        {isLoading ? <p className="k-panel mb-4 p-4 text-sm font-bold text-white/60">Cargando cupos reales desde Supabase...</p> : null}
+        {reservationMessage ? <p className="mb-4 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{reservationMessage}</p> : null}
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
           <button
             type="button"
@@ -295,15 +327,15 @@ export function Reservations({
           >
             Todos
           </button>
-          {weeklySchedule.map((day) => (
+          {dayFilters.map((day) => (
             <button
-              key={day.id}
+              key={day.dayId}
               type="button"
-              aria-pressed={selectedDayId === day.id}
+              aria-pressed={selectedDayId === day.dayId}
               className={`min-w-16 rounded-lg px-4 py-3 text-sm font-black uppercase transition ${
-                selectedDayId === day.id ? 'bg-kupan-ember text-white shadow-glow' : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
+                selectedDayId === day.dayId ? 'bg-kupan-ember text-white shadow-glow' : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
               }`}
-              onClick={() => setSelectedDayId(day.id)}
+              onClick={() => setSelectedDayId(day.dayId)}
             >
               {day.short}
             </button>
@@ -312,18 +344,16 @@ export function Reservations({
         <div className="grid gap-3 md:grid-cols-2">
           {filteredClasses.map((item, index) => (
             <Motion.div
-              key={`${item.dayId}-${item.time}-${item.name}`}
+              key={`${item.classScheduleId}-${item.reservationDate}`}
               initial={{ opacity: 0, y: 12 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.12 }}
               transition={{ duration: 0.22, delay: Math.min(index * 0.025, 0.16) }}
             >
               <ReservationCard
-              item={item}
-              isSelected={
-                selectedClassKey === getClassKey(item)
-              }
-              onSelect={handleSelect}
+                item={item}
+                isSelected={selectedClassKey === `${item.classScheduleId}-${item.reservationDate}`}
+                onSelect={handleSelect}
               />
             </Motion.div>
           ))}
@@ -332,7 +362,7 @@ export function Reservations({
 
       <section>
         <SectionTitle eyebrow="Mis cupos" title="Tu agenda KUPAN" />
-        <ReservationList reservations={userActiveReservations} onCancelReservation={onCancelReservation} />
+        <ReservationList reservations={userActiveReservations} onCancelReservation={handleCancelReservation} />
       </section>
     </div>
   )
