@@ -4,6 +4,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { buildBirthdayGreeting, formatBirthdayDayMonth, loadUpcomingBirthdays } from '../utils/birthdays.js'
 import { defaultAppText } from '../utils/adminContent.js'
 import { saveAppSetting } from '../utils/sharedContent.js'
+import { getCurrentSupabaseUser } from '../utils/auth.js'
 
 const adminTabs = [
   { id: 'overview', label: 'Resumen' },
@@ -194,84 +195,77 @@ function getMembershipTokens(membership) {
   }
 }
 
+const emptyAdminData = {
+  profiles: [],
+  plans: [],
+  memberships: [],
+  reservations: [],
+  wod: [],
+  schedule: [],
+  posts: [],
+  settings: [],
+  birthdays: [],
+  upcomingBirthdays: [],
+  prs: [],
+  tokenMovements: [],
+}
+
+const adminLoaders = [
+  ['alumnos', 'profiles', 'admin_get_profiles'],
+  ['planes', 'plans', 'admin_get_plans'],
+  ['membresias', 'memberships', 'admin_get_memberships'],
+  ['reservas', 'reservations', 'admin_get_reservations'],
+  ['WOD', 'wod', 'admin_get_wod'],
+  ['horarios', 'schedule', 'admin_get_schedule'],
+  ['comunidad', 'posts', 'admin_get_community_posts'],
+  ['textos', 'settings', 'admin_get_app_settings'],
+  ['cumpleanos', 'birthdays', 'birthdays_this_month'],
+  ['PR destacados', 'prs', 'admin_get_personal_records'],
+  ['movimientos de tokens', 'tokenMovements', 'admin_get_token_movements'],
+]
+
+async function runAdminLoader([label, key, rpcName]) {
+  try {
+    const { data, error } = await supabase.rpc(rpcName)
+    if (error) {
+      return { key, label, data: emptyAdminData[key], error: error.message }
+    }
+    return { key, label, data: data ?? emptyAdminData[key], error: null }
+  } catch (error) {
+    return { key, label, data: emptyAdminData[key], error: error.message }
+  }
+}
+
 async function loadAdminData() {
   if (!isSupabaseConfigured || !supabase) {
     return { ok: false, message: 'Supabase aun no esta configurado. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.' }
   }
 
-  const today = new Date().toISOString().slice(0, 10)
-  const [
-    profiles,
-    plans,
-    memberships,
-    reservations,
-    wod,
-    schedule,
-    posts,
-    settings,
-    birthdays,
-    prs,
-    tokenMovements,
-  ] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, email, phone, birth_date, level, role, status, created_at').order('created_at', { ascending: false }),
-    supabase.from('plans').select('id, name, price, classes_per_week, is_unlimited, active, created_at').order('price', { ascending: true }),
-    supabase.from('memberships').select('id, profile_id, plan_id, start_date, end_date, status, notes, classes_total, classes_used, expires_at, payment_status, payment_provider, payment_reference, activated_at, auto_activated, profile:profiles(full_name, email), plan:plans(name, price, classes_per_week, is_unlimited)').order('end_date', { ascending: false }),
-    supabase.from('reservations').select('id, profile_id, class_schedule_id, membership_id, reservation_date, status, token_charged, cancelled_at, created_at, profile:profiles(full_name, email), class_schedule:class_schedule(day_of_week, time, class_name, coach)').gte('reservation_date', today).order('reservation_date', { ascending: true }),
-    supabase.from('wod').select('id, date, title, warmup, strength, workout, time_cap, notes').order('date', { ascending: false }).limit(14),
-    supabase.from('class_schedule').select('id, day_of_week, time, class_name, coach, max_spots, active').order('day_of_week', { ascending: true }).order('time', { ascending: true }),
-    supabase.from('community_posts').select('id, type, title, content, event_date, active, created_at').order('created_at', { ascending: false }),
-    supabase.from('app_settings').select('key, value'),
-    supabase.rpc('birthdays_this_month'),
-    supabase.from('personal_records').select('id, movement, value, unit, record_date, notes, profile:profiles(full_name, email)').order('value', { ascending: false }).limit(20),
-    supabase
-      .from('membership_token_movements')
-      .select('id, membership_id, profile_id, reservation_id, movement_type, quantity, reason, created_at, created_by, profile:profiles!membership_token_movements_profile_id_fkey(full_name, email)')
-      .order('created_at', { ascending: false })
-      .limit(80),
-  ])
+  const settledResults = await Promise.allSettled(adminLoaders.map(runAdminLoader))
+  const data = { ...emptyAdminData }
+  const errors = []
 
-  const queryResults = [
-    ['alumnos', profiles],
-    ['planes', plans],
-    ['membresias', memberships],
-    ['reservas', reservations],
-    ['wod', wod],
-    ['horarios', schedule],
-    ['comunidad', posts],
-    ['cumpleanos', birthdays],
-    ['pr', prs],
-    ['movimientos de tokens', tokenMovements],
-  ]
-  const firstError = queryResults.find(([, result]) => result.error)
-  if (firstError?.error) {
-    const [section, result] = firstError
-    return {
-      ok: false,
-      message: `No pudimos cargar ${section} desde Supabase: ${result.error.message}`,
+  settledResults.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      const [label, key] = adminLoaders[index]
+      errors.push(`No pudimos cargar ${label}: ${result.reason?.message ?? 'Error desconocido'}`)
+      data[key] = emptyAdminData[key]
+      return
     }
-  }
 
-  return {
-    ok: true,
-    data: {
-      profiles: profiles.data ?? [],
-      plans: plans.data ?? [],
-      memberships: memberships.data ?? [],
-      reservations: reservations.data ?? [],
-      wod: wod.data ?? [],
-      schedule: schedule.data ?? [],
-      posts: posts.data ?? [],
-      settings: settings.error ? [] : settings.data ?? [],
-      birthdays: birthdays.data ?? [],
-      upcomingBirthdays: [],
-      prs: prs.data ?? [],
-      tokenMovements: tokenMovements.data ?? [],
-    },
-  }
+    data[result.value.key] = result.value.data
+    if (result.value.error) {
+      errors.push(`No pudimos cargar ${result.value.label}: ${result.value.error}`)
+    }
+  })
+
+  return { ok: true, data, errors }
 }
 
 export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [activeSection, setActiveSection] = useState('overview')
+  const [verifiedUser, setVerifiedUser] = useState(currentUser)
+  const [isCheckingAccess, setIsCheckingAccess] = useState(Boolean(currentUser))
   const [adminData, setAdminData] = useState({
     profiles: [],
     plans: [],
@@ -289,6 +283,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('error')
   const [isLoading, setIsLoading] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState(null)
   const [planDraft, setPlanDraft] = useState(emptyPlan)
   const [membershipDraft, setMembershipDraft] = useState(emptyMembership)
   const [membershipEditDraft, setMembershipEditDraft] = useState(emptyMembershipEdit)
@@ -300,10 +295,37 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [createdCredentials, setCreatedCredentials] = useState(null)
   const [isCreatingStudent, setIsCreatingStudent] = useState(false)
 
-  const isAdmin = currentUser?.role === 'admin'
+  const activeUser = verifiedUser ?? currentUser
+  const isAdmin = activeUser?.role === 'admin'
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function verifyAdminRole() {
+      if (!currentUser?.id) {
+        setVerifiedUser(null)
+        setIsCheckingAccess(false)
+        return
+      }
+
+      setIsCheckingAccess(true)
+      const freshUser = await getCurrentSupabaseUser()
+
+      if (!isMounted) return
+
+      setVerifiedUser(freshUser ?? currentUser)
+      setIsCheckingAccess(false)
+    }
+
+    verifyAdminRole()
+
+    return () => {
+      isMounted = false
+    }
+  }, [currentUser])
 
   const totals = useMemo(() => ({
-    students: adminData.profiles.filter((profile) => profile.role === 'student').length,
+    students: adminData.profiles.length,
     activeMemberships: adminData.memberships.filter((membership) => membership.status === 'active').length,
     reservations: adminData.reservations.filter((reservation) => reservation.status === 'reserved').length,
     plans: adminData.plans.filter((plan) => plan.active).length,
@@ -336,6 +358,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
 
     setAdminData(result.data)
+    setLastUpdated(new Date())
     setTextDraft({
       homeEyebrow: result.data.settings.find((item) => item.key === 'home_eyebrow')?.value ?? defaultAppText.homeEyebrow,
       homeTitle: result.data.settings.find((item) => item.key === 'home_title')?.value ?? defaultAppText.homeTitle,
@@ -348,6 +371,14 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const upcomingBirthdays = await loadUpcomingBirthdays(30)
     if (upcomingBirthdays.ok) {
       setAdminData((current) => ({ ...current, upcomingBirthdays: upcomingBirthdays.birthdays }))
+    }
+
+    if (result.errors?.length) {
+      setMessageType('error')
+      setMessage(result.errors.join(' | '))
+    } else {
+      setMessageType('success')
+      setMessage('Datos actualizados desde Supabase.')
     }
   }
 
@@ -746,7 +777,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     setMessage(`Saludo de cumpleaños copiado para ${birthday.full_name}.`)
   }
 
-  if (!currentUser) {
+  if (!activeUser && !isCheckingAccess) {
     return (
       <section className="k-card p-5">
         <p className="k-pill inline-flex text-kupan-flame">Admin KUPAN</p>
@@ -755,6 +786,16 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         <button type="button" className="k-button mt-5 w-full" onClick={() => setActivePage('login')}>
           Iniciar sesion
         </button>
+      </section>
+    )
+  }
+
+  if (isCheckingAccess) {
+    return (
+      <section className="k-card p-5">
+        <p className="k-pill inline-flex text-kupan-flame">Verificando acceso</p>
+        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Conectando con Supabase.</h2>
+        <p className="mt-3 text-sm leading-6 text-white/60">Estamos revisando tu rol actualizado antes de abrir el panel admin.</p>
       </section>
     )
   }
@@ -791,6 +832,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         <button type="button" className="k-button mt-5 w-full" onClick={refreshData} disabled={isLoading}>
           {isLoading ? 'Actualizando...' : 'Actualizar datos'}
         </button>
+        {lastUpdated ? (
+          <p className="mt-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-white/45">
+            Ultima actualizacion: {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(lastUpdated)}
+          </p>
+        ) : null}
         {message ? (
           <p className={`mt-3 rounded-lg border p-3 text-sm font-bold text-white ${
             messageType === 'success' ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-kupan-flame/30 bg-kupan-flame/10'
