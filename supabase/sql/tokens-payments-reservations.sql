@@ -17,6 +17,45 @@ begin
   if not exists (
     select 1
     from pg_constraint
+    where conname = 'memberships_classes_used_non_negative_chk'
+      and conrelid = 'public.memberships'::regclass
+  ) then
+    alter table public.memberships
+      add constraint memberships_classes_used_non_negative_chk
+      check (classes_used >= 0)
+      not valid;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'memberships_classes_total_non_negative_chk'
+      and conrelid = 'public.memberships'::regclass
+  ) then
+    alter table public.memberships
+      add constraint memberships_classes_total_non_negative_chk
+      check (classes_total is null or classes_total >= 0)
+      not valid;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'memberships_classes_used_not_over_total_chk'
+      and conrelid = 'public.memberships'::regclass
+  ) then
+    alter table public.memberships
+      add constraint memberships_classes_used_not_over_total_chk
+      check (classes_total is null or classes_used <= classes_total)
+      not valid;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
     where conname = 'memberships_exact_30_day_cycle_chk'
       and conrelid = 'public.memberships'::regclass
   ) then
@@ -474,6 +513,311 @@ begin
 end;
 $$;
 
+create or replace function public.admin_activate_membership(
+  target_profile_id uuid,
+  target_plan_id uuid,
+  membership_start_date date,
+  classes_total_override integer default null,
+  initial_classes_used integer default 0,
+  payment_provider_input text default 'manual_admin',
+  payment_reference_input text default null,
+  notes_input text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  plan_record record;
+  membership_record public.memberships%rowtype;
+  total_classes integer;
+  used_classes integer;
+  final_payment_reference text;
+begin
+  if not public.is_admin() then
+    raise exception 'Solo admin activo puede activar membresias.';
+  end if;
+
+  if target_profile_id is null or target_plan_id is null or membership_start_date is null then
+    raise exception 'Selecciona alumno, plan e inicio para activar la membresia.';
+  end if;
+
+  select *
+  into plan_record
+  from public.plans
+  where id = target_plan_id;
+
+  if not found then
+    raise exception 'El plan seleccionado no existe.';
+  end if;
+
+  used_classes := greatest(coalesce(initial_classes_used, 0), 0);
+
+  if plan_record.is_unlimited then
+    total_classes := null;
+    used_classes := 0;
+  else
+    total_classes := coalesce(
+      classes_total_override,
+      case
+        when plan_record.name ilike '%4%' then 4
+        when plan_record.name ilike '%8%' then 8
+        when plan_record.name ilike '%12%' then 12
+        when plan_record.name ilike '%16%' then 16
+        else coalesce(plan_record.classes_per_week, 0) * 4
+      end
+    );
+
+    if total_classes <= 0 then
+      raise exception 'Indica un total de tokens valido para el plan.';
+    end if;
+
+    if used_classes > total_classes then
+      raise exception 'Los tokens ya usados no pueden ser mayores que los tokens del plan.';
+    end if;
+  end if;
+
+  final_payment_reference := coalesce(
+    nullif(payment_reference_input, ''),
+    'manual-' || target_profile_id::text || '-' || extract(epoch from now())::bigint::text
+  );
+
+  update public.memberships
+  set
+    status = 'expired',
+    updated_at = now()
+  where profile_id = target_profile_id
+    and status = 'active';
+
+  insert into public.memberships (
+    profile_id,
+    plan_id,
+    start_date,
+    end_date,
+    expires_at,
+    status,
+    classes_total,
+    classes_used,
+    payment_status,
+    payment_provider,
+    payment_reference,
+    activated_at,
+    auto_activated,
+    notes
+  )
+  values (
+    target_profile_id,
+    target_plan_id,
+    membership_start_date,
+    membership_start_date + 30,
+    membership_start_date + 30,
+    'active',
+    total_classes,
+    used_classes,
+    'paid',
+    coalesce(nullif(payment_provider_input, ''), 'manual_admin'),
+    final_payment_reference,
+    now(),
+    false,
+    notes_input
+  )
+  returning * into membership_record;
+
+  if used_classes > 0 then
+    insert into public.membership_token_movements (
+      membership_id,
+      profile_id,
+      movement_type,
+      quantity,
+      reason,
+      created_by
+    )
+    values (
+      membership_record.id,
+      membership_record.profile_id,
+      'manual_adjustment',
+      used_classes,
+      'Migración inicial: clases usadas antes de activar app',
+      auth.uid()
+    );
+  end if;
+
+  return jsonb_build_object(
+    'id', membership_record.id,
+    'profile_id', membership_record.profile_id,
+    'classes_total', membership_record.classes_total,
+    'classes_used', membership_record.classes_used,
+    'available_tokens', case
+      when total_classes is null then null
+      else greatest(total_classes - used_classes, 0)
+    end
+  );
+end;
+$$;
+
+drop function if exists public.admin_update_membership(uuid, uuid, date, text, text, text, text, text, integer, integer);
+
+create or replace function public.admin_update_membership(
+  target_membership_id uuid,
+  target_plan_id uuid,
+  start_date_input date,
+  status_input text,
+  payment_status_input text,
+  payment_provider_input text default null,
+  payment_reference_input text default null,
+  notes_input text default null,
+  classes_total_input integer default null,
+  classes_used_input integer default 0
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_membership public.memberships%rowtype;
+  updated_membership public.memberships%rowtype;
+  plan_record record;
+  total_classes integer;
+  used_classes integer;
+  token_difference integer;
+begin
+  if not public.is_admin() then
+    raise exception 'Solo admin activo puede editar membresias.';
+  end if;
+
+  if target_membership_id is null or target_plan_id is null or start_date_input is null then
+    raise exception 'Faltan datos obligatorios para guardar la membresia.';
+  end if;
+
+  if status_input not in ('active', 'expired', 'paused', 'cancelled') then
+    raise exception 'Estado de membresia no valido.';
+  end if;
+
+  if payment_status_input not in ('pending', 'paid', 'failed', 'refunded') then
+    raise exception 'Estado de pago no valido.';
+  end if;
+
+  select *
+  into current_membership
+  from public.memberships
+  where id = target_membership_id
+  for update;
+
+  if not found then
+    raise exception 'La membresia seleccionada no existe.';
+  end if;
+
+  select *
+  into plan_record
+  from public.plans
+  where id = target_plan_id;
+
+  if not found then
+    raise exception 'El plan seleccionado no existe.';
+  end if;
+
+  used_classes := greatest(coalesce(classes_used_input, 0), 0);
+
+  if plan_record.is_unlimited then
+    total_classes := null;
+    used_classes := 0;
+  else
+    total_classes := coalesce(
+      classes_total_input,
+      case
+        when plan_record.name ilike '%4%' then 4
+        when plan_record.name ilike '%8%' then 8
+        when plan_record.name ilike '%12%' then 12
+        when plan_record.name ilike '%16%' then 16
+        else coalesce(plan_record.classes_per_week, 0) * 4
+      end
+    );
+
+    if total_classes <= 0 then
+      raise exception 'Indica un total de tokens valido para el plan.';
+    end if;
+
+    if used_classes > total_classes then
+      raise exception 'Los tokens usados no pueden ser mayores que los tokens totales.';
+    end if;
+  end if;
+
+  if status_input = 'active' then
+    update public.memberships
+    set
+      status = 'expired',
+      updated_at = now()
+    where profile_id = current_membership.profile_id
+      and status = 'active'
+      and id <> target_membership_id;
+  end if;
+
+  token_difference := used_classes - coalesce(current_membership.classes_used, 0);
+
+  update public.memberships
+  set
+    plan_id = target_plan_id,
+    start_date = start_date_input,
+    end_date = start_date_input + 30,
+    expires_at = start_date_input + 30,
+    status = status_input,
+    payment_status = payment_status_input,
+    payment_provider = nullif(payment_provider_input, ''),
+    payment_reference = nullif(payment_reference_input, ''),
+    notes = notes_input,
+    classes_total = total_classes,
+    classes_used = used_classes,
+    activated_at = case
+      when status_input = 'active' then coalesce(activated_at, now())
+      else activated_at
+    end,
+    updated_at = now()
+  where id = target_membership_id
+  returning * into updated_membership;
+
+  if token_difference <> 0 then
+    insert into public.membership_token_movements (
+      membership_id,
+      profile_id,
+      movement_type,
+      quantity,
+      reason,
+      created_by
+    )
+    values (
+      updated_membership.id,
+      updated_membership.profile_id,
+      'manual_adjustment',
+      token_difference,
+      'Ajuste manual admin',
+      auth.uid()
+    );
+  end if;
+
+  return jsonb_build_object(
+    'id', updated_membership.id,
+    'profile_id', updated_membership.profile_id,
+    'plan_id', updated_membership.plan_id,
+    'start_date', updated_membership.start_date,
+    'end_date', updated_membership.end_date,
+    'expires_at', updated_membership.expires_at,
+    'status', updated_membership.status,
+    'payment_status', updated_membership.payment_status,
+    'payment_provider', updated_membership.payment_provider,
+    'payment_reference', updated_membership.payment_reference,
+    'notes', updated_membership.notes,
+    'classes_total', updated_membership.classes_total,
+    'classes_used', updated_membership.classes_used,
+    'available_tokens', case
+      when updated_membership.classes_total is null then null
+      else greatest(updated_membership.classes_total - updated_membership.classes_used, 0)
+    end
+  );
+end;
+$$;
+
 grant execute on function public.get_active_membership(uuid) to authenticated;
 grant execute on function public.membership_remaining_tokens(uuid) to authenticated;
 grant execute on function public.reserve_class(uuid, uuid, date) to authenticated;
@@ -481,6 +825,8 @@ grant execute on function public.cancel_reservation(uuid) to authenticated;
 grant execute on function public.admin_mark_reservation(uuid, text) to authenticated;
 grant execute on function public.get_my_reservations() to authenticated;
 grant execute on function public.expire_old_memberships() to authenticated;
+grant execute on function public.admin_activate_membership(uuid, uuid, date, integer, integer, text, text, text) to authenticated;
+grant execute on function public.admin_update_membership(uuid, uuid, date, text, text, text, text, text, integer, integer) to authenticated;
 
 alter table public.memberships enable row level security;
 alter table public.reservations enable row level security;

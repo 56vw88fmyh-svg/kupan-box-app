@@ -68,6 +68,8 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileMessage, setProfileMessage] = useState('')
   const [messageType, setMessageType] = useState('error')
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false)
   const [passwordMessage, setPasswordMessage] = useState('')
   const [passwordMessageType, setPasswordMessageType] = useState('error')
   const [isSavingPassword, setIsSavingPassword] = useState(false)
@@ -152,6 +154,36 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
     { label: 'Asistencias', value: attendance },
     { label: 'Nivel', value: level },
   ]), [attendance, level, visibleReservations.length])
+
+  const hasUnsavedProfileChanges = useMemo(() => (
+    formData.fullName !== (supabaseProfile?.full_name ?? currentUser?.name ?? '')
+    || formData.phone !== (supabaseProfile?.phone ?? '')
+    || formData.birthDate !== (supabaseProfile?.birth_date ?? '')
+    || formData.level !== (supabaseProfile?.level ?? 'Iniciado')
+  ), [currentUser?.name, formData, supabaseProfile])
+
+  function toggleEditProfile() {
+    setIsEditOpen((current) => {
+      const nextValue = !current
+      if (current && hasUnsavedProfileChanges) {
+        setMessageType('error')
+        setProfileMessage('Tienes cambios sin guardar. Quedaron en el formulario para cuando vuelvas a abrirlo.')
+      }
+      return nextValue
+    })
+  }
+
+  function togglePasswordPanel() {
+    setIsPasswordOpen((current) => {
+      const nextValue = !current
+      if (current) {
+        setPasswordForm({ password: '', confirmPassword: '' })
+        setPasswordMessage('')
+        setPasswordMessageType('error')
+      }
+      return nextValue
+    })
+  }
 
   async function handleSaveProfile(event) {
     event.preventDefault()
@@ -284,66 +316,111 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
       </MotionCard>
 
       <MotionCard as="section" className="k-card p-5" delay={0.04}>
-        <SectionTitle eyebrow="Editar perfil" title="Datos que puedes actualizar" />
-        <form className="mt-4 space-y-4" onSubmit={handleSaveProfile}>
-          <EditableField label="Nombre completo" value={formData.fullName} required onChange={(value) => setFormData((current) => ({ ...current, fullName: value }))} />
-          <EditableField label="Telefono" type="tel" value={formData.phone} onChange={(value) => setFormData((current) => ({ ...current, phone: value }))} />
-          <EditableField label="Fecha de nacimiento" type="date" value={formData.birthDate} required onChange={(value) => setFormData((current) => ({ ...current, birthDate: value }))} />
-          <label className="block">
-            <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">Nivel</span>
-            <select
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
-              value={formData.level}
-              onChange={(event) => setFormData((current) => ({ ...current, level: event.target.value }))}
-            >
-              {profileEditableLevels.map((levelOption) => (
-                <option key={levelOption} className="bg-kupan-black text-white" value={levelOption}>
-                  {levelOption}
-                </option>
-              ))}
-            </select>
-          </label>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-kupan-ember/60 hover:bg-kupan-ember/10 focus:border-kupan-ember focus:outline-none"
+          aria-expanded={isEditOpen}
+          onClick={toggleEditProfile}
+        >
+          <span className="min-w-0">
+            <span className="block text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Editar perfil</span>
+            <span className="mt-2 block text-2xl font-black uppercase leading-none text-white">Datos que puedes actualizar</span>
+            <span className="mt-2 block text-sm font-bold leading-6 text-white/55">Nombre, telefono, fecha de nacimiento y nivel.</span>
+          </span>
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/35 text-lg font-black text-kupan-flame transition ${isEditOpen ? '-rotate-90' : 'rotate-90'}`}>
+            {'>'}
+          </span>
+        </button>
 
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
-            Email, plan, rol y estado de membresia quedan protegidos. Si necesitas cambiarlos, debe hacerlo un admin.
-          </div>
+        {profileMessage ? (
+          <p className={`mt-4 rounded-lg border p-3 text-sm font-bold text-white ${
+            messageType === 'success'
+              ? 'border-emerald-400/30 bg-emerald-400/10'
+              : 'border-kupan-flame/30 bg-kupan-flame/10'
+          }`}
+          >
+            {profileMessage}
+          </p>
+        ) : null}
 
-          {profileMessage ? (
-            <p className={`rounded-lg border p-3 text-sm font-bold text-white ${
-              messageType === 'success'
-                ? 'border-emerald-400/30 bg-emerald-400/10'
-                : 'border-kupan-flame/30 bg-kupan-flame/10'
-            }`}
-            >
-              {profileMessage}
-            </p>
-          ) : null}
+        <Motion.div
+          initial={false}
+          animate={isEditOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+          className="overflow-hidden"
+        >
+          <form className="mt-4 space-y-4" onSubmit={handleSaveProfile}>
+            <EditableField label="Nombre completo" value={formData.fullName} required onChange={(value) => setFormData((current) => ({ ...current, fullName: value }))} />
+            <EditableField label="Telefono" type="tel" value={formData.phone} onChange={(value) => setFormData((current) => ({ ...current, phone: value }))} />
+            <EditableField label="Fecha de nacimiento" type="date" value={formData.birthDate} required onChange={(value) => setFormData((current) => ({ ...current, birthDate: value }))} />
+            <label className="block">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">Nivel</span>
+              <select
+                className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
+                value={formData.level}
+                onChange={(event) => setFormData((current) => ({ ...current, level: event.target.value }))}
+              >
+                {profileEditableLevels.map((levelOption) => (
+                  <option key={levelOption} className="bg-kupan-black text-white" value={levelOption}>
+                    {levelOption}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <button type="submit" className="k-button w-full" disabled={isSavingProfile}>
-            {isSavingProfile ? 'Guardando...' : 'Guardar cambios'}
-          </button>
-        </form>
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
+              Email, plan, rol y estado de membresia quedan protegidos. Si necesitas cambiarlos, debe hacerlo un admin.
+            </div>
+
+            <button type="submit" className="k-button w-full" disabled={isSavingProfile}>
+              {isSavingProfile ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </form>
+        </Motion.div>
       </MotionCard>
 
       <MotionCard as="section" className="k-card p-5" delay={0.045}>
-        <SectionTitle eyebrow="Seguridad" title="Cambiar contraseña" />
-        <form className="mt-4 space-y-4" onSubmit={handleChangePassword}>
-          <EditableField label="Nueva contraseña" type="password" value={passwordForm.password} required onChange={(value) => setPasswordForm((current) => ({ ...current, password: value }))} />
-          <EditableField label="Confirmar contraseña" type="password" value={passwordForm.confirmPassword} required onChange={(value) => setPasswordForm((current) => ({ ...current, confirmPassword: value }))} />
-          {passwordMessage ? (
-            <p className={`rounded-lg border p-3 text-sm font-bold text-white ${
-              passwordMessageType === 'success'
-                ? 'border-emerald-400/30 bg-emerald-400/10'
-                : 'border-kupan-flame/30 bg-kupan-flame/10'
-            }`}
-            >
-              {passwordMessage}
-            </p>
-          ) : null}
-          <button type="submit" className="k-button-secondary w-full" disabled={isSavingPassword}>
-            {isSavingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
-          </button>
-        </form>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-kupan-ember/60 hover:bg-kupan-ember/10 focus:border-kupan-ember focus:outline-none"
+          aria-expanded={isPasswordOpen}
+          onClick={togglePasswordPanel}
+        >
+          <span className="min-w-0">
+            <span className="block text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Seguridad</span>
+            <span className="mt-2 block text-2xl font-black uppercase leading-none text-white">Cambiar contraseña</span>
+            <span className="mt-2 block text-sm font-bold leading-6 text-white/55">Actualiza tu clave de acceso cuando lo necesites.</span>
+          </span>
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/35 text-lg font-black text-kupan-flame transition ${isPasswordOpen ? '-rotate-90' : 'rotate-90'}`}>
+            {'>'}
+          </span>
+        </button>
+
+        {passwordMessage ? (
+          <p className={`mt-4 rounded-lg border p-3 text-sm font-bold text-white ${
+            passwordMessageType === 'success'
+              ? 'border-emerald-400/30 bg-emerald-400/10'
+              : 'border-kupan-flame/30 bg-kupan-flame/10'
+          }`}
+          >
+            {passwordMessage}
+          </p>
+        ) : null}
+
+        <Motion.div
+          initial={false}
+          animate={isPasswordOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+          className="overflow-hidden"
+        >
+          <form className="mt-4 space-y-4" onSubmit={handleChangePassword}>
+            <EditableField label="Nueva contraseña" type="password" value={passwordForm.password} required onChange={(value) => setPasswordForm((current) => ({ ...current, password: value }))} />
+            <EditableField label="Confirmar contraseña" type="password" value={passwordForm.confirmPassword} required onChange={(value) => setPasswordForm((current) => ({ ...current, confirmPassword: value }))} />
+            <button type="submit" className="k-button-secondary w-full" disabled={isSavingPassword}>
+              {isSavingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
+            </button>
+          </form>
+        </Motion.div>
       </MotionCard>
 
       <MotionCard as="section" className="k-card p-5" delay={0.05}>

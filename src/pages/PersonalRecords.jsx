@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
 import {
@@ -11,7 +11,7 @@ import {
 } from '../utils/personalRecords.js'
 
 const emptyForm = {
-  movement: 'Back Squat',
+  movement: '',
   value: '',
   unit: 'kg',
   recordDate: new Date().toISOString().slice(0, 10),
@@ -49,6 +49,90 @@ function RecordField({ label, children }) {
       <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">{label}</span>
       {children}
     </label>
+  )
+}
+
+function MovementSelect({ value, options, onChange }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const searchRef = useRef(null)
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery) return options
+    return options.filter((movement) => movement.toLowerCase().includes(normalizedQuery))
+  }, [options, query])
+
+  useEffect(() => {
+    if (!isOpen) return
+    window.setTimeout(() => searchRef.current?.focus(), 80)
+  }, [isOpen])
+
+  function selectMovement(movement) {
+    onChange(movement)
+    setQuery('')
+    setIsOpen(false)
+  }
+
+  return (
+    <div className="mt-2" onKeyDown={(event) => {
+      if (event.key === 'Escape') setIsOpen(false)
+    }}
+    >
+      <button
+        type="button"
+        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left text-sm font-black uppercase outline-none transition ${
+          isOpen ? 'border-kupan-ember bg-kupan-ember/10 text-white shadow-glow' : 'border-white/10 bg-black/35 text-white hover:border-kupan-ember/70'
+        }`}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        <span className={value ? 'text-white' : 'text-white/40'}>{value || 'Seleccionar movimiento'}</span>
+        <span className={`text-kupan-flame transition ${isOpen ? 'rotate-90' : ''}`}>{'>'}</span>
+      </button>
+
+      {isOpen ? (
+        <div className="mt-2 overflow-hidden rounded-lg border border-kupan-ember/40 bg-kupan-gray shadow-2xl">
+          <div className="border-b border-white/10 p-3">
+            <input
+              ref={searchRef}
+              className="w-full rounded-lg border border-white/10 bg-black/40 px-4 py-3 text-base font-bold text-white outline-none transition placeholder:text-white/35 focus:border-kupan-ember"
+              type="search"
+              inputMode="search"
+              value={query}
+              placeholder="Buscar movimiento..."
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+
+          <div className="max-h-72 overflow-y-auto overscroll-contain p-2" role="listbox" aria-label="Movimientos PR KUPAN">
+            {filteredOptions.map((movement) => {
+              const isSelected = movement === value
+              return (
+                <button
+                  key={movement}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  className={`mb-1 flex min-h-11 w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-black uppercase transition last:mb-0 ${
+                    isSelected ? 'bg-kupan-ember text-white shadow-glow' : 'text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white'
+                  }`}
+                  onClick={() => selectMovement(movement)}
+                >
+                  <span>{movement}</span>
+                  {isSelected ? <span className="text-xs">OK</span> : null}
+                </button>
+              )
+            })}
+
+            {filteredOptions.length === 0 ? (
+              <p className="px-3 py-4 text-sm font-bold text-white/55">No encontramos ese movimiento. Prueba con otro nombre.</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -118,6 +202,12 @@ export function PersonalRecords({ currentUser, setActivePage }) {
     event.preventDefault()
     setMessage('')
     setMessageType('error')
+
+    if (!formData.movement || !suggestedMovements.includes(formData.movement)) {
+      setMessage('Selecciona un movimiento desde la lista KUPAN antes de guardar tu PR.')
+      return
+    }
+
     setIsSaving(true)
 
     const result = editingId
@@ -216,16 +306,11 @@ export function PersonalRecords({ currentUser, setActivePage }) {
         <SectionTitle eyebrow={editingId ? 'Editar PR' : 'Nuevo PR'} title={editingId ? 'Actualiza tu marca' : 'Registra progreso'} />
         <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
           <RecordField label="Movimiento">
-            <input
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/30 focus:border-kupan-ember"
-              list="kupan-pr-movements"
+            <MovementSelect
               value={formData.movement}
-              required
-              onChange={(event) => updateForm('movement', event.target.value)}
+              options={suggestedMovements}
+              onChange={(movement) => updateForm('movement', movement)}
             />
-            <datalist id="kupan-pr-movements">
-              {suggestedMovements.map((movement) => <option key={movement} value={movement} />)}
-            </datalist>
           </RecordField>
 
           <div className="grid grid-cols-[1fr_0.75fr] gap-3">

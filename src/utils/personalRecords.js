@@ -1,22 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { prMovements } from '../data/movements.js'
 
-export const suggestedMovements = [
-  'Back Squat',
-  'Front Squat',
-  'Deadlift',
-  'Clean',
-  'Clean & Jerk',
-  'Snatch',
-  'Bench Press',
-  'Shoulder Press',
-  'Pull Up',
-  '5K Run',
-  '2K Row',
-  'Fran',
-  'Grace',
-  'Isabel',
-  'Murph',
-]
+export const suggestedMovements = prMovements
 
 export const recordUnits = ['kg', 'reps', 'tiempo', 'metros', 'calorias']
 
@@ -36,7 +21,11 @@ function normalizeRecordForm(values) {
 
 function validateRecord(record) {
   if (!record.movement || !record.record_date || !record.unit) {
-    return 'Completa movimiento, unidad y fecha para registrar tu PR.'
+    return 'Selecciona movimiento, unidad y fecha para registrar tu PR.'
+  }
+
+  if (!suggestedMovements.includes(record.movement)) {
+    return 'Selecciona un movimiento valido desde la lista KUPAN.'
   }
 
   if (!Number.isFinite(record.value) || record.value <= 0) {
