@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion as Motion } from 'framer-motion'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
@@ -11,6 +11,19 @@ import {
 } from '../utils/supabaseReservations.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
+const reservationDayFilters = [
+  { dayId: '1', short: 'LUN', label: 'Lunes' },
+  { dayId: '2', short: 'MAR', label: 'Martes' },
+  { dayId: '3', short: 'MIE', label: 'Miercoles' },
+  { dayId: '4', short: 'JUE', label: 'Jueves' },
+  { dayId: '5', short: 'VIE', label: 'Viernes' },
+  { dayId: '6', short: 'SAB', label: 'Sabado' },
+]
+
+function getCurrentReservationDayId() {
+  const currentDay = new Date().getDay()
+  return currentDay === 0 ? '1' : String(currentDay)
+}
 
 function ReservationCard({ item, isSelected, onSelect }) {
   const maxSpots = item.maxSpots ?? 12
@@ -195,15 +208,14 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   const [remainingTokens, setRemainingTokens] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [reservationMessage, setReservationMessage] = useState('')
-  const [selectedDayId, setSelectedDayId] = useState('all')
+  const [selectedDayId, setSelectedDayId] = useState(getCurrentReservationDayId)
   const [selectedClass, setSelectedClass] = useState(null)
   const [successReservation, setSuccessReservation] = useState(null)
   const selectedClassKey = selectedClass ? `${selectedClass.classScheduleId}-${selectedClass.reservationDate}` : null
-  const filteredClasses = selectedDayId === 'all'
-    ? availableClasses
-    : availableClasses.filter((classItem) => classItem.dayId === selectedDayId)
-  const totalClasses = availableClasses.length
-  const totalSpots = availableClasses.reduce((sum, item) => sum + item.spots, 0)
+  const filteredClasses = availableClasses.filter((classItem) => classItem.dayId === selectedDayId)
+  const selectedDayLabel = reservationDayFilters.find((day) => day.dayId === selectedDayId)?.label ?? 'este dia'
+  const totalClasses = filteredClasses.length
+  const totalSpots = filteredClasses.reduce((sum, item) => sum + item.spots, 0)
   const reservedCount = userActiveReservations.length
 
   const refreshReservations = useCallback(async () => {
@@ -246,6 +258,9 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
       classItem.name === pendingReservation.name &&
       classItem.day === pendingReservation.day
     ))
+    if (matchedClass?.dayId) {
+      setSelectedDayId(matchedClass.dayId)
+    }
     setSelectedClass(matchedClass ?? null)
   }, [availableClasses, pendingReservation])
 
@@ -282,8 +297,6 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     setSelectedClass(null)
     setSuccessReservation(null)
   }
-
-  const dayFilters = useMemo(() => [...new Map(availableClasses.map((classItem) => [classItem.dayId, classItem])).values()], [availableClasses])
 
   return (
     <div className="space-y-6">
@@ -329,30 +342,31 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
         {isLoading ? <p className="k-panel mb-4 p-4 text-sm font-bold text-white/60">Cargando cupos reales desde Supabase...</p> : null}
         {reservationMessage ? <p className="mb-4 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{reservationMessage}</p> : null}
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            aria-pressed={selectedDayId === 'all'}
-            className={`min-w-20 rounded-lg px-4 py-3 text-sm font-black uppercase transition ${
-              selectedDayId === 'all' ? 'bg-kupan-ember text-white shadow-glow' : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
-            }`}
-            onClick={() => setSelectedDayId('all')}
-          >
-            Todos
-          </button>
-          {dayFilters.map((day) => (
+          {reservationDayFilters.map((day) => (
             <button
               key={day.dayId}
               type="button"
+              aria-label={`Mostrar clases de ${day.label}`}
               aria-pressed={selectedDayId === day.dayId}
               className={`min-w-16 rounded-lg px-4 py-3 text-sm font-black uppercase transition ${
                 selectedDayId === day.dayId ? 'bg-kupan-ember text-white shadow-glow' : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
               }`}
-              onClick={() => setSelectedDayId(day.dayId)}
+              onClick={() => {
+                setSelectedDayId(day.dayId)
+                setSelectedClass(null)
+                setSuccessReservation(null)
+              }}
             >
               {day.short}
             </button>
           ))}
         </div>
+        {filteredClasses.length === 0 ? (
+          <MotionCard className="k-panel mb-4 p-4">
+            <p className="font-black uppercase text-white">No hay clases para {selectedDayLabel}.</p>
+            <p className="mt-1 text-sm text-white/60">Elige otro dia para ver cupos disponibles y reservar tu entrenamiento.</p>
+          </MotionCard>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           {filteredClasses.map((item, index) => (
             <Motion.div

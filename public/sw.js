@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kupan-v4'
+const CACHE_NAME = 'kupan-v5'
 const APP_SHELL = [
   '/',
   '/index.html',

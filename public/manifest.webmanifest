@@ -2,7 +2,7 @@
   "id": "/",
   "name": "KUPAN",
   "short_name": "KUPAN",
-  "description": "App progresiva para reservas, horarios, WOD y comunidad de KUPAN.",
+  "description": "App progresiva para reservas, WOD, planes y comunidad de KUPAN.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -19,7 +19,6 @@ const Plans = lazy(() => import('./pages/Plans.jsx').then((module) => ({ default
 const PersonalRecords = lazy(() => import('./pages/PersonalRecords.jsx').then((module) => ({ default: module.PersonalRecords })))
 const Profile = lazy(() => import('./pages/Profile.jsx').then((module) => ({ default: module.Profile })))
 const Reservations = lazy(() => import('./pages/Reservations.jsx').then((module) => ({ default: module.Reservations })))
-const Schedule = lazy(() => import('./pages/Schedule.jsx').then((module) => ({ default: module.Schedule })))
 const Wod = lazy(() => import('./pages/Wod.jsx').then((module) => ({ default: module.Wod })))
 
 export default function App() {
@@ -122,11 +121,6 @@ export default function App() {
     if (shortcut === 'wod') navigate('/wod', { replace: true })
   }, [location.search, navigate])
 
-  function startReservation(classItem) {
-    setPendingReservation(classItem)
-    goToPage('reservations')
-  }
-
   return (
     <MotionConfig reducedMotion="user">
       <AppShell title={page.title} eyebrow={page.eyebrow}>
@@ -136,7 +130,7 @@ export default function App() {
             <Suspense fallback={<div className="k-card p-5 text-sm font-bold uppercase text-white/60">Cargando KUPAN...</div>}>
               <Routes location={location}>
                 <Route path="/" element={<Home setActivePage={goToPage} appContent={appContent} />} />
-                <Route path="/horarios" element={<Schedule currentUser={currentUser} appContent={appContent} userReservations={[]} onStartReservation={startReservation} />} />
+                <Route path="/horarios" element={<Navigate to="/reservas" replace />} />
                 <Route
                   path="/reservas"
                   element={(

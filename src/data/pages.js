@@ -1,6 +1,5 @@
 export const pages = [
   { id: 'home', path: '/', label: 'Inicio', title: 'KUPAN', eyebrow: 'Comunidad, esfuerzo y progreso', icon: 'K' },
-  { id: 'schedule', path: '/horarios', label: 'Horarios', title: 'Horarios', eyebrow: 'Reserva tu momento de entrenar', icon: 'H' },
   { id: 'reservations', path: '/reservas', label: 'Reservas', title: 'Reservas', eyebrow: 'Ven a darlo todo', icon: 'R' },
   { id: 'wod', path: '/wod', label: 'WOD', title: 'WOD del día', eyebrow: 'Entrena fuerte, entrena acompañado', icon: 'W' },
   { id: 'plans', path: '/planes', label: 'Planes', title: 'Planes', eyebrow: 'Elige tu ritmo KUPAN', icon: 'P' },

@@ -5,7 +5,7 @@ import isotipoKupan from '../assets/brand/isotipo-kupan.png'
 export function BottomNav({ pages }) {
   return (
     <nav className="k-bottom-nav fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-kupan-black/96 px-2 pt-2 backdrop-blur-2xl">
-      <div className="mx-auto grid max-w-5xl grid-cols-7 gap-1">
+      <div className="mx-auto grid max-w-5xl grid-cols-6 gap-1">
         {pages.filter((page) => !page.hidden).map((page) => {
           return (
             <NavLink
