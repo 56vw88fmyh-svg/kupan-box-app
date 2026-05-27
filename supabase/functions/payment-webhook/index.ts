@@ -25,6 +25,21 @@ function getPlanClasses(plan: { name: string; classes_per_week: number | null; i
   return plan.classes_per_week ? plan.classes_per_week * 4 : 0
 }
 
+function getChileDate() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
+function addDays(dateText: string, days: number) {
+  const date = new Date(`${dateText}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse({ ok: false, message: 'Metodo no permitido.' }, 405)
@@ -108,11 +123,8 @@ serve(async (req) => {
 
   if (planError || !plan) return jsonResponse({ ok: false, message: 'Plan no encontrado.' }, 404)
 
-  const today = new Date()
-  const startDate = today.toISOString().slice(0, 10)
-  const endDate = new Date(today)
-  endDate.setDate(today.getDate() + 30)
-  const endDateText = endDate.toISOString().slice(0, 10)
+  const startDate = getChileDate()
+  const endDateText = addDays(startDate, 30)
 
   await adminClient
     .from('memberships')

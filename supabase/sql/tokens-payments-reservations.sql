@@ -53,15 +53,25 @@ end $$;
 
 do $$
 begin
-  if not exists (
+  if exists (
     select 1
     from pg_constraint
     where conname = 'memberships_exact_30_day_cycle_chk'
       and conrelid = 'public.memberships'::regclass
   ) then
     alter table public.memberships
-      add constraint memberships_exact_30_day_cycle_chk
-      check (end_date = start_date + 30)
+      drop constraint memberships_exact_30_day_cycle_chk;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'memberships_minimum_30_day_cycle_chk'
+      and conrelid = 'public.memberships'::regclass
+  ) then
+    alter table public.memberships
+      add constraint memberships_minimum_30_day_cycle_chk
+      check (end_date >= start_date + 30 and expires_at = end_date)
       not valid;
   end if;
 end $$;
@@ -818,6 +828,229 @@ begin
 end;
 $$;
 
+create or replace function public.admin_renew_membership(
+  target_membership_id uuid,
+  start_date_input date default (timezone('America/Santiago', now()))::date
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_membership public.memberships%rowtype;
+  plan_record record;
+  renewed_membership public.memberships%rowtype;
+  total_classes integer;
+begin
+  if not public.is_admin() then
+    raise exception 'Solo admin activo puede renovar membresias.';
+  end if;
+
+  select *
+  into current_membership
+  from public.memberships
+  where id = target_membership_id;
+
+  if not found then
+    raise exception 'La membresia seleccionada no existe.';
+  end if;
+
+  select *
+  into plan_record
+  from public.plans
+  where id = current_membership.plan_id;
+
+  if not found then
+    raise exception 'El plan de la membresia no existe.';
+  end if;
+
+  total_classes := case
+    when plan_record.is_unlimited then null
+    else coalesce(
+      current_membership.classes_total,
+      case
+        when plan_record.name ilike '%4%' then 4
+        when plan_record.name ilike '%8%' then 8
+        when plan_record.name ilike '%12%' then 12
+        when plan_record.name ilike '%16%' then 16
+        else coalesce(plan_record.classes_per_week, 0) * 4
+      end
+    )
+  end;
+
+  if not plan_record.is_unlimited and (total_classes is null or total_classes <= 0) then
+    raise exception 'El plan no tiene tokens validos para renovar.';
+  end if;
+
+  update public.memberships
+  set status = 'expired', updated_at = now()
+  where profile_id = current_membership.profile_id
+    and status = 'active';
+
+  insert into public.memberships (
+    profile_id,
+    plan_id,
+    start_date,
+    end_date,
+    expires_at,
+    status,
+    classes_total,
+    classes_used,
+    payment_status,
+    payment_provider,
+    payment_reference,
+    activated_at,
+    auto_activated,
+    notes
+  )
+  values (
+    current_membership.profile_id,
+    current_membership.plan_id,
+    start_date_input,
+    start_date_input + 30,
+    start_date_input + 30,
+    'active',
+    total_classes,
+    0,
+    'paid',
+    coalesce(nullif(current_membership.payment_provider, ''), 'manual_admin'),
+    'renewal-' || current_membership.profile_id::text || '-' || extract(epoch from now())::bigint::text,
+    now(),
+    false,
+    'Renovacion admin: nuevo ciclo de 30 dias, tokens anteriores no acumulables.'
+  )
+  returning * into renewed_membership;
+
+  return jsonb_build_object(
+    'id', renewed_membership.id,
+    'profile_id', renewed_membership.profile_id,
+    'classes_total', renewed_membership.classes_total,
+    'classes_used', renewed_membership.classes_used,
+    'available_tokens', renewed_membership.classes_total
+  );
+end;
+$$;
+
+create or replace function public.admin_adjust_tokens(
+  target_membership_id uuid,
+  classes_used_input integer,
+  reason_input text default 'Ajuste manual admin'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_membership public.memberships%rowtype;
+  updated_membership public.memberships%rowtype;
+  token_difference integer;
+begin
+  if not public.is_admin() then
+    raise exception 'Solo admin activo puede ajustar tokens.';
+  end if;
+
+  select *
+  into current_membership
+  from public.memberships
+  where id = target_membership_id
+  for update;
+
+  if not found then
+    raise exception 'La membresia seleccionada no existe.';
+  end if;
+
+  if current_membership.classes_total is null then
+    classes_used_input := 0;
+  end if;
+
+  if classes_used_input < 0 then
+    raise exception 'Los tokens usados no pueden ser menores que 0.';
+  end if;
+
+  if current_membership.classes_total is not null and classes_used_input > current_membership.classes_total then
+    raise exception 'Los tokens usados no pueden ser mayores que los tokens totales.';
+  end if;
+
+  token_difference := classes_used_input - coalesce(current_membership.classes_used, 0);
+
+  update public.memberships
+  set classes_used = classes_used_input,
+      updated_at = now()
+  where id = target_membership_id
+  returning * into updated_membership;
+
+  if token_difference <> 0 then
+    insert into public.membership_token_movements (
+      membership_id,
+      profile_id,
+      movement_type,
+      quantity,
+      reason,
+      created_by
+    )
+    values (
+      updated_membership.id,
+      updated_membership.profile_id,
+      'manual_adjustment',
+      token_difference,
+      coalesce(nullif(reason_input, ''), 'Ajuste manual admin'),
+      auth.uid()
+    );
+  end if;
+
+  return jsonb_build_object(
+    'id', updated_membership.id,
+    'classes_total', updated_membership.classes_total,
+    'classes_used', updated_membership.classes_used,
+    'available_tokens', case
+      when updated_membership.classes_total is null then null
+      else greatest(updated_membership.classes_total - updated_membership.classes_used, 0)
+    end
+  );
+end;
+$$;
+
+create or replace function public.admin_extend_membership(
+  target_membership_id uuid,
+  days_input integer default 7
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  updated_membership public.memberships%rowtype;
+  safe_days integer;
+begin
+  if not public.is_admin() then
+    raise exception 'Solo admin activo puede extender membresias.';
+  end if;
+
+  safe_days := least(greatest(coalesce(days_input, 7), 1), 30);
+
+  update public.memberships
+  set end_date = end_date + safe_days,
+      expires_at = end_date + safe_days,
+      updated_at = now(),
+      notes = concat_ws(E'\n', nullif(notes, ''), 'Extension admin: +' || safe_days::text || ' dias.')
+  where id = target_membership_id
+  returning * into updated_membership;
+
+  if not found then
+    raise exception 'La membresia seleccionada no existe.';
+  end if;
+
+  return jsonb_build_object(
+    'id', updated_membership.id,
+    'end_date', updated_membership.end_date,
+    'expires_at', updated_membership.expires_at
+  );
+end;
+$$;
+
 grant execute on function public.get_active_membership(uuid) to authenticated;
 grant execute on function public.membership_remaining_tokens(uuid) to authenticated;
 grant execute on function public.reserve_class(uuid, uuid, date) to authenticated;
@@ -827,6 +1060,9 @@ grant execute on function public.get_my_reservations() to authenticated;
 grant execute on function public.expire_old_memberships() to authenticated;
 grant execute on function public.admin_activate_membership(uuid, uuid, date, integer, integer, text, text, text) to authenticated;
 grant execute on function public.admin_update_membership(uuid, uuid, date, text, text, text, text, text, integer, integer) to authenticated;
+grant execute on function public.admin_renew_membership(uuid, date) to authenticated;
+grant execute on function public.admin_adjust_tokens(uuid, integer, text) to authenticated;
+grant execute on function public.admin_extend_membership(uuid, integer) to authenticated;
 
 alter table public.memberships enable row level security;
 alter table public.reservations enable row level security;

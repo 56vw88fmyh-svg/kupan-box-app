@@ -308,6 +308,15 @@ function formatDate(date) {
   return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`))
 }
 
+function getChileDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
 function formatMoney(value) {
   return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0))
 }
@@ -320,6 +329,13 @@ function addDays(dateText, days) {
   const date = dateText ? new Date(`${dateText}T00:00:00`) : new Date()
   date.setDate(date.getDate() + days)
   return date.toISOString().slice(0, 10)
+}
+
+function calculateDaysBetween(startDate, endDate) {
+  const start = new Date(`${startDate}T00:00:00`)
+  const end = new Date(`${endDate}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 999
+  return Math.ceil((end.getTime() - start.getTime()) / 86400000)
 }
 
 function getPlanTokenTotal(plan) {
@@ -369,6 +385,16 @@ const adminLoaders = [
   ['movimientos de tokens', 'tokenMovements', 'admin_get_token_movements'],
 ]
 
+const studentFilters = [
+  { id: 'all', label: 'Todos' },
+  { id: 'active', label: 'Activos' },
+  { id: 'inactive', label: 'Inactivos' },
+  { id: 'plan-active', label: 'Plan activo' },
+  { id: 'plan-expired', label: 'Plan vencido' },
+  { id: 'no-tokens', label: 'Sin tokens' },
+  { id: 'expiring', label: 'Por vencer' },
+]
+
 async function runAdminLoader([label, key, rpcName]) {
   try {
     const { data, error } = await supabase.rpc(rpcName)
@@ -393,14 +419,14 @@ async function loadAdminData() {
   settledResults.forEach((result, index) => {
     if (result.status === 'rejected') {
       const [label, key] = adminLoaders[index]
-      errors.push(`No pudimos cargar ${label}: ${result.reason?.message ?? 'Error desconocido'}`)
+      errors.push({ key, label, message: `No pudimos cargar ${label}: ${result.reason?.message ?? 'Error desconocido'}` })
       data[key] = emptyAdminData[key]
       return
     }
 
     data[result.value.key] = result.value.data
     if (result.value.error) {
-      errors.push(`No pudimos cargar ${result.value.label}: ${result.value.error}`)
+      errors.push({ key: result.value.key, label: result.value.label, message: `No pudimos cargar ${result.value.label}: ${result.value.error}` })
     }
   })
 
@@ -433,6 +459,9 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [messageType, setMessageType] = useState('error')
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [sectionErrors, setSectionErrors] = useState([])
+  const [studentQuery, setStudentQuery] = useState('')
+  const [studentFilter, setStudentFilter] = useState('all')
   const [planDraft, setPlanDraft] = useState(emptyPlan)
   const [membershipDraft, setMembershipDraft] = useState(emptyMembership)
   const [membershipEditDraft, setMembershipEditDraft] = useState(emptyMembershipEdit)
@@ -481,13 +510,6 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
   }, [currentUser])
 
-  const totals = useMemo(() => ({
-    students: adminData.profiles.length,
-    activeMemberships: adminData.memberships.filter((membership) => membership.status === 'active').length,
-    reservations: adminData.reservations.filter((reservation) => reservation.status === 'reserved').length,
-    plans: adminData.plans.filter((plan) => plan.active).length,
-  }), [adminData])
-
   const activeMembershipByProfile = useMemo(() => {
     const membershipsByProfile = new Map()
 
@@ -501,6 +523,72 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
     return membershipsByProfile
   }, [adminData.memberships])
+
+  const latestMembershipByProfile = useMemo(() => {
+    const membershipsByProfile = new Map()
+
+    adminData.memberships
+      .slice()
+      .sort((a, b) => String(b.created_at ?? b.start_date ?? '').localeCompare(String(a.created_at ?? a.start_date ?? '')))
+      .forEach((membership) => {
+        if (!membershipsByProfile.has(membership.profile_id)) {
+          membershipsByProfile.set(membership.profile_id, membership)
+        }
+      })
+
+    return membershipsByProfile
+  }, [adminData.memberships])
+
+  const todayDate = getChileDateString()
+
+  const totals = useMemo(() => {
+    const activeStudents = adminData.profiles.filter((profile) => profile.status === 'active').length
+    const expiredMemberships = adminData.memberships.filter((membership) => membership.status === 'expired' || membership.end_date < todayDate).length
+    const todayReservations = adminData.reservations.filter((reservation) => (
+      reservation.reservation_date === todayDate && ['reserved', 'attended'].includes(reservation.status)
+    )).length
+    const lowTokenMemberships = adminData.memberships.filter((membership) => {
+      if (membership.status !== 'active' || membership.plan?.is_unlimited || membership.classes_total === null) return false
+      const remaining = Number(membership.classes_total ?? 0) - Number(membership.classes_used ?? 0)
+      return remaining > 0 && remaining <= 2
+    }).length
+
+    return {
+      students: adminData.profiles.length,
+      activeStudents,
+      expiredMemberships,
+      todayReservations,
+      lowTokenMemberships,
+      activeMemberships: adminData.memberships.filter((membership) => membership.status === 'active').length,
+      reservations: adminData.reservations.filter((reservation) => reservation.status === 'reserved').length,
+      plans: adminData.plans.filter((plan) => plan.active).length,
+    }
+  }, [adminData, todayDate])
+
+  const filteredProfiles = useMemo(() => {
+    const query = studentQuery.trim().toLowerCase()
+
+    return adminData.profiles.filter((profile) => {
+      const activeMembership = activeMembershipByProfile.get(profile.id)
+      const latestMembership = latestMembershipByProfile.get(profile.id)
+      const tokens = activeMembership ? getMembershipTokens(activeMembership) : null
+      const searchable = `${profile.full_name ?? ''} ${profile.email ?? ''} ${profile.phone ?? ''}`.toLowerCase()
+      const matchesQuery = !query || searchable.includes(query)
+      const hasActivePlan = Boolean(activeMembership?.status === 'active' && activeMembership.end_date >= todayDate)
+      const hasExpiredPlan = Boolean(latestMembership && (latestMembership.status === 'expired' || latestMembership.end_date < todayDate))
+      const hasNoTokens = Boolean(activeMembership && !activeMembership.plan?.is_unlimited && Number(tokens?.remaining ?? 0) <= 0)
+      const isExpiring = Boolean(activeMembership && activeMembership.end_date >= todayDate && calculateDaysBetween(todayDate, activeMembership.end_date) <= 7)
+
+      if (!matchesQuery) return false
+      if (studentFilter === 'active') return profile.status === 'active'
+      if (studentFilter === 'inactive') return profile.status === 'inactive'
+      if (studentFilter === 'plan-active') return hasActivePlan
+      if (studentFilter === 'plan-expired') return hasExpiredPlan
+      if (studentFilter === 'no-tokens') return hasNoTokens
+      if (studentFilter === 'expiring') return isExpiring
+      return true
+    })
+  }, [activeMembershipByProfile, adminData.profiles, latestMembershipByProfile, studentFilter, studentQuery, todayDate])
 
   const selectedMembershipPlan = useMemo(
     () => adminData.plans.find((plan) => plan.id === membershipDraft.plan_id),
@@ -568,6 +656,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
 
     setAdminData(result.data)
+    setSectionErrors(result.errors ?? [])
     setLastUpdated(new Date())
     setTextDraft({
       homeEyebrow: result.data.settings.find((item) => item.key === 'home_eyebrow')?.value ?? defaultAppText.homeEyebrow,
@@ -585,7 +674,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
     if (result.errors?.length) {
       setMessageType('error')
-      setMessage(result.errors.join(' | '))
+      setMessage(`${result.errors.length} secciones tuvieron problemas. Revisa el detalle bajo los contadores.`)
     } else {
       setMessageType('success')
       setMessage('Datos actualizados desde Supabase.')
@@ -788,12 +877,9 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       classes_used_input: editedClassesUsed,
     }
 
-    window.console.log('KUPAN admin_update_membership payload', updatePayload)
-
     const { error } = await supabase.rpc('admin_update_membership', updatePayload)
 
     if (error) {
-      window.console.error('KUPAN admin_update_membership error', error)
       setMessageType('error')
       setMessage(`No pudimos guardar los cambios de membresia: ${error.message}`)
       return
@@ -806,21 +892,99 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function updateMembershipStatus(membership, status) {
-    const payload = { status }
-    if (status === 'active') {
-      await supabase
-        .from('memberships')
-        .update({ status: 'expired' })
-        .eq('profile_id', membership.profile_id)
-        .eq('status', 'active')
-        .neq('id', membership.id)
-      payload.payment_status = membership.payment_status === 'paid' ? membership.payment_status : 'paid'
-      payload.activated_at = membership.activated_at ?? new Date().toISOString()
+    const { error } = await supabase.rpc('admin_update_membership', {
+      target_membership_id: membership.id,
+      target_plan_id: membership.plan_id,
+      start_date_input: membership.start_date,
+      status_input: status,
+      payment_status_input: status === 'active' ? 'paid' : membership.payment_status ?? 'paid',
+      payment_provider_input: membership.payment_provider ?? null,
+      payment_reference_input: membership.payment_reference ?? null,
+      notes_input: membership.notes ?? null,
+      classes_total_input: membership.classes_total,
+      classes_used_input: membership.classes_used ?? 0,
+    })
+
+    if (error) {
+      setMessageType('error')
+      setMessage(`No pudimos cambiar estado de membresia: ${error.message}`)
+      return
     }
 
-    const { error } = await supabase.from('memberships').update(payload).eq('id', membership.id)
-    if (error) return setMessage('No pudimos actualizar la membresia.')
+    setMessageType('success')
+    setMessage(`Membresia actualizada a ${status}.`)
     refreshData()
+  }
+
+  async function renewMembership(membership) {
+    const { error } = await supabase.rpc('admin_renew_membership', {
+      target_membership_id: membership.id,
+    })
+
+    if (error) {
+      setMessageType('error')
+      setMessage(`No pudimos renovar la membresia: ${error.message}`)
+      return
+    }
+
+    setMessageType('success')
+    setMessage('Plan renovado. Se creo un nuevo ciclo de 30 dias sin acumular tokens anteriores.')
+    refreshData()
+  }
+
+  async function extendMembershipSevenDays(membership) {
+    const { error } = await supabase.rpc('admin_extend_membership', {
+      target_membership_id: membership.id,
+      days_input: 7,
+    })
+
+    if (error) {
+      setMessageType('error')
+      setMessage(`No pudimos extender la membresia: ${error.message}`)
+      return
+    }
+
+    setMessageType('success')
+    setMessage('Membresia extendida 7 dias.')
+    refreshData()
+  }
+
+  async function adjustMembershipTokens(membership) {
+    const tokens = getMembershipTokens(membership)
+    const nextValue = window.prompt(
+      `Tokens usados actuales: ${tokens.used}. Ingresa el nuevo total de tokens usados:`,
+      String(membership.classes_used ?? 0),
+    )
+
+    if (nextValue === null) return
+
+    const parsedValue = Number(nextValue)
+    if (!Number.isInteger(parsedValue) || parsedValue < 0) {
+      setMessageType('error')
+      setMessage('Ingresa un numero entero de tokens usados.')
+      return
+    }
+
+    const { error } = await supabase.rpc('admin_adjust_tokens', {
+      target_membership_id: membership.id,
+      classes_used_input: parsedValue,
+      reason_input: 'Ajuste manual admin desde acciones rapidas',
+    })
+
+    if (error) {
+      setMessageType('error')
+      setMessage(`No pudimos ajustar tokens: ${error.message}`)
+      return
+    }
+
+    setMessageType('success')
+    setMessage('Tokens usados actualizados y movimiento manual registrado.')
+    refreshData()
+  }
+
+  function prepareMembershipActivation(profileId = '') {
+    setMembershipDraft((current) => ({ ...current, profile_id: profileId, start_date: new Date().toISOString().slice(0, 10) }))
+    scrollToTarget('membership-activate')
   }
 
   async function saveWod(event) {
@@ -1102,11 +1266,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         <p className="mt-3 text-sm leading-6 text-white/60">
           Panel conectado a Supabase. Los cambios quedan guardados en la base de datos y protegidos por RLS.
         </p>
-        <div className="mt-5 grid grid-cols-4 gap-2">
-          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.students}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Alumnos</p></div>
-          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.activeMemberships}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Membresias</p></div>
-          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.reservations}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Reservas</p></div>
-          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.plans}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Planes</p></div>
+        <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-5">
+          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.students}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Alumnos totales</p></div>
+          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.activeStudents}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Alumnos activos</p></div>
+          <div className="k-stat"><p className="text-2xl font-black text-kupan-flame">{totals.expiredMemberships}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Planes vencidos</p></div>
+          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.todayReservations}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Reservas hoy</p></div>
+          <div className="k-stat"><p className="text-2xl font-black text-kupan-flame">{totals.lowTokenMemberships}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Tokens bajos</p></div>
         </div>
         <button type="button" className="k-button mt-5 w-full" onClick={refreshData} disabled={isLoading}>
           {isLoading ? 'Actualizando...' : 'Actualizar datos'}
@@ -1124,6 +1289,45 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
             {message}
           </p>
         ) : null}
+        {sectionErrors.length > 0 ? (
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {sectionErrors.map((error) => (
+              <p key={`${error.key}-${error.label}`} className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-xs font-bold leading-5 text-white">
+                {error.message}
+              </p>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="k-card p-4">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+          <label className="block">
+            <span className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Buscar alumno</span>
+            <input
+              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/35 focus:border-kupan-ember"
+              type="search"
+              value={studentQuery}
+              placeholder="Nombre, email o telefono..."
+              onChange={(event) => setStudentQuery(event.target.value)}
+            />
+          </label>
+          <p className="text-sm font-black uppercase text-white/60">{filteredProfiles.length} resultados</p>
+        </div>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {studentFilters.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              className={`min-w-max rounded-lg px-3 py-2 text-xs font-black uppercase transition ${
+                studentFilter === filter.id ? 'bg-kupan-ember text-white shadow-glow' : 'border border-white/10 bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
+              }`}
+              onClick={() => setStudentFilter(filter.id)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
       </section>
 
       <div className="grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
@@ -1253,7 +1457,10 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
       {activeSection === 'students' ? (
         <AdminSection eyebrow="Alumnos" title="Perfiles registrados">
-          {adminData.profiles.map((student) => (
+          {filteredProfiles.length === 0 ? (
+            <SmallRow title="Sin resultados" meta="Filtro activo" detail="No encontramos alumnos con esa busqueda o filtro." />
+          ) : null}
+          {filteredProfiles.map((student) => (
             <SmallRow key={student.id} title={student.full_name} meta={`${student.level} · ${student.status}`} detail={`${student.email}${student.phone ? ` · ${student.phone}` : ''}`} />
           ))}
         </AdminSection>
@@ -1296,23 +1503,71 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           </div>
 
           <div ref={membershipsOverviewRef} className="grid scroll-mt-28 gap-3 md:grid-cols-2">
-            {adminData.profiles.map((profile) => {
+            {filteredProfiles.map((profile) => {
               const activeMembership = activeMembershipByProfile.get(profile.id)
               const tokens = activeMembership ? getMembershipTokens(activeMembership) : null
               return (
-                <SmallRow
-                  key={profile.id}
-                  title={profile.full_name}
-                  meta={activeMembership ? `Plan actual: ${activeMembership.plan?.name ?? 'Plan'}` : 'Sin plan activo'}
-                  detail={activeMembership ? `Vence ${formatDate(activeMembership.end_date)} · ${activeMembership.status} · tokens ${tokens.remaining}/${tokens.total}` : profile.email}
-                  action={activeMembership ? (
-                    <button type="button" className="k-button-secondary shrink-0 px-3 py-2 text-xs" onClick={() => startEditMembership(activeMembership)}>
-                      Editar
+                <article key={profile.id} className="k-panel p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">{activeMembership ? activeMembership.plan?.name ?? 'Plan KUPAN' : 'Sin plan activo'}</p>
+                      <h3 className="mt-2 break-words text-lg font-black uppercase text-white">{profile.full_name}</h3>
+                      <p className="mt-1 text-sm leading-6 text-white/60">{profile.email}</p>
+                    </div>
+                    <span className={`k-pill shrink-0 ${
+                      activeMembership?.status === 'active' ? 'text-kupan-flame' : activeMembership ? 'text-white/60' : 'text-kupan-red'
+                    }`}
+                    >
+                      {activeMembership?.status ?? 'sin plan'}
+                    </span>
+                  </div>
+
+                  {activeMembership ? (
+                    <>
+                      <div className="mt-4 grid grid-cols-4 gap-2">
+                        <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+                          <p className="text-[0.62rem] font-black uppercase text-white/50">Total</p>
+                          <p className="mt-1 text-sm font-black uppercase text-white">{tokens.total}</p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+                          <p className="text-[0.62rem] font-black uppercase text-white/50">Usados</p>
+                          <p className="mt-1 text-sm font-black uppercase text-white">{tokens.used}</p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+                          <p className="text-[0.62rem] font-black uppercase text-white/50">Disponibles</p>
+                          <p className="mt-1 text-sm font-black uppercase text-kupan-flame">{tokens.remaining}</p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+                          <p className="text-[0.62rem] font-black uppercase text-white/50">Vence</p>
+                          <p className="mt-1 text-xs font-black uppercase text-white">{formatDate(activeMembership.end_date)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <button type="button" className="k-button px-3 py-2 text-xs" onClick={() => renewMembership(activeMembership)}>Renovar plan</button>
+                        <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => adjustMembershipTokens(activeMembership)}>Ajustar tokens usados</button>
+                        {activeMembership.status === 'paused' ? (
+                          <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(activeMembership, 'active')}>Activar plan</button>
+                        ) : (
+                          <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(activeMembership, 'paused')}>Congelar / pausar</button>
+                        )}
+                        <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => extendMembershipSevenDays(activeMembership)}>Extender 7 dias</button>
+                        <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => startEditMembership(activeMembership)}>Editar avanzado</button>
+                        {activeMembership.status !== 'cancelled' ? (
+                          <button type="button" className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white" onClick={() => updateMembershipStatus(activeMembership, 'cancelled')}>Cancelar plan</button>
+                        ) : null}
+                      </div>
+                    </>
+                  ) : (
+                    <button type="button" className="k-button mt-4 w-full" onClick={() => prepareMembershipActivation(profile.id)}>
+                      Activar plan
                     </button>
-                  ) : null}
-                />
+                  )}
+                </article>
               )
             })}
+            {filteredProfiles.length === 0 ? (
+              <SmallRow title="Sin resultados" meta="Filtro activo" detail="No encontramos alumnos con esa busqueda o filtro." />
+            ) : null}
           </div>
 
           <form ref={membershipActivateRef} className="k-panel grid scroll-mt-28 gap-3 p-4 sm:grid-cols-2" onSubmit={saveMembership}>
@@ -1403,7 +1658,10 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
                 detail={`Inicio ${formatDate(membership.start_date)} · tokens ${tokens.used}/${tokens.total} · disponibles ${tokens.remaining}${membership.notes ? ` · ${membership.notes}` : ''}`}
                 action={(
                   <div className="grid shrink-0 gap-2">
-                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => startEditMembership(membership)}>Editar</button>
+                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => renewMembership(membership)}>Renovar</button>
+                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => adjustMembershipTokens(membership)}>Tokens</button>
+                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => extendMembershipSevenDays(membership)}>+7 dias</button>
+                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => startEditMembership(membership)}>Avanzado</button>
                     {membership.status === 'active' ? (
                       <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(membership, 'paused')}>Pausar</button>
                     ) : (

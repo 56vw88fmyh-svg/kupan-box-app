@@ -97,8 +97,8 @@ export function Home({ setActivePage, appContent }) {
       <section>
         <SectionTitle eyebrow="Organiza tu semana" title="Horarios para darlo todo" />
         <div className="grid gap-3 md:grid-cols-3">
-          {schedule.slice(1, 4).map((item) => (
-            <button key={`${item.time}-${item.name}`} type="button" className="k-panel p-4 text-left transition hover:border-kupan-flame/60" onClick={() => setActivePage('reservations')}>
+          {schedule.slice(1, 4).map((item, index) => (
+            <button key={`${item.day ?? item.level ?? 'kupan'}-${item.time}-${item.name}-${index}`} type="button" className="k-panel p-4 text-left transition hover:border-kupan-flame/60" onClick={() => setActivePage('reservations')}>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-2xl font-black text-white">{item.time}</p>
                 <span className="k-pill text-kupan-flame">{item.spots} disponibles</span>

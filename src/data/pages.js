@@ -6,6 +6,8 @@ export const pages = [
   { id: 'community', path: '/comunidad', label: 'Comunidad', title: 'Comunidad', eyebrow: 'El WOD termina juntos', icon: 'C' },
   { id: 'profile', path: '/perfil', label: 'Perfil', title: 'Perfil', eyebrow: 'Tu esfuerzo va sumando', icon: 'U' },
   { id: 'prs', path: '/mis-pr', label: 'Mis PR', title: 'Mis PR', eyebrow: 'Marcas que se celebran', icon: 'M', hidden: true },
+  { id: 'ranking', path: '/ranking', label: 'Ranking', title: 'Ranking KUPAN', eyebrow: 'Mejores marcas del box', icon: 'R', hidden: true },
   { id: 'login', path: '/login', label: 'Login', title: 'Acceso KUPAN', eyebrow: 'Entrena acompañado', icon: 'L', hidden: true },
   { id: 'admin', path: '/admin', label: 'Admin', title: 'Admin KUPAN', eyebrow: 'Panel Supabase', icon: 'A', hidden: true },
+  { id: 'coach', path: '/coach', label: 'Coach', title: 'Modo Coach', eyebrow: 'Asistencia del día', icon: 'C', hidden: true },
 ]

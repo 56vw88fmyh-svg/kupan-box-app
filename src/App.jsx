@@ -5,6 +5,7 @@ import { BottomNav } from './components/BottomNav.jsx'
 import { AppShell } from './components/AppShell.jsx'
 import { LoadingScreen } from './components/LoadingScreen.jsx'
 import { MotionPage } from './components/Motion.jsx'
+import { PwaUpdateBanner } from './components/PwaUpdateBanner.jsx'
 import { pages } from './data/pages.js'
 import { isSupabaseConfigured, supabase } from './lib/supabase.js'
 import { getCurrentSupabaseUser, loginWithSupabase, logoutFromSupabase, registerWithSupabase } from './utils/auth.js'
@@ -13,11 +14,13 @@ import { loadSharedContent } from './utils/sharedContent.js'
 
 const Admin = lazy(() => import('./pages/Admin.jsx').then((module) => ({ default: module.Admin })))
 const Auth = lazy(() => import('./pages/Auth.jsx').then((module) => ({ default: module.Auth })))
+const Coach = lazy(() => import('./pages/Coach.jsx').then((module) => ({ default: module.Coach })))
 const Community = lazy(() => import('./pages/Community.jsx').then((module) => ({ default: module.Community })))
 const Home = lazy(() => import('./pages/Home.jsx').then((module) => ({ default: module.Home })))
 const Plans = lazy(() => import('./pages/Plans.jsx').then((module) => ({ default: module.Plans })))
 const PersonalRecords = lazy(() => import('./pages/PersonalRecords.jsx').then((module) => ({ default: module.PersonalRecords })))
 const Profile = lazy(() => import('./pages/Profile.jsx').then((module) => ({ default: module.Profile })))
+const Ranking = lazy(() => import('./pages/Ranking.jsx').then((module) => ({ default: module.Ranking })))
 const Reservations = lazy(() => import('./pages/Reservations.jsx').then((module) => ({ default: module.Reservations })))
 const Wod = lazy(() => import('./pages/Wod.jsx').then((module) => ({ default: module.Wod })))
 
@@ -123,7 +126,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <AppShell title={page.title} eyebrow={page.eyebrow}>
+      <AppShell title={page.title} eyebrow={page.eyebrow} currentUser={currentUser}>
         <AnimatePresence>{isLoading ? <LoadingScreen /> : null}</AnimatePresence>
         <AnimatePresence mode="wait">
           <MotionPage key={location.pathname}>
@@ -146,15 +149,18 @@ export default function App() {
                 <Route path="/wod" element={<Wod appContent={appContent} />} />
                 <Route path="/planes" element={<Plans appContent={appContent} />} />
                 <Route path="/comunidad" element={<Community appContent={appContent} />} />
-                <Route path="/perfil" element={<Profile currentUser={currentUser} onLogout={logout} setActivePage={goToPage} userReservations={[]} onCancelReservation={() => {}} onUserUpdate={setCurrentUser} />} />
+                <Route path="/perfil" element={<Profile currentUser={currentUser} onLogout={logout} setActivePage={goToPage} onUserUpdate={setCurrentUser} />} />
                 <Route path="/mis-pr" element={<PersonalRecords currentUser={currentUser} setActivePage={goToPage} />} />
+                <Route path="/ranking" element={<Ranking />} />
                 <Route path="/login" element={<Auth onLogin={login} onRegister={register} />} />
                 <Route path="/admin" element={<Admin currentUser={currentUser} setActivePage={goToPage} onContentChange={async () => setAppContent(await loadSharedContent())} />} />
+                <Route path="/coach" element={<Coach currentUser={currentUser} setActivePage={goToPage} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
           </MotionPage>
         </AnimatePresence>
+        <PwaUpdateBanner />
         <BottomNav pages={pages} />
       </AppShell>
     </MotionConfig>

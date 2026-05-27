@@ -25,11 +25,23 @@ function getCurrentReservationDayId() {
   return currentDay === 0 ? '1' : String(currentDay)
 }
 
+function formatMembershipDate(date) {
+  if (!date) return 'Sin fecha'
+  return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`))
+}
+
+function getClassStatus(item) {
+  if (item.isReserved) return { label: 'Reservada', tone: 'reserved' }
+  if (item.isFull) return { label: 'Completa', tone: 'full' }
+  return { label: 'Disponible', tone: 'available' }
+}
+
 function ReservationCard({ item, isSelected, onSelect }) {
   const maxSpots = item.maxSpots ?? 12
   const isDisabled = item.isFull || item.isReserved
   const reservedSpots = maxSpots - item.spots
   const progress = Math.min(Math.max((reservedSpots / maxSpots) * 100, 0), 100)
+  const status = getClassStatus(item)
 
   return (
     <Motion.button
@@ -53,24 +65,91 @@ function ReservationCard({ item, isSelected, onSelect }) {
           <p className="mt-1 text-sm font-semibold text-white/60">Coach {item.coach}</p>
           <p className="mt-1 text-xs font-black uppercase text-white/60">Máximo {maxSpots} alumnos</p>
         </div>
-        <span className={`k-pill ${item.isFull ? 'text-white/60' : 'text-kupan-flame'}`}>
-          {item.isFull ? 'Clase completa' : `${item.spots} cupos`}
-        </span>
+        <div className="shrink-0 text-right">
+          <span className={`k-pill ${
+            status.tone === 'available' ? 'text-kupan-flame' : status.tone === 'reserved' ? 'text-emerald-300' : 'text-white/60'
+          }`}
+          >
+            {status.label}
+          </span>
+          <p className="mt-2 text-2xl font-black text-white">{item.spots}</p>
+          <p className="text-[0.65rem] font-black uppercase text-white/50">cupos</p>
+        </div>
       </div>
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
         <div className={`h-full rounded-full ${item.isFull ? 'bg-kupan-flame' : 'bg-kupan-ember'}`} style={{ width: `${progress}%` }} />
       </div>
-      <div className={`mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-black uppercase ${
-        isSelected ? 'bg-kupan-ember text-white' : 'border border-white/15 bg-white/10 text-white'
+      <div className={`mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-lg px-4 text-base font-black uppercase ${
+        isSelected ? 'bg-kupan-ember text-white shadow-glow' : item.isReserved ? 'border border-emerald-300/30 bg-emerald-300/10 text-emerald-200' : 'border border-white/15 bg-white/10 text-white'
       }`}
       >
-        {item.isFull ? 'Clase completa' : item.isReserved ? 'Ya reservada' : isSelected ? 'Lista para confirmar' : 'Reservar clase'}
+        {item.isFull ? 'Clase completa' : item.isReserved ? 'Ya reservaste' : isSelected ? 'Confirmar abajo' : 'Reservar'}
       </div>
     </Motion.button>
   )
 }
 
-function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasActiveMembership, membership, remainingTokens }) {
+function PlanStatusCard({ currentUser, hasActiveMembership, membership, remainingTokens, isLoading }) {
+  const isUnlimitedPlan = Boolean(membership?.is_unlimited)
+  const planName = membership?.plan?.name ?? membership?.plan_name ?? 'Plan KUPAN'
+  const expiresAt = membership?.end_date ?? membership?.expires_at
+  const hasTokens = isUnlimitedPlan || remainingTokens === null || Number(remainingTokens) > 0
+
+  if (!currentUser) {
+    return (
+      <MotionCard as="section" className="k-card p-5">
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Tu acceso</p>
+        <h2 className="mt-2 text-2xl font-black uppercase text-white">Inicia sesión para reservar.</h2>
+        <p className="mt-2 text-sm leading-6 text-white/60">Así podemos revisar tu plan, tokens y reservas activas.</p>
+      </MotionCard>
+    )
+  }
+
+  return (
+    <MotionCard as="section" className="k-card overflow-hidden p-0">
+      <div className="border-b border-white/10 bg-black/25 p-5">
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Tu plan y tokens</p>
+        <h2 className="mt-2 text-2xl font-black uppercase text-white">
+          {isLoading ? 'Actualizando datos...' : hasActiveMembership ? planName : 'Sin plan activo'}
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-white/60">
+          {hasActiveMembership
+            ? 'Reserva con calma: al confirmar se descuenta un token si tu plan no es Full.'
+            : 'Tu plan está vencido, pausado, sin pago confirmado o aún no fue activado.'}
+        </p>
+      </div>
+      <div className="grid grid-cols-3 gap-0 border-b border-white/10">
+        <div className="p-4">
+          <p className="text-xs font-black uppercase text-white/60">Tokens</p>
+          <p className="mt-1 text-2xl font-black uppercase text-white">
+            {hasActiveMembership ? (isUnlimitedPlan ? 'Full' : remainingTokens ?? 0) : '-'}
+          </p>
+        </div>
+        <div className="border-l border-white/10 p-4">
+          <p className="text-xs font-black uppercase text-white/60">Vence</p>
+          <p className="mt-1 text-sm font-black uppercase text-white">{hasActiveMembership ? formatMembershipDate(expiresAt) : 'Sin fecha'}</p>
+        </div>
+        <div className="border-l border-white/10 p-4">
+          <p className="text-xs font-black uppercase text-white/60">Estado</p>
+          <p className={`mt-1 text-sm font-black uppercase ${hasActiveMembership && hasTokens ? 'text-kupan-flame' : 'text-white/60'}`}>
+            {hasActiveMembership ? (hasTokens ? 'Listo' : 'Sin tokens') : 'Bloqueado'}
+          </p>
+        </div>
+      </div>
+      {!hasActiveMembership ? (
+        <p className="m-5 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4 text-sm font-black uppercase leading-6 text-white">
+          No puedes reservar porque no tienes un plan activo. Si ya pagaste, avísanos para revisar tu membresía.
+        </p>
+      ) : !hasTokens ? (
+        <p className="m-5 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4 text-sm font-black uppercase leading-6 text-white">
+          No tienes tokens disponibles. Para seguir reservando debes renovar tu plan.
+        </p>
+      ) : null}
+    </MotionCard>
+  )
+}
+
+function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasActiveMembership, membership, remainingTokens, isSubmitting }) {
   const isUnlimitedPlan = Boolean(membership?.is_unlimited)
   const hasTokens = isUnlimitedPlan || remainingTokens === null || Number(remainingTokens) > 0
   const canConfirm = selectedClass && !selectedClass.isFull && !selectedClass.isReserved && hasActiveMembership && hasTokens
@@ -119,7 +198,7 @@ function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasA
               ? hasTokens
                 ? 'Confirma tu cupo y queda listo para entrenar fuerte con la comunidad.'
                 : 'Tu plan esta activo, pero ya usaste todos tus tokens. Para seguir reservando debes renovar.'
-              : `Para reservar necesitas membresía activa. Estado actual: ${membership?.status ?? 'sin plan activo'}.`
+              : 'Para reservar necesitas membresía activa y pagada. Si tu plan venció, debes renovarlo antes de reservar.'
             : 'Inicia sesión para tomar este cupo y mantener tu reserva guardada.'}
         </p>
         {currentUser && hasActiveMembership ? (
@@ -128,11 +207,11 @@ function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasA
           </p>
         ) : null}
         {currentUser ? (
-          <button type="button" className={`w-full ${canConfirm ? 'k-button' : 'k-button-secondary opacity-60'}`} disabled={!canConfirm} onClick={() => onConfirm(selectedClass)}>
-            {!hasActiveMembership ? 'Membresía requerida' : !hasTokens ? 'Sin tokens disponibles' : selectedClass.isFull ? 'Clase completa' : selectedClass.isReserved ? 'Ya tienes esta reserva' : 'Confirmar reserva'}
+          <button type="button" className={`min-h-14 w-full text-base ${canConfirm ? 'k-button' : 'k-button-secondary opacity-60'}`} disabled={!canConfirm || isSubmitting} onClick={() => onConfirm(selectedClass)}>
+            {isSubmitting ? 'Confirmando...' : !hasActiveMembership ? 'Plan vencido o inactivo' : !hasTokens ? 'Sin tokens disponibles' : selectedClass.isFull ? 'Clase completa' : selectedClass.isReserved ? 'Ya tienes esta reserva' : 'Confirmar reserva'}
           </button>
         ) : (
-          <button type="button" className="k-button w-full" onClick={onGoLogin}>
+          <button type="button" className="k-button min-h-14 w-full text-base" onClick={onGoLogin}>
             Iniciar sesión para reservar
           </button>
         )}
@@ -166,7 +245,7 @@ function SuccessMessage({ reservation, onGoProfile, onNewReservation }) {
   )
 }
 
-function ReservationList({ reservations, onCancelReservation }) {
+function ReservationList({ reservations, onCancelReservation, cancellingId }) {
   if (reservations.length === 0) {
     return (
       <MotionCard className="k-panel p-4">
@@ -189,8 +268,8 @@ function ReservationList({ reservations, onCancelReservation }) {
               <p className="text-sm text-white/60">{item.time} · Coach {item.coach}</p>
               <span className="k-pill mt-3 inline-flex text-kupan-flame">{item.status}</span>
             </div>
-            <button type="button" className="k-button-secondary shrink-0 px-3 py-2 text-xs" onClick={() => onCancelReservation(item.id)}>
-              Cancelar
+            <button type="button" className="k-button-secondary min-h-11 shrink-0 px-3 py-2 text-xs" disabled={cancellingId === item.id} onClick={() => onCancelReservation(item.id)}>
+              {cancellingId === item.id ? 'Cancelando...' : 'Cancelar'}
             </button>
           </div>
         </MotionCard>
@@ -207,6 +286,8 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   const [hasActiveMembership, setHasActiveMembership] = useState(false)
   const [remainingTokens, setRemainingTokens] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSubmittingReservation, setIsSubmittingReservation] = useState(false)
+  const [cancellingReservationId, setCancellingReservationId] = useState('')
   const [reservationMessage, setReservationMessage] = useState('')
   const [selectedDayId, setSelectedDayId] = useState(getCurrentReservationDayId)
   const [selectedClass, setSelectedClass] = useState(null)
@@ -272,24 +353,30 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   }
 
   async function handleConfirm(classItem) {
+    setIsSubmittingReservation(true)
     const result = await createSupabaseReservation(currentUser?.id, classItem, hasActiveMembership)
     if (!result.ok) {
+      setIsSubmittingReservation(false)
       setReservationMessage(result.message)
       return
     }
     setSuccessReservation(result.reservation)
     setSelectedClass(null)
-    refreshReservations()
+    await refreshReservations()
+    setIsSubmittingReservation(false)
   }
 
   async function handleCancelReservation(reservationId) {
+    setCancellingReservationId(reservationId)
     const result = await cancelSupabaseReservation(reservationId)
     if (!result.ok) {
+      setCancellingReservationId('')
       setReservationMessage(result.message)
       return
     }
     setReservationMessage(result.message)
-    refreshReservations()
+    await refreshReservations()
+    setCancellingReservationId('')
   }
 
   function handleNewReservation() {
@@ -327,6 +414,14 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
 
       <SuccessMessage reservation={successReservation} onGoProfile={() => setActivePage('profile')} onNewReservation={handleNewReservation} />
 
+      <PlanStatusCard
+        currentUser={currentUser}
+        hasActiveMembership={hasActiveMembership}
+        membership={membership}
+        remainingTokens={remainingTokens}
+        isLoading={isLoading}
+      />
+
       <BookingSummary
         selectedClass={selectedClass}
         currentUser={currentUser}
@@ -335,6 +430,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
         hasActiveMembership={hasActiveMembership}
         membership={membership}
         remainingTokens={remainingTokens}
+        isSubmitting={isSubmittingReservation}
       />
 
       <section>
@@ -388,7 +484,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
 
       <section>
         <SectionTitle eyebrow="Mis cupos" title="Tu agenda KUPAN" />
-        <ReservationList reservations={userActiveReservations} onCancelReservation={handleCancelReservation} />
+        <ReservationList reservations={userActiveReservations} onCancelReservation={handleCancelReservation} cancellingId={cancellingReservationId} />
       </section>
     </div>
   )

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion as Motion } from 'framer-motion'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
-import { profile as mockProfile } from '../data/mockData.js'
 import { updateCurrentUserPassword } from '../utils/auth.js'
 import {
   calculateAge,
@@ -22,6 +21,15 @@ const weeklyProgress = [
 ]
 
 const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
+
+function getChileDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
 
 function formatDate(date) {
   if (!date) return 'Sin registrar'
@@ -62,7 +70,116 @@ function EditableField({ label, type = 'text', value, onChange, required = false
   )
 }
 
-export function Profile({ userReservations, onCancelReservation, setActivePage, currentUser, onLogout, onUserUpdate }) {
+function getReservationClass(reservation) {
+  return reservation?.class_schedule ?? {
+    day_of_week: Number(reservation?.dayId ?? 0),
+    time: reservation?.time,
+    class_name: reservation?.name,
+    coach: reservation?.coach,
+  }
+}
+
+function StudentDashboard({
+  isLoading,
+  message,
+  activeMembership,
+  nextReservation,
+  classesRemaining,
+  isUnlimitedPlan,
+  setActivePage,
+}) {
+  const planIsActive = Boolean(activeMembership?.status === 'active')
+  const showPlanWarning = !isLoading && !planIsActive
+  const membershipEndDate = activeMembership?.end_date ?? activeMembership?.expires_at
+  const classItem = getReservationClass(nextReservation)
+  const dayLabel = classItem?.day_of_week ? dayNames[classItem.day_of_week] : nextReservation?.day
+  const classTime = classItem?.time?.slice?.(0, 5) ?? classItem?.time ?? ''
+  const className = classItem?.class_name ?? 'Clase KUPAN'
+  const coach = classItem?.coach ?? 'Coach KUPAN'
+
+  return (
+    <MotionCard as="section" className="k-card overflow-hidden p-0" delay={0.025}>
+      <div className="border-b border-white/10 bg-black/25 p-5">
+        <p className="k-pill inline-flex text-kupan-flame">Panel alumno</p>
+        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Tu semana KUPAN clara y al tiro.</h2>
+        <p className="mt-3 text-sm leading-6 text-white/60">
+          Revisa tu próxima clase, tokens y plan antes de reservar.
+        </p>
+      </div>
+
+      {isLoading ? (
+        <p className="border-b border-white/10 p-5 text-sm font-bold text-white/60">Cargando tu información real desde Supabase...</p>
+      ) : null}
+
+      {message ? (
+        <p className="m-5 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{message}</p>
+      ) : null}
+
+      <div className="grid gap-3 p-5 sm:grid-cols-3">
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 sm:col-span-3">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Próxima clase</p>
+          {isLoading ? (
+            <>
+              <h3 className="mt-2 text-2xl font-black uppercase leading-tight text-white">Revisando tus reservas...</h3>
+              <p className="mt-2 text-sm leading-6 text-white/60">Estamos cargando tu próxima clase desde Supabase.</p>
+            </>
+          ) : nextReservation ? (
+            <>
+              <h3 className="mt-2 text-3xl font-black uppercase leading-none text-white">{className}</h3>
+              <p className="mt-2 text-sm font-bold text-white/65">
+                {formatDate(nextReservation.reservation_date ?? nextReservation.reservationDate)} · {dayLabel} · {classTime} · Coach {coach}
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="mt-2 text-2xl font-black uppercase leading-tight text-white">Aún no tienes una clase reservada.</h3>
+              <p className="mt-2 text-sm leading-6 text-white/60">Reserva tu clase y ven a darlo todo con la comunidad.</p>
+            </>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+          <p className="text-xs font-black uppercase text-white/55">Tokens disponibles</p>
+          <p className="mt-2 text-3xl font-black uppercase text-white">
+            {isLoading ? '...' : planIsActive ? (isUnlimitedPlan ? 'Full' : classesRemaining) : 'Sin plan'}
+          </p>
+          <p className="mt-1 text-xs font-bold uppercase text-kupan-flame">
+            {isLoading ? 'cargando' : planIsActive ? (isUnlimitedPlan ? 'Ilimitado' : 'clases restantes') : 'activa tu membresía'}
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+          <p className="text-xs font-black uppercase text-white/55">Vence</p>
+          <p className="mt-2 text-xl font-black uppercase text-white">{isLoading ? 'Cargando...' : planIsActive ? formatDate(membershipEndDate) : 'Sin plan activo'}</p>
+          <p className="mt-1 text-xs font-bold uppercase text-kupan-flame">30 días desde activación</p>
+        </div>
+
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+          <p className="text-xs font-black uppercase text-white/55">Estado</p>
+          <p className="mt-2 text-xl font-black uppercase text-white">{isLoading ? 'Conectando' : planIsActive ? 'Listo para entrenar' : 'Plan requerido'}</p>
+          <p className="mt-1 text-xs font-bold uppercase text-kupan-flame">{isLoading ? 'Supabase' : planIsActive ? 'somos comunidad' : 'habla con el box'}</p>
+        </div>
+      </div>
+
+      {showPlanWarning ? (
+        <div className="mx-5 mb-5 rounded-lg border border-kupan-flame/35 bg-kupan-flame/10 p-4">
+          <p className="text-sm font-black uppercase leading-6 text-white">No tienes un plan activo. Activa tu membresía para poder reservar clases.</p>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 border-t border-white/10 p-5 sm:grid-cols-2">
+        <button type="button" className="k-button w-full" onClick={() => setActivePage('reservations')}>
+          Reservar clase
+        </button>
+        <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('prs')}>
+          Mis PR
+        </button>
+      </div>
+    </MotionCard>
+  )
+}
+
+export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) {
   const [profileData, setProfileData] = useState(null)
   const [isFetchingProfile, setIsFetchingProfile] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -120,14 +237,11 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
 
   const supabaseProfile = profileData?.profile
   const activeMembership = profileData?.membership
-  const supabaseReservations = profileData?.reservations ?? []
-  const personalRecords = profileData?.records ?? []
-  const localReservations = currentUser
-    ? userReservations.filter((reservation) => reservation.userId === currentUser.id)
-    : []
-  const visibleReservations = supabaseReservations.length > 0 ? supabaseReservations : localReservations
+  const supabaseReservations = useMemo(() => profileData?.reservations ?? [], [profileData?.reservations])
+  const personalRecords = useMemo(() => profileData?.records ?? [], [profileData?.records])
+  const visibleReservations = supabaseReservations
 
-  const profileName = supabaseProfile?.full_name ?? currentUser?.name ?? mockProfile.name
+  const profileName = supabaseProfile?.full_name ?? currentUser?.name ?? 'Atleta KUPAN'
   const email = supabaseProfile?.email ?? currentUser?.email ?? 'Inicia sesion para guardar tu progreso'
   const phone = supabaseProfile?.phone ?? currentUser?.phone ?? ''
   const birthDate = supabaseProfile?.birth_date ?? currentUser?.birthDate ?? ''
@@ -142,11 +256,27 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
   const classesUsed = activeMembership?.classes_used ?? 0
   const classesRemaining = isUnlimitedPlan ? null : Math.max(Number(classesTotal ?? 0) - Number(classesUsed), 0)
   const daysRemaining = calculateDaysRemaining(activeMembership?.end_date)
+  const nextReservation = useMemo(() => {
+    const today = getChileDateString()
+
+    return supabaseReservations
+      .filter((reservation) => {
+        const date = reservation.reservation_date ?? reservation.reservationDate
+        return date >= today && reservation.status === 'reserved'
+      })
+      .sort((a, b) => {
+        const aClass = getReservationClass(a)
+        const bClass = getReservationClass(b)
+        const aDateTime = `${a.reservation_date ?? a.reservationDate}T${aClass?.time ?? '00:00'}`
+        const bDateTime = `${b.reservation_date ?? b.reservationDate}T${bClass?.time ?? '00:00'}`
+        return aDateTime.localeCompare(bDateTime)
+      })[0] ?? null
+  }, [supabaseReservations])
 
   const weeklyCompleted = weeklyProgress.filter((item) => item.done).length
   const weeklyGoal = weeklyProgress.length
   const weeklyPercent = Math.round((weeklyCompleted / weeklyGoal) * 100)
-  const attendance = currentUser ? mockProfile.attendance + visibleReservations.length : mockProfile.attendance
+  const attendance = supabaseReservations.filter((reservation) => reservation.status === 'attended').length
   const motivation = 'Entrena fuerte, entrena acompañado. El progreso se construye apareciendo.'
 
   const stats = useMemo(() => ([
@@ -299,6 +429,16 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
           </button>
         </div>
       </MotionCard>
+
+      <StudentDashboard
+        isLoading={isFetchingProfile}
+        message={profileMessage && messageType === 'error' ? profileMessage : ''}
+        activeMembership={activeMembership}
+        nextReservation={nextReservation}
+        classesRemaining={classesRemaining}
+        isUnlimitedPlan={isUnlimitedPlan}
+        setActivePage={setActivePage}
+      />
 
       <MotionCard as="section" className="k-card p-5" delay={0.03}>
         <SectionTitle eyebrow="Datos del atleta" title="Tu ficha KUPAN" />
@@ -500,11 +640,6 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
                         {dayLabel} · Coach {isSupabaseReservation ? classItem.coach : item.coach} · cupo confirmado
                       </p>
                     </div>
-                    {!isSupabaseReservation ? (
-                      <button type="button" className="k-button-secondary shrink-0 px-3 py-2 text-xs" onClick={() => onCancelReservation(item.id)}>
-                        Cancelar
-                      </button>
-                    ) : null}
                   </div>
                 </MotionCard>
               )
@@ -523,31 +658,40 @@ export function Profile({ userReservations, onCancelReservation, setActivePage, 
         <button type="button" className="k-button mb-4 w-full" onClick={() => setActivePage('prs')}>
           Gestionar mis PR
         </button>
-        <div className="space-y-3">
-          {(personalRecords.length > 0 ? personalRecords : mockProfile.prs).map((record) => (
-            <MotionCard key={record.id ?? record.lift} className="k-panel flex items-center justify-between gap-4 p-4">
-              <div>
-                <p className="font-black uppercase text-white">{record.movement ?? record.lift}</p>
-                {record.record_date ? <p className="mt-1 text-xs font-bold uppercase text-white/45">{formatDate(record.record_date)}</p> : null}
-              </div>
-              <p className="text-lg font-black text-kupan-flame">
-                {record.value} {record.unit ?? ''}
-              </p>
-            </MotionCard>
-          ))}
-        </div>
+        {personalRecords.length > 0 ? (
+          <div className="space-y-3">
+            {personalRecords.map((record) => (
+              <MotionCard key={record.id} className="k-panel flex items-center justify-between gap-4 p-4">
+                <div>
+                  <p className="font-black uppercase text-white">{record.movement}</p>
+                  {record.record_date ? <p className="mt-1 text-xs font-bold uppercase text-white/45">{formatDate(record.record_date)}</p> : null}
+                </div>
+                <p className="text-lg font-black text-kupan-flame">
+                  {record.value} {record.unit ?? ''}
+                </p>
+              </MotionCard>
+            ))}
+          </div>
+        ) : (
+          <MotionCard className="k-panel p-4">
+            <p className="font-black uppercase text-white">Aún no tienes PR registrados.</p>
+            <p className="mt-1 text-sm leading-6 text-white/60">Entra a Mis PR y registra tu primera marca KUPAN.</p>
+          </MotionCard>
+        )}
       </section>
 
-      <MotionCard as="section" className="k-card p-5" delay={0.08}>
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Gestion del box</p>
-        <h2 className="mt-2 text-2xl font-black uppercase text-white">Panel admin KUPAN</h2>
-        <p className="mt-2 text-sm leading-6 text-white/60">
-          Gestiona alumnos, planes, reservas, WOD, horarios y comunidad desde Supabase.
-        </p>
-        <button type="button" className="k-button-secondary mt-4 w-full" onClick={() => setActivePage('admin')}>
-          Entrar a admin
-        </button>
-      </MotionCard>
+      {currentUser.role === 'admin' ? (
+        <MotionCard as="section" className="k-card p-5" delay={0.08}>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Gestion del box</p>
+          <h2 className="mt-2 text-2xl font-black uppercase text-white">Panel admin KUPAN</h2>
+          <p className="mt-2 text-sm leading-6 text-white/60">
+            Gestiona alumnos, planes, reservas, WOD, horarios y comunidad desde Supabase.
+          </p>
+          <button type="button" className="k-button-secondary mt-4 w-full" onClick={() => setActivePage('admin')}>
+            Entrar a admin
+          </button>
+        </MotionCard>
+      ) : null}
     </div>
   )
 }

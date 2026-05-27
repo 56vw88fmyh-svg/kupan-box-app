@@ -285,6 +285,9 @@ export function PersonalRecords({ currentUser, setActivePage }) {
           <p className="mt-3 text-sm leading-6 text-white/60">
             Registra tus mejores levantamientos, benchmarks y avances. Somos comunidad, esfuerzo y progreso.
           </p>
+          <button type="button" className="k-button-secondary mt-5 w-full" onClick={() => setActivePage('ranking')}>
+            Ver ranking interno
+          </button>
         </div>
         <div className="grid grid-cols-3 border-b border-white/10">
           <div className="p-4">
