@@ -680,16 +680,23 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         )}
       </section>
 
-      {currentUser.role === 'admin' ? (
+      {['admin', 'coach'].includes(currentUser.role) ? (
         <MotionCard as="section" className="k-card p-5" delay={0.08}>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Gestion del box</p>
-          <h2 className="mt-2 text-2xl font-black uppercase text-white">Panel admin KUPAN</h2>
+          <h2 className="mt-2 text-2xl font-black uppercase text-white">Herramientas KUPAN</h2>
           <p className="mt-2 text-sm leading-6 text-white/60">
-            Gestiona alumnos, planes, reservas, WOD, horarios y comunidad desde Supabase.
+            Entra al modo coach para ver la clase del día, reservas y asistencia.
           </p>
-          <button type="button" className="k-button-secondary mt-4 w-full" onClick={() => setActivePage('admin')}>
-            Entrar a admin
-          </button>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('coach')}>
+              Entrar a modo coach
+            </button>
+            {currentUser.role === 'admin' ? (
+              <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('admin')}>
+                Entrar a admin
+              </button>
+            ) : null}
+          </div>
         </MotionCard>
       ) : null}
     </div>

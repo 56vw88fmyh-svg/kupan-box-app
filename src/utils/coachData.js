@@ -139,6 +139,30 @@ export async function loadCoachDashboard() {
   }
 }
 
+export async function loadCoachManualReservationOptions() {
+  if (!isSupabaseConfigured || !supabase) {
+    return getCoachError('Supabase aun no esta configurado.')
+  }
+
+  try {
+    const [profilesResult, membershipsResult] = await Promise.all([
+      supabase.rpc('coach_get_manual_reservation_profiles'),
+      supabase.rpc('coach_get_manual_reservation_memberships'),
+    ])
+
+    if (profilesResult.error) return getCoachError(`No pudimos cargar alumnos: ${profilesResult.error.message}`)
+    if (membershipsResult.error) return getCoachError(`No pudimos cargar membresias: ${membershipsResult.error.message}`)
+
+    return {
+      ok: true,
+      profiles: profilesResult.data ?? [],
+      memberships: membershipsResult.data ?? [],
+    }
+  } catch (error) {
+    return getCoachError(`No pudimos preparar reserva manual: ${error.message}`)
+  }
+}
+
 export async function markCoachReservation(reservationId, status) {
   const { error } = await supabase.rpc('admin_mark_reservation', {
     target_reservation_id: reservationId,

@@ -170,3 +170,38 @@ export async function cancelSupabaseReservation(reservationId) {
   if (error) return getReservationError(error.message || 'No pudimos cancelar la reserva.')
   return { ok: true, message: 'Reserva cancelada. Si correspondia, el token fue devuelto.' }
 }
+
+export async function adminReserveForStudent({
+  profileId,
+  classScheduleId,
+  reservationDate,
+  allowWithoutMembership = false,
+  note = '',
+}) {
+  if (!isSupabaseConfigured || !supabase) {
+    return getReservationError('Supabase aun no esta configurado.')
+  }
+
+  if (!profileId) return getReservationError('Selecciona un alumno.')
+  if (!classScheduleId) return getReservationError('Selecciona una clase.')
+  if (!reservationDate) return getReservationError('Selecciona una fecha.')
+
+  const { data, error } = await supabase.rpc('admin_reserve_for_student', {
+    target_profile_id: profileId,
+    target_class_schedule_id: classScheduleId,
+    target_reservation_date: reservationDate,
+    allow_without_membership: allowWithoutMembership,
+    admin_note: note || null,
+  })
+
+  if (error) {
+    const message = error.message || 'No pudimos agregar el alumno a la clase.'
+    return getReservationError(message)
+  }
+
+  return {
+    ok: true,
+    reservation: data,
+    message: 'Alumno agregado correctamente a la clase.',
+  }
+}

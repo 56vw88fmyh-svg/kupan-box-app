@@ -21,7 +21,7 @@ export function AppShell({ title, eyebrow, children, currentUser }) {
       <main className="k-app-main mx-auto max-w-5xl py-4 sm:px-4 sm:py-5">
         {children}
         <p className="mt-8 text-center text-[0.65rem] font-black uppercase tracking-[0.18em] text-white/30">
-          KUPAN App v1.0.4
+          KUPAN App v1.0.6
         </p>
       </main>
     </div>

@@ -5,6 +5,7 @@ import { buildBirthdayGreeting, formatBirthdayDayMonth, loadUpcomingBirthdays } 
 import { defaultAppText } from '../utils/adminContent.js'
 import { saveAppSetting } from '../utils/sharedContent.js'
 import { getCurrentSupabaseUser } from '../utils/auth.js'
+import { adminReserveForStudent } from '../utils/supabaseReservations.js'
 
 const adminSectionMeta = {
   overview: { label: 'Resumen', module: 'Panel', icon: 'IN' },
@@ -12,7 +13,7 @@ const adminSectionMeta = {
   students: { label: 'Ver alumnos', module: 'Alumnos', icon: 'AL' },
   plans: { label: 'Planes', module: 'Pagos', icon: 'PL' },
   memberships: { label: 'Membresias', module: 'Alumnos', icon: 'ME' },
-  reservations: { label: 'Asistencia', module: 'Clases', icon: 'AS' },
+  reservations: { label: 'Reservas', module: 'Clases', icon: 'RE' },
   wod: { label: 'WOD', module: 'Clases', icon: 'WD' },
   schedule: { label: 'Horarios', module: 'Clases', icon: 'HO' },
   community: { label: 'Comunidad', module: 'Contenido', icon: 'CO' },
@@ -51,7 +52,8 @@ const adminNavigationModules = [
     items: [
       { id: 'schedule', label: 'Crear clase', hint: 'Horarios' },
       { id: 'schedule', label: 'Ver clases', hint: 'Agenda semanal' },
-      { id: 'reservations', label: 'Asistencia', hint: 'Reservas activas' },
+      { id: 'reservations', label: 'Reservas', hint: 'Reservas activas' },
+      { id: 'reservations', label: 'Agregar alumno', target: 'manual-reservation', hint: 'Reserva manual' },
       { id: 'wod', label: 'WOD del dia', hint: 'Programacion' },
     ],
   },
@@ -119,6 +121,15 @@ const emptyStudent = {
   plan_id: '',
   membership_start_date: '',
   membership_end_date: '',
+}
+
+const emptyManualReservation = {
+  reservation_date: '',
+  class_schedule_id: '',
+  profile_id: '',
+  student_query: '',
+  note: '',
+  allow_without_membership: false,
 }
 
 function buildWhatsAppUrl(phone, credentials) {
@@ -469,9 +480,14 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [scheduleDraft, setScheduleDraft] = useState(emptySchedule)
   const [postDraft, setPostDraft] = useState(emptyPost)
   const [studentDraft, setStudentDraft] = useState(emptyStudent)
+  const [manualReservationDraft, setManualReservationDraft] = useState(() => ({
+    ...emptyManualReservation,
+    reservation_date: getChileDateString(),
+  }))
   const [textDraft, setTextDraft] = useState(defaultAppText)
   const [createdCredentials, setCreatedCredentials] = useState(null)
   const [isCreatingStudent, setIsCreatingStudent] = useState(false)
+  const [isSavingManualReservation, setIsSavingManualReservation] = useState(false)
   const contentTopRef = useRef(null)
   const createStudentRef = useRef(null)
   const membershipsOverviewRef = useRef(null)
@@ -479,6 +495,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const membershipEditRef = useRef(null)
   const membershipHistoryRef = useRef(null)
   const tokenMovementsRef = useRef(null)
+  const manualReservationRef = useRef(null)
 
   const activeUser = verifiedUser ?? currentUser
   const isAdmin = activeUser?.role === 'admin'
@@ -590,6 +607,26 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     })
   }, [activeMembershipByProfile, adminData.profiles, latestMembershipByProfile, studentFilter, studentQuery, todayDate])
 
+  const manualReservationStudents = useMemo(() => {
+    const query = manualReservationDraft.student_query.trim().toLowerCase()
+    return adminData.profiles
+      .filter((profile) => {
+        const searchable = `${profile.full_name ?? ''} ${profile.email ?? ''} ${profile.phone ?? ''}`.toLowerCase()
+        return !query || searchable.includes(query)
+      })
+      .slice(0, 40)
+  }, [adminData.profiles, manualReservationDraft.student_query])
+
+  const selectedManualProfile = useMemo(
+    () => adminData.profiles.find((profile) => profile.id === manualReservationDraft.profile_id),
+    [adminData.profiles, manualReservationDraft.profile_id],
+  )
+
+  const selectedManualMembership = manualReservationDraft.profile_id
+    ? activeMembershipByProfile.get(manualReservationDraft.profile_id)
+    : null
+  const selectedManualTokens = selectedManualMembership ? getMembershipTokens(selectedManualMembership) : null
+
   const selectedMembershipPlan = useMemo(
     () => adminData.plans.find((plan) => plan.id === membershipDraft.plan_id),
     [adminData.plans, membershipDraft.plan_id],
@@ -621,6 +658,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       'membership-edit': membershipEditRef,
       'membership-history': membershipHistoryRef,
       'token-movements': tokenMovementsRef,
+      'manual-reservation': manualReservationRef,
     }
     const targetRef = targetMap[target] ?? contentTopRef
 
@@ -684,6 +722,15 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   useEffect(() => {
     if (isAdmin) refreshData()
   }, [isAdmin])
+
+  useEffect(() => {
+    if (manualReservationDraft.class_schedule_id || adminData.schedule.length === 0) return
+    const firstActiveClass = adminData.schedule.find((classItem) => classItem.active) ?? adminData.schedule[0]
+    setManualReservationDraft((current) => ({
+      ...current,
+      class_schedule_id: firstActiveClass?.id ?? '',
+    }))
+  }, [adminData.schedule, manualReservationDraft.class_schedule_id])
 
   useEffect(() => {
     if (!pendingFocusTarget) return
@@ -1117,6 +1164,37 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     refreshData()
   }
 
+  async function saveManualReservation(event) {
+    event.preventDefault()
+    setMessage('')
+    setMessageType('error')
+    setIsSavingManualReservation(true)
+
+    const result = await adminReserveForStudent({
+      profileId: manualReservationDraft.profile_id,
+      classScheduleId: manualReservationDraft.class_schedule_id,
+      reservationDate: manualReservationDraft.reservation_date,
+      allowWithoutMembership: manualReservationDraft.allow_without_membership,
+      note: manualReservationDraft.note,
+    })
+
+    setIsSavingManualReservation(false)
+
+    if (!result.ok) {
+      setMessage(result.message)
+      return
+    }
+
+    setMessageType('success')
+    setMessage(result.message)
+    setManualReservationDraft((current) => ({
+      ...emptyManualReservation,
+      reservation_date: current.reservation_date || getChileDateString(),
+      class_schedule_id: current.class_schedule_id,
+    }))
+    refreshData()
+  }
+
   async function simulateApprovedPayment() {
     setMessage('')
     setMessageType('error')
@@ -1353,7 +1431,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
               <div className="flex flex-wrap gap-2">
                 <QuickActionButton label="Nuevo alumno" icon="NA" primary onClick={() => navigateAdmin({ id: 'create-student', target: 'create-student-form' })} />
                 <QuickActionButton label="Membresia" icon="ME" onClick={() => navigateAdmin({ id: 'memberships', target: 'membership-activate' })} />
-                <QuickActionButton label="Asistencia" icon="AS" onClick={() => navigateAdmin({ id: 'reservations' })} />
+                <QuickActionButton label="Reservas" icon="RE" onClick={() => navigateAdmin({ id: 'reservations' })} />
+                <QuickActionButton label="Modo Coach" icon="CO" onClick={() => setActivePage('coach')} />
               </div>
             </div>
 
@@ -1364,7 +1443,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
                   className="w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/35 focus:border-kupan-ember"
                   type="search"
                   value={globalQuery}
-                  placeholder="Buscar accion: alumno, pago, asistencia, WOD..."
+                  placeholder="Buscar accion: alumno, pago, reservas, WOD..."
                   onChange={(event) => setGlobalQuery(event.target.value)}
                 />
               </label>
@@ -1696,6 +1775,80 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
       {activeSection === 'reservations' ? (
         <AdminSection eyebrow="Reservas" title="Reservas activas">
+          <form ref={manualReservationRef} className="k-panel grid scroll-mt-28 gap-3 p-4 sm:grid-cols-2" onSubmit={saveManualReservation}>
+            <div className="sm:col-span-2">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Agregar alumno a clase</p>
+              <p className="mt-1 text-sm leading-6 text-white/60">
+                Toma reserva por un alumno desde el box. Si tiene plan activo se descuenta token; si es Full no descuenta.
+              </p>
+            </div>
+            <Field
+              label="Fecha"
+              type="date"
+              required
+              value={manualReservationDraft.reservation_date}
+              onChange={(value) => setManualReservationDraft((current) => ({ ...current, reservation_date: value }))}
+            />
+            <SelectField
+              label="Horario / clase"
+              value={manualReservationDraft.class_schedule_id}
+              onChange={(value) => setManualReservationDraft((current) => ({ ...current, class_schedule_id: value }))}
+            >
+              <option className="bg-kupan-black" value="">Seleccionar clase</option>
+              {adminData.schedule.filter((classItem) => classItem.active).map((classItem) => (
+                <option key={classItem.id} className="bg-kupan-black" value={classItem.id}>
+                  Dia {classItem.day_of_week} · {toTime(classItem.time)} · {classItem.class_name}
+                </option>
+              ))}
+            </SelectField>
+            <Field
+              label="Buscar alumno"
+              value={manualReservationDraft.student_query}
+              onChange={(value) => setManualReservationDraft((current) => ({ ...current, student_query: value }))}
+            />
+            <SelectField
+              label="Alumno"
+              value={manualReservationDraft.profile_id}
+              onChange={(value) => setManualReservationDraft((current) => ({ ...current, profile_id: value }))}
+            >
+              <option className="bg-kupan-black" value="">Seleccionar alumno</option>
+              {manualReservationStudents.map((profile) => (
+                <option key={profile.id} className="bg-kupan-black" value={profile.id}>
+                  {profile.full_name} · {profile.email}
+                </option>
+              ))}
+            </SelectField>
+            <div className="rounded-lg border border-white/10 bg-black/25 p-4 sm:col-span-2">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Estado del alumno</p>
+              {selectedManualProfile ? (
+                <p className="mt-2 text-sm font-bold leading-6 text-white/70">
+                  {selectedManualProfile.full_name} · {selectedManualMembership ? `plan ${selectedManualMembership.plan?.name ?? 'activo'} · tokens ${selectedManualTokens?.used}/${selectedManualTokens?.total} · disponibles ${selectedManualTokens?.remaining}` : 'sin plan activo'}
+                </p>
+              ) : (
+                <p className="mt-2 text-sm font-bold leading-6 text-white/60">Busca y selecciona un alumno para revisar su plan.</p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <TextArea
+                label="Nota opcional"
+                rows={3}
+                value={manualReservationDraft.note}
+                onChange={(value) => setManualReservationDraft((current) => ({ ...current, note: value }))}
+              />
+            </div>
+            <ToggleField
+              label="Permitir sin plan activo"
+              checked={manualReservationDraft.allow_without_membership}
+              onChange={(value) => setManualReservationDraft((current) => ({ ...current, allow_without_membership: value }))}
+            />
+            <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-xs font-bold leading-5 text-white/55">
+              Sobrecupo queda desactivado por ahora. Si la clase esta completa, Supabase bloqueara la reserva.
+            </div>
+            <button type="submit" className="k-button sm:col-span-2" disabled={isSavingManualReservation}>
+              {isSavingManualReservation ? 'Agregando...' : 'Agregar a clase'}
+            </button>
+          </form>
+
           {adminData.reservations.map((reservation) => {
             const isAttended = reservation.status === 'attended'
             const isNoShow = reservation.status === 'no_show'
@@ -1706,7 +1859,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
                 key={reservation.id}
                 title={`${reservation.class_schedule?.class_name ?? 'Clase'} · ${toTime(reservation.class_schedule?.time)}`}
                 meta={`${formatDate(reservation.reservation_date)} · ${reservation.status}`}
-                detail={`${reservation.profile?.full_name ?? 'Alumno'} · Coach ${reservation.class_schedule?.coach ?? 'KUPAN'} · token ${reservation.token_charged ? 'cobrado' : 'no descuenta'}`}
+                detail={`${reservation.profile?.full_name ?? 'Alumno'} · Coach ${reservation.class_schedule?.coach ?? 'KUPAN'} · token ${reservation.token_charged ? 'cobrado' : 'no descuenta'}${reservation.notes ? ` · ${reservation.notes}` : ''}`}
                 action={(
                   <div className="grid shrink-0 gap-2">
                     <button

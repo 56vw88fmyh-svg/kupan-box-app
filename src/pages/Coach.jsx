@@ -4,8 +4,21 @@ import { SectionTitle } from '../components/SectionTitle.jsx'
 import {
   cancelCoachReservation,
   loadCoachDashboard,
+  loadCoachManualReservationOptions,
   markCoachReservation,
 } from '../utils/coachData.js'
+import { adminReserveForStudent } from '../utils/supabaseReservations.js'
+
+function getMembershipTokens(membership) {
+  const isUnlimited = Boolean(membership?.plan?.is_unlimited)
+  const total = membership?.classes_total
+  const used = Number(membership?.classes_used ?? 0)
+  return {
+    total: isUnlimited ? 'Ilimitado' : total ?? 0,
+    used: isUnlimited ? 'No descuenta' : used,
+    remaining: isUnlimited ? 'Ilimitado' : Math.max(Number(total ?? 0) - used, 0),
+  }
+}
 
 function ClassSummary({ title, classItem }) {
   return (
@@ -49,6 +62,7 @@ function ReservationRow({ reservation, onMark, onCancel, busyId }) {
           <p className="mt-2 text-xs font-black uppercase text-white/45">
             Token {reservation.token_charged ? 'cobrado' : 'no descuenta'}
           </p>
+          {reservation.notes ? <p className="mt-2 text-sm leading-6 text-white/55">{reservation.notes}</p> : null}
         </div>
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -74,6 +88,10 @@ export function Coach({ currentUser, setActivePage }) {
   const [dashboard, setDashboard] = useState({ classes: [], currentClass: null, nextClass: null })
   const [selectedClassId, setSelectedClassId] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [isManualOpen, setIsManualOpen] = useState(false)
+  const [manualOptions, setManualOptions] = useState({ profiles: [], memberships: [] })
+  const [manualDraft, setManualDraft] = useState({ profileId: '', query: '', note: '', allowWithoutMembership: false })
+  const [isManualSaving, setIsManualSaving] = useState(false)
 
   async function refreshCoach() {
     if (!canAccess) return
@@ -98,6 +116,30 @@ export function Coach({ currentUser, setActivePage }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess])
 
+  useEffect(() => {
+    let isMounted = true
+
+    async function fetchManualOptions() {
+      if (!canAccess || !isManualOpen) return
+      const result = await loadCoachManualReservationOptions()
+      if (!isMounted) return
+
+      if (!result.ok) {
+        setMessageType('error')
+        setMessage(result.message)
+        return
+      }
+
+      setManualOptions({ profiles: result.profiles, memberships: result.memberships })
+    }
+
+    fetchManualOptions()
+
+    return () => {
+      isMounted = false
+    }
+  }, [canAccess, isManualOpen])
+
   async function handleMark(reservationId, status) {
     setBusyId(reservationId)
     const result = await markCoachReservation(reservationId, status)
@@ -114,6 +156,32 @@ export function Coach({ currentUser, setActivePage }) {
     setMessageType(result.ok ? 'success' : 'error')
     setMessage(result.message)
     if (result.ok) refreshCoach()
+  }
+
+  async function handleManualReservation(event) {
+    event.preventDefault()
+    if (!selectedClass) {
+      setMessageType('error')
+      setMessage('Selecciona una clase antes de agregar alumno.')
+      return
+    }
+
+    setIsManualSaving(true)
+    const result = await adminReserveForStudent({
+      profileId: manualDraft.profileId,
+      classScheduleId: selectedClass.id,
+      reservationDate: dashboard.today,
+      allowWithoutMembership: currentUser?.role === 'admin' && manualDraft.allowWithoutMembership,
+      note: manualDraft.note,
+    })
+    setIsManualSaving(false)
+    setMessageType(result.ok ? 'success' : 'error')
+    setMessage(result.message)
+
+    if (result.ok) {
+      setManualDraft({ profileId: '', query: '', note: '', allowWithoutMembership: false })
+      refreshCoach()
+    }
   }
 
   if (!currentUser) {
@@ -143,6 +211,16 @@ export function Coach({ currentUser, setActivePage }) {
 
   const selectedClass = dashboard.classes.find((classItem) => classItem.id === selectedClassId) ?? dashboard.currentClass
   const reservations = selectedClass?.reservations ?? []
+  const manualQuery = manualDraft.query.trim().toLowerCase()
+  const manualStudents = manualOptions.profiles
+    .filter((profile) => {
+      const searchable = `${profile.full_name ?? ''} ${profile.email ?? ''} ${profile.phone ?? ''}`.toLowerCase()
+      return !manualQuery || searchable.includes(manualQuery)
+    })
+    .slice(0, 40)
+  const selectedManualProfile = manualOptions.profiles.find((profile) => profile.id === manualDraft.profileId)
+  const selectedManualMembership = manualOptions.memberships.find((membership) => membership.profile_id === manualDraft.profileId && membership.status === 'active')
+  const selectedManualTokens = selectedManualMembership ? getMembershipTokens(selectedManualMembership) : null
 
   return (
     <div className="space-y-6">
@@ -200,6 +278,72 @@ export function Coach({ currentUser, setActivePage }) {
               <div className="k-stat"><p className="text-2xl font-black text-white">{selectedClass.usedSpots}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Usados</p></div>
               <div className="k-stat"><p className="text-2xl font-black text-kupan-flame">{selectedClass.availableSpots}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Disponibles</p></div>
             </div>
+            <button type="button" className="k-button mt-4 w-full" onClick={() => setIsManualOpen((current) => !current)}>
+              {isManualOpen ? 'Cerrar agregar alumno' : 'Agregar alumno'}
+            </button>
+          </MotionCard>
+        ) : null}
+
+        {isManualOpen ? (
+          <MotionCard className="k-panel mb-4 p-4">
+            <form className="space-y-3" onSubmit={handleManualReservation}>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Agregar alumno</p>
+                <p className="mt-1 text-sm leading-6 text-white/60">
+                  {selectedClass ? `${selectedClass.className} · ${selectedClass.time} · ${dashboard.today}` : 'Selecciona una clase para continuar.'}
+                </p>
+              </div>
+              <label className="block">
+                <span className="text-xs font-black uppercase text-white/60">Buscar alumno</span>
+                <input
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
+                  value={manualDraft.query}
+                  onChange={(event) => setManualDraft((current) => ({ ...current, query: event.target.value }))}
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-black uppercase text-white/60">Alumno</span>
+                <select
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
+                  value={manualDraft.profileId}
+                  onChange={(event) => setManualDraft((current) => ({ ...current, profileId: event.target.value }))}
+                >
+                  <option className="bg-kupan-black" value="">Seleccionar alumno</option>
+                  {manualStudents.map((profile) => (
+                    <option key={profile.id} className="bg-kupan-black" value={profile.id}>{profile.full_name} · {profile.email}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-sm font-bold leading-6 text-white/65">
+                {selectedManualProfile ? (
+                  <span>
+                    {selectedManualProfile.full_name} · {selectedManualMembership ? `plan ${selectedManualMembership.plan?.name ?? 'activo'} · tokens ${selectedManualTokens?.used}/${selectedManualTokens?.total} · disponibles ${selectedManualTokens?.remaining}` : 'sin plan activo'}
+                  </span>
+                ) : 'Selecciona un alumno para revisar plan y tokens.'}
+              </div>
+              <label className="block">
+                <span className="text-xs font-black uppercase text-white/60">Nota opcional</span>
+                <textarea
+                  className="mt-2 min-h-20 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-semibold leading-6 text-white outline-none transition focus:border-kupan-ember"
+                  value={manualDraft.note}
+                  onChange={(event) => setManualDraft((current) => ({ ...current, note: event.target.value }))}
+                />
+              </label>
+              {currentUser?.role === 'admin' ? (
+                <label className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/35 px-3 py-2">
+                  <span className="text-xs font-black uppercase text-white/60">Permitir sin plan activo</span>
+                  <input
+                    className="h-5 w-5 accent-kupan-ember"
+                    type="checkbox"
+                    checked={manualDraft.allowWithoutMembership}
+                    onChange={(event) => setManualDraft((current) => ({ ...current, allowWithoutMembership: event.target.checked }))}
+                  />
+                </label>
+              ) : null}
+              <button type="submit" className="k-button w-full" disabled={isManualSaving}>
+                {isManualSaving ? 'Agregando...' : 'Confirmar alumno'}
+              </button>
+            </form>
           </MotionCard>
         ) : null}
 
