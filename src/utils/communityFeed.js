@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { getHumanErrorMessage, logAppError } from './appState.js'
 
 const chileDateFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Santiago',
@@ -84,7 +85,10 @@ export async function loadTodaysWod() {
     .eq('date', today)
     .maybeSingle()
 
-  if (error) return getFeedError(`No pudimos cargar el WOD de hoy: ${error.message}`)
+  if (error) {
+    logAppError('community.todays_wod', error)
+    return getFeedError(getHumanErrorMessage(error, 'No fue posible cargar el WOD de hoy. Revisa tu conexión y vuelve a intentarlo.'))
+  }
 
   return { ok: true, wod: mapWodRow(data), today }
 }
@@ -141,7 +145,6 @@ async function loadNews() {
     .from('community_posts')
     .select('id, type, title, content, event_date, created_at')
     .eq('active', true)
-    .neq('type', 'evento')
     .order('created_at', { ascending: false })
     .limit(5)
 
@@ -204,12 +207,15 @@ export async function loadCommunityFeed() {
 
   const errors = [birthdays, ranking, news, recentPrs]
     .filter((result) => result.status === 'rejected')
-    .map((result) => result.reason?.message)
+    .map((result) => {
+      logAppError('community.feed_block', result.reason)
+      return getHumanErrorMessage(result.reason, 'Un bloque de comunidad no pudo actualizarse.')
+    })
     .filter(Boolean)
 
   return {
     ok: errors.length === 0,
-    message: errors.length > 0 ? `Algunos bloques no pudieron cargar: ${errors.join(' · ')}` : '',
+    message: errors.length > 0 ? 'Algunos bloques no pudieron actualizarse. Mostramos la información disponible.' : '',
     birthdays: birthdays.status === 'fulfilled' ? birthdays.value : [],
     ranking: ranking.status === 'fulfilled' ? ranking.value : [],
     news: news.status === 'fulfilled' ? news.value : [],

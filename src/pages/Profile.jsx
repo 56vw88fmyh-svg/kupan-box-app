@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion as Motion } from 'framer-motion'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
@@ -180,6 +181,7 @@ function StudentDashboard({
 }
 
 export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) {
+  const location = useLocation()
   const [profileData, setProfileData] = useState(null)
   const [isFetchingProfile, setIsFetchingProfile] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -239,7 +241,9 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
   const activeMembership = profileData?.membership
   const supabaseReservations = useMemo(() => profileData?.reservations ?? [], [profileData?.reservations])
   const personalRecords = useMemo(() => profileData?.records ?? [], [profileData?.records])
+  const recordsIssue = profileData?.recordsIssue ?? ''
   const visibleReservations = supabaseReservations
+  const accessRestricted = new window.URLSearchParams(location.search).get('access') === 'restricted'
 
   const profileName = supabaseProfile?.full_name ?? currentUser?.name ?? 'Atleta KUPAN'
   const email = supabaseProfile?.email ?? currentUser?.email ?? 'Inicia sesion para guardar tu progreso'
@@ -395,6 +399,14 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
 
   return (
     <div className="space-y-6">
+      {accessRestricted ? (
+        <MotionCard as="section" className="k-card border-kupan-flame/30 bg-kupan-flame/10 p-5">
+          <p className="k-pill inline-flex text-kupan-flame">Acceso restringido</p>
+          <h2 className="mt-3 text-2xl font-black uppercase leading-tight text-white">Ese panel requiere permiso administrativo.</h2>
+          <p className="mt-2 text-sm leading-6 text-white/70">Tu cuenta sigue segura en el perfil de alumno. Si necesitas entrar al panel admin, pide que validen tu rol en Supabase.</p>
+        </MotionCard>
+      ) : null}
+
       <MotionCard as="section" className="k-card overflow-hidden p-0">
         <div className="border-b border-white/10 bg-black/25 p-5">
           <div className="flex items-start gap-4">
@@ -658,6 +670,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         <button type="button" className="k-button mb-4 w-full" onClick={() => setActivePage('prs')}>
           Gestionar mis PR
         </button>
+        {recordsIssue ? <p className="mb-4 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{recordsIssue}</p> : null}
         {personalRecords.length > 0 ? (
           <div className="space-y-3">
             {personalRecords.map((record) => (

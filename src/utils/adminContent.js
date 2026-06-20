@@ -6,7 +6,7 @@ import {
   todayStats,
   weeklySchedule,
   wod,
-} from '../data/mockData.js'
+} from '../data/fallbackData.js'
 
 export const defaultAppText = {
   homeEyebrow: 'Entrena fuerte, entrena acompañado',

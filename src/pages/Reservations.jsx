@@ -1,8 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { motion as Motion } from 'framer-motion'
-import { MotionCard } from '../components/Motion.jsx'
-import { SectionTitle } from '../components/SectionTitle.jsx'
-import { createWhatsAppUrl, whatsappMessages } from '../utils/whatsapp.js'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Badge, Button, Card, Dialog, EmptyState, ErrorState, LoadingState, useToast } from '../components/ui/index.js'
 import {
   cancelSupabaseReservation,
   createSupabaseReservation,
@@ -10,83 +7,116 @@ import {
   loadReservationData,
 } from '../utils/supabaseReservations.js'
 
+const CHILE_TIME_ZONE = 'America/Santiago'
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
-const reservationDayFilters = [
-  { dayId: '1', short: 'LUN', label: 'Lunes' },
-  { dayId: '2', short: 'MAR', label: 'Martes' },
-  { dayId: '3', short: 'MIE', label: 'Miercoles' },
-  { dayId: '4', short: 'JUE', label: 'Jueves' },
-  { dayId: '5', short: 'VIE', label: 'Viernes' },
-  { dayId: '6', short: 'SAB', label: 'Sabado' },
-]
 
-function getCurrentReservationDayId() {
-  const currentDay = new Date().getDay()
-  return currentDay === 0 ? '1' : String(currentDay)
+function getChileDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: CHILE_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+function getReservationDayId(date) {
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: CHILE_TIME_ZONE, weekday: 'short' }).format(date)
+  const map = { Mon: '1', Tue: '2', Wed: '3', Thu: '4', Fri: '5', Sat: '6', Sun: '7' }
+  return map[weekday] ?? '1'
+}
+
+function buildWeekDays(baseDate = new Date()) {
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(baseDate)
+    date.setDate(baseDate.getDate() + index)
+    const short = new Intl.DateTimeFormat('es-CL', { timeZone: CHILE_TIME_ZONE, weekday: 'short' })
+      .format(date)
+      .replace('.', '')
+    const number = new Intl.DateTimeFormat('es-CL', { timeZone: CHILE_TIME_ZONE, day: '2-digit' }).format(date)
+    const month = new Intl.DateTimeFormat('es-CL', { timeZone: CHILE_TIME_ZONE, month: 'short' })
+      .format(date)
+      .replace('.', '')
+
+    return {
+      date,
+      dateKey: getChileDateKey(date),
+      dayId: getReservationDayId(date),
+      short,
+      number,
+      month,
+      label: new Intl.DateTimeFormat('es-CL', {
+        timeZone: CHILE_TIME_ZONE,
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      }).format(date),
+    }
+  })
+}
+
+function parseLocalClassDateTime(reservationDate, time) {
+  if (!reservationDate || !time) return null
+  const [year, month, day] = reservationDate.split('-').map(Number)
+  const [hours, minutes] = time.split(':').map(Number)
+  if (![year, month, day, hours, minutes].every(Number.isFinite)) return null
+  return new Date(year, month - 1, day, hours, minutes)
 }
 
 function formatMembershipDate(date) {
   if (!date) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`))
+  return new Intl.DateTimeFormat('es-CL', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: CHILE_TIME_ZONE,
+  }).format(new Date(`${date}T00:00:00`))
 }
 
-function getClassStatus(item) {
-  if (item.isReserved) return { label: 'Reservada', tone: 'reserved' }
-  if (item.isFull) return { label: 'Completa', tone: 'full' }
-  return { label: 'Disponible', tone: 'available' }
+function getDurationLabel(item) {
+  const duration = item.durationMinutes ?? item.duration_minutes ?? item.duration
+  if (!duration) return ''
+  if (typeof duration === 'number') return `${duration} min`
+  return String(duration)
 }
 
-function ReservationCard({ item, isSelected, onSelect }) {
-  const maxSpots = item.maxSpots ?? 12
-  const isDisabled = item.isFull || item.isReserved
-  const reservedSpots = maxSpots - item.spots
-  const progress = Math.min(Math.max((reservedSpots / maxSpots) * 100, 0), 100)
-  const status = getClassStatus(item)
+function getSpots(item) {
+  const maxSpots = Number(item.maxSpots ?? item.max_spots ?? 0)
+  const available = Math.max(Number(item.spots ?? item.available_spots ?? 0), 0)
+  const capacity = maxSpots > 0 ? maxSpots : available
+  const occupied = Math.max(capacity - available, 0)
+  return { capacity, available, occupied }
+}
 
-  return (
-    <Motion.button
-      type="button"
-      onClick={() => onSelect(item)}
-      disabled={isDisabled}
-      whileHover={!isDisabled ? { y: -3, scale: 1.005 } : undefined}
-      whileTap={!isDisabled ? { scale: 0.985 } : undefined}
-      transition={{ duration: 0.16 }}
-      className={`k-panel w-full overflow-hidden p-4 text-left transition ${
-        isSelected ? 'border-kupan-ember bg-kupan-ember/15 shadow-glow' : 'hover:border-kupan-flame/60'
-      } ${isDisabled ? 'opacity-70' : ''}`}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">
-            {item.day} · {formatReservationDate(item.reservationDate)} · {item.block}
-          </p>
-          <p className="mt-2 text-3xl font-black leading-none text-white">{item.time}</p>
-          <h3 className="mt-2 text-base font-black uppercase text-white">{item.name}</h3>
-          <p className="mt-1 text-sm font-semibold text-white/60">Coach {item.coach}</p>
-          <p className="mt-1 text-xs font-black uppercase text-white/60">Máximo {maxSpots} alumnos</p>
-        </div>
-        <div className="shrink-0 text-right">
-          <span className={`k-pill ${
-            status.tone === 'available' ? 'text-kupan-flame' : status.tone === 'reserved' ? 'text-emerald-300' : 'text-white/60'
-          }`}
-          >
-            {status.label}
-          </span>
-          <p className="mt-2 text-2xl font-black text-white">{item.spots}</p>
-          <p className="text-[0.65rem] font-black uppercase text-white/50">cupos</p>
-        </div>
-      </div>
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
-        <div className={`h-full rounded-full ${item.isFull ? 'bg-kupan-flame' : 'bg-kupan-ember'}`} style={{ width: `${progress}%` }} />
-      </div>
-      <div className={`mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-lg px-4 text-base font-black uppercase ${
-        isSelected ? 'bg-kupan-ember text-white shadow-glow' : item.isReserved ? 'border border-emerald-300/30 bg-emerald-300/10 text-emerald-200' : 'border border-white/15 bg-white/10 text-white'
-      }`}
-      >
-        {item.isFull ? 'Clase completa' : item.isReserved ? 'Ya reservaste' : isSelected ? 'Confirmar abajo' : 'Reservar'}
-      </div>
-    </Motion.button>
-  )
+function getClassViewState(item, now = new Date()) {
+  const classDateTime = parseLocalClassDateTime(item.reservationDate, item.time)
+  const isPastOrInProgress = classDateTime ? classDateTime <= now : false
+  const rawStatus = String(item.status ?? item.class_status ?? '').toLowerCase()
+
+  if (rawStatus.includes('cancel') || item.isCancelled) {
+    return { key: 'cancelled', label: 'Clase cancelada', badge: 'cancelled', action: 'none' }
+  }
+
+  if (rawStatus.includes('closed') || rawStatus.includes('cerrad') || item.isClosed) {
+    return { key: 'closed', label: 'Reservas cerradas', badge: 'neutral', action: 'none' }
+  }
+
+  if (isPastOrInProgress) {
+    return { key: 'past', label: 'En curso o pasada', badge: 'neutral', action: 'none' }
+  }
+
+  if (item.isReserved) {
+    return { key: 'reserved', label: 'Reserva confirmada', badge: 'success', action: 'cancel' }
+  }
+
+  if (item.isFull) {
+    return { key: 'full', label: 'Clase completa', badge: 'full', action: 'none' }
+  }
+
+  return { key: 'available', label: 'Cupos disponibles', badge: 'available', action: 'reserve' }
+}
+
+function getClassKey(item) {
+  return `${item.classScheduleId}-${item.reservationDate}`
 }
 
 function PlanStatusCard({ currentUser, hasActiveMembership, membership, remainingTokens, isLoading }) {
@@ -95,209 +125,201 @@ function PlanStatusCard({ currentUser, hasActiveMembership, membership, remainin
   const expiresAt = membership?.end_date ?? membership?.expires_at
   const hasTokens = isUnlimitedPlan || remainingTokens === null || Number(remainingTokens) > 0
 
-  if (!currentUser) {
-    return (
-      <MotionCard as="section" className="k-card p-5">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Tu acceso</p>
-        <h2 className="mt-2 text-2xl font-black uppercase text-white">Inicia sesión para reservar.</h2>
-        <p className="mt-2 text-sm leading-6 text-white/60">Así podemos revisar tu plan, tokens y reservas activas.</p>
-      </MotionCard>
-    )
-  }
-
   return (
-    <MotionCard as="section" className="k-card overflow-hidden p-0">
-      <div className="border-b border-white/10 bg-black/25 p-5">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Tu plan y tokens</p>
-        <h2 className="mt-2 text-2xl font-black uppercase text-white">
-          {isLoading ? 'Actualizando datos...' : hasActiveMembership ? planName : 'Sin plan activo'}
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-white/60">
-          {hasActiveMembership
-            ? 'Reserva con calma: al confirmar se descuenta un token si tu plan no es Full.'
-            : 'Tu plan está vencido, pausado, sin pago confirmado o aún no fue activado.'}
-        </p>
+    <Card variant="standard" className="p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">Tu acceso</p>
+          <h2 className="mt-1 text-lg font-black text-text-primary">
+            {isLoading
+              ? 'Actualizando plan...'
+              : !currentUser
+                ? 'Inicia sesión para reservar'
+                : hasActiveMembership
+                  ? planName
+                  : 'Sin plan activo'}
+          </h2>
+        </div>
+        <Badge status={hasActiveMembership && hasTokens ? 'success' : 'warning'}>
+          {hasActiveMembership ? (hasTokens ? 'Listo para reservar' : 'Sin tokens') : 'Revisar plan'}
+        </Badge>
       </div>
-      <div className="grid grid-cols-3 gap-0 border-b border-white/10">
-        <div className="p-4">
-          <p className="text-xs font-black uppercase text-white/60">Tokens</p>
-          <p className="mt-1 text-2xl font-black uppercase text-white">
-            {hasActiveMembership ? (isUnlimitedPlan ? 'Full' : remainingTokens ?? 0) : '-'}
-          </p>
+      {currentUser ? (
+        <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+          <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
+            <p className="text-xs text-text-muted">Tokens</p>
+            <p className="mt-1 font-black text-text-primary">{hasActiveMembership ? (isUnlimitedPlan ? 'Full' : remainingTokens ?? 0) : '-'}</p>
+          </div>
+          <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
+            <p className="text-xs text-text-muted">Vence</p>
+            <p className="mt-1 font-black text-text-primary">{hasActiveMembership ? formatMembershipDate(expiresAt) : 'Sin fecha'}</p>
+          </div>
+          <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
+            <p className="text-xs text-text-muted">Estado</p>
+            <p className="mt-1 font-black text-text-primary">{hasActiveMembership && hasTokens ? 'Activo' : 'Bloqueado'}</p>
+          </div>
         </div>
-        <div className="border-l border-white/10 p-4">
-          <p className="text-xs font-black uppercase text-white/60">Vence</p>
-          <p className="mt-1 text-sm font-black uppercase text-white">{hasActiveMembership ? formatMembershipDate(expiresAt) : 'Sin fecha'}</p>
-        </div>
-        <div className="border-l border-white/10 p-4">
-          <p className="text-xs font-black uppercase text-white/60">Estado</p>
-          <p className={`mt-1 text-sm font-black uppercase ${hasActiveMembership && hasTokens ? 'text-kupan-flame' : 'text-white/60'}`}>
-            {hasActiveMembership ? (hasTokens ? 'Listo' : 'Sin tokens') : 'Bloqueado'}
-          </p>
-        </div>
-      </div>
-      {!hasActiveMembership ? (
-        <p className="m-5 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4 text-sm font-black uppercase leading-6 text-white">
-          No puedes reservar porque no tienes un plan activo. Si ya pagaste, avísanos para revisar tu membresía.
-        </p>
-      ) : !hasTokens ? (
-        <p className="m-5 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4 text-sm font-black uppercase leading-6 text-white">
-          No tienes tokens disponibles. Para seguir reservando debes renovar tu plan.
+      ) : null}
+      {currentUser && (!hasActiveMembership || !hasTokens) ? (
+        <p className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm font-semibold text-text-secondary">
+          Para reservar necesitas un plan activo y cupos disponibles. Si ya pagaste, pide revisión en recepción.
         </p>
       ) : null}
-    </MotionCard>
+    </Card>
   )
 }
 
-function BookingSummary({ selectedClass, onConfirm, currentUser, onGoLogin, hasActiveMembership, membership, remainingTokens, isSubmitting }) {
-  const isUnlimitedPlan = Boolean(membership?.is_unlimited)
-  const hasTokens = isUnlimitedPlan || remainingTokens === null || Number(remainingTokens) > 0
-  const canConfirm = selectedClass && !selectedClass.isFull && !selectedClass.isReserved && hasActiveMembership && hasTokens
+function WeekSelector({ weekDays, selectedDateKey, onSelect }) {
+  return (
+    <div className="-mx-4 overflow-x-auto k-scroll-x px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Seleccionar dia de reserva">
+      <div className="flex min-w-max gap-2">
+        {weekDays.map((day) => {
+          const isSelected = day.dateKey === selectedDateKey
+          return (
+            <button
+              key={day.dateKey}
+              type="button"
+              aria-pressed={isSelected}
+              aria-label={`Ver clases de ${day.label}`}
+              onClick={() => onSelect(day.dateKey)}
+              className={`min-h-20 min-w-[4.75rem] rounded-2xl border px-3 py-3 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red ${
+                isSelected
+                  ? 'border-brand-red bg-brand-red text-white shadow-[0_0_0_3px_rgba(240,68,68,.18)]'
+                  : 'border-border-default bg-bg-card text-text-secondary hover:border-border-strong hover:bg-bg-elevated hover:text-text-primary'
+              }`}
+            >
+              <span className="block text-xs font-black uppercase tracking-[0.12em]">{day.short}</span>
+              <span className="mt-1 block text-2xl font-black leading-none">{day.number}</span>
+              <span className="mt-1 block text-[0.68rem] font-bold uppercase opacity-80">{day.month}</span>
+              {isSelected ? <span className="mx-auto mt-2 block h-1.5 w-8 rounded-full bg-white" /> : null}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
-  if (!selectedClass) {
-    return (
-      <MotionCard as="section" className="k-card p-5">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Primer paso</p>
-        <h2 className="mt-2 text-2xl font-black uppercase text-white">Elige tu clase y ven a darlo todo</h2>
-        <p className="mt-2 text-sm leading-6 text-white/60">
-          Toca una clase disponible y te mostramos el resumen antes de confirmar tu cupo.
-        </p>
-      </MotionCard>
-    )
-  }
+function ClassCard({ item, reservation, currentUser, hasActiveMembership, remainingTokens, onReserve, onCancel, processingKey }) {
+  const status = getClassViewState(item)
+  const spots = getSpots(item)
+  const duration = getDurationLabel(item)
+  const classKey = getClassKey(item)
+  const isProcessing = processingKey === classKey
+  const hasTokens = remainingTokens === null || Number(remainingTokens) > 0
+  const canReserve = status.action === 'reserve' && currentUser && hasActiveMembership && hasTokens
+  const progress = spots.capacity > 0 ? Math.min((spots.occupied / spots.capacity) * 100, 100) : 0
 
   return (
-    <MotionCard as="section" className="k-card overflow-hidden p-0">
-      <div className="border-b border-white/10 bg-black/25 p-5">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Reserva tu cupo</p>
-        <h2 className="mt-2 text-3xl font-black uppercase text-white">{selectedClass.name}</h2>
-        <p className="mt-2 text-sm text-white/60">
-          {selectedClass.day} · {formatReservationDate(selectedClass.reservationDate)} · {selectedClass.time} · Coach {selectedClass.coach}
-        </p>
+    <Card variant={status.key === 'reserved' ? 'selected' : 'interactive'} className="p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-3xl font-black leading-none text-text-primary">{item.time}</p>
+          <h3 className="mt-2 text-lg font-black text-text-primary">{item.name}</h3>
+          <p className="mt-1 text-sm text-text-secondary">Coach {item.coach || 'KUPAN'}</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-text-muted">
+            <span>{formatReservationDate(item.reservationDate)}</span>
+            {duration ? <span>· {duration}</span> : null}
+            {item.block ? <span>· {item.block}</span> : null}
+          </div>
+        </div>
+        <Badge status={status.badge}>{status.label}</Badge>
       </div>
-      <div className="grid grid-cols-3 gap-0 border-b border-white/10">
-        <div className="p-4">
-          <p className="text-xs font-black uppercase text-white/60">Bloque</p>
-          <p className="mt-1 text-lg font-black text-white">{selectedClass.block}</p>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+        <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
+          <p className="text-text-muted">Ocupados</p>
+          <p className="mt-1 text-xl font-black text-text-primary">{spots.occupied}/{spots.capacity || '-'}</p>
         </div>
-        <div className="border-l border-white/10 p-4">
-          <p className="text-xs font-black uppercase text-white/60">Cupos</p>
-          <p className="mt-1 text-lg font-black text-white">{selectedClass.spots}/{selectedClass.maxSpots ?? 12}</p>
-        </div>
-        <div className="border-l border-white/10 p-4">
-          <p className="text-xs font-black uppercase text-white/60">Estado</p>
-          <p className="mt-1 text-lg font-black text-kupan-flame">
-            {selectedClass.isFull ? 'Completa' : selectedClass.isReserved ? 'Ya reservada' : 'Disponible'}
-          </p>
+        <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
+          <p className="text-text-muted">Disponibles</p>
+          <p className="mt-1 text-xl font-black text-text-primary">{spots.available}</p>
         </div>
       </div>
-      <div className="p-5">
-        <p className="mb-4 text-sm leading-6 text-white/70">
-          {currentUser
-            ? hasActiveMembership
-              ? hasTokens
-                ? 'Confirma tu cupo y queda listo para entrenar fuerte con la comunidad.'
-                : 'Tu plan esta activo, pero ya usaste todos tus tokens. Para seguir reservando debes renovar.'
-              : 'Para reservar necesitas membresía activa y pagada. Si tu plan venció, debes renovarlo antes de reservar.'
-            : 'Inicia sesión para tomar este cupo y mantener tu reserva guardada.'}
-        </p>
-        {currentUser && hasActiveMembership ? (
-          <p className="mb-4 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-xs font-black uppercase tracking-[0.14em] text-white/70">
-            Tokens disponibles: {isUnlimitedPlan ? 'Ilimitado' : remainingTokens ?? 0}
-          </p>
+
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-bg-elevated" aria-hidden="true">
+        <div className="h-full rounded-full bg-brand-red transition-all" style={{ width: `${progress}%` }} />
+      </div>
+
+      <div className="mt-4">
+        {status.action === 'reserve' ? (
+          <Button
+            type="button"
+            variant="primary"
+            size="lg"
+            fullWidth
+            isLoading={isProcessing}
+            disabled={isProcessing || !canReserve}
+            onClick={() => onReserve(item)}
+          >
+            {!currentUser ? 'Iniciar sesión' : !hasActiveMembership ? 'Plan requerido' : !hasTokens ? 'Sin tokens' : 'Reservar'}
+          </Button>
         ) : null}
-        {currentUser ? (
-          <button type="button" className={`min-h-14 w-full text-base ${canConfirm ? 'k-button' : 'k-button-secondary opacity-60'}`} disabled={!canConfirm || isSubmitting} onClick={() => onConfirm(selectedClass)}>
-            {isSubmitting ? 'Confirmando...' : !hasActiveMembership ? 'Plan vencido o inactivo' : !hasTokens ? 'Sin tokens disponibles' : selectedClass.isFull ? 'Clase completa' : selectedClass.isReserved ? 'Ya tienes esta reserva' : 'Confirmar reserva'}
-          </button>
-        ) : (
-          <button type="button" className="k-button min-h-14 w-full text-base" onClick={onGoLogin}>
-            Iniciar sesión para reservar
-          </button>
-        )}
-        <a className="k-button-secondary mt-3 w-full" href={createWhatsAppUrl(whatsappMessages.reservation)} target="_blank" rel="noreferrer">
-          Reservar por WhatsApp
-        </a>
+        {status.action === 'cancel' ? (
+          <Button type="button" variant="secondary" size="lg" fullWidth disabled={isProcessing || !reservation?.id} onClick={() => onCancel(reservation ?? item)}>
+            Cancelar reserva
+          </Button>
+        ) : null}
+        {status.key === 'full' ? <p className="text-sm font-semibold text-text-muted">No hay lista de espera activa para esta clase.</p> : null}
+        {status.action === 'none' && status.key !== 'full' ? <p className="text-sm font-semibold text-text-muted">Esta clase no admite acciones de reserva.</p> : null}
       </div>
-    </MotionCard>
+    </Card>
   )
 }
 
-function SuccessMessage({ reservation, onGoProfile, onNewReservation }) {
-  if (!reservation) return null
-
-  return (
-    <MotionCard as="section" className="rounded-lg border border-kupan-ember/50 bg-kupan-ember/15 p-5 shadow-glow">
-      <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Reserva lista</p>
-      <h2 className="mt-2 text-3xl font-black uppercase text-white">Nos vemos en el box.</h2>
-      <p className="mt-2 text-sm leading-6 text-white/80">
-        Tu cupo quedó tomado para {reservation.name}, {reservation.day} {formatReservationDate(reservation.reservationDate)} a las {reservation.time}.
-      </p>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <button type="button" className="k-button" onClick={onGoProfile}>
-          Ver en mi perfil
-        </button>
-        <button type="button" className="k-button-secondary" onClick={onNewReservation}>
-          Reservar otra
-        </button>
-      </div>
-    </MotionCard>
-  )
-}
-
-function ReservationList({ reservations, onCancelReservation, cancellingId }) {
+function ReservationList({ reservations, onCancel, processingKey }) {
   if (reservations.length === 0) {
     return (
-      <MotionCard className="k-panel p-4">
-        <p className="font-black uppercase text-white">Aún no tienes reservas.</p>
-        <p className="mt-1 text-sm text-white/60">Elige una clase, reserva tu cupo y ven a darlo todo con el equipo.</p>
-      </MotionCard>
+      <EmptyState
+        title="Aun no tienes reservas."
+        description="Elige una clase disponible y tu cupo quedará guardado aquí."
+      />
     )
   }
 
   return (
     <div className="space-y-3">
-      {reservations.map((item) => (
-        <MotionCard key={item.id} as="article" className="k-panel p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">
-                {item.day} · {formatReservationDate(item.reservationDate)} · {item.block}
-              </p>
-              <p className="font-black uppercase text-white">{item.name}</p>
-              <p className="text-sm text-white/60">{item.time} · Coach {item.coach}</p>
-              <span className="k-pill mt-3 inline-flex text-kupan-flame">{item.status}</span>
+      {reservations.map((item) => {
+        const classKey = getClassKey(item)
+        return (
+          <Card key={item.id} variant="standard" className="p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-text-muted">{item.day} · {formatReservationDate(item.reservationDate)}</p>
+                <h3 className="mt-1 font-black text-text-primary">{item.name}</h3>
+                <p className="mt-1 text-sm text-text-secondary">{item.time} · Coach {item.coach || 'KUPAN'}</p>
+              </div>
+              <Button type="button" variant="tertiary" size="sm" disabled={processingKey === classKey} onClick={() => onCancel(item)}>
+                Cancelar
+              </Button>
             </div>
-            <button type="button" className="k-button-secondary min-h-11 shrink-0 px-3 py-2 text-xs" disabled={cancellingId === item.id} onClick={() => onCancelReservation(item.id)}>
-              {cancellingId === item.id ? 'Cancelando...' : 'Cancelar'}
-            </button>
-          </div>
-        </MotionCard>
-      ))}
+          </Card>
+        )
+      })}
     </div>
   )
 }
 
-export function Reservations({ pendingReservation, currentUser, onClearPendingReservation, setActivePage, appContent }) {
-  const text = appContent.appText
+export function Reservations({ pendingReservation, currentUser, onClearPendingReservation, setActivePage }) {
+  const { showToast } = useToast()
+  const weekDays = useMemo(() => buildWeekDays(), [])
   const [availableClasses, setAvailableClasses] = useState([])
   const [userActiveReservations, setUserActiveReservations] = useState([])
   const [membership, setMembership] = useState(null)
   const [hasActiveMembership, setHasActiveMembership] = useState(false)
   const [remainingTokens, setRemainingTokens] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [isSubmittingReservation, setIsSubmittingReservation] = useState(false)
-  const [cancellingReservationId, setCancellingReservationId] = useState('')
   const [reservationMessage, setReservationMessage] = useState('')
-  const [selectedDayId, setSelectedDayId] = useState(getCurrentReservationDayId)
-  const [selectedClass, setSelectedClass] = useState(null)
-  const [successReservation, setSuccessReservation] = useState(null)
-  const selectedClassKey = selectedClass ? `${selectedClass.classScheduleId}-${selectedClass.reservationDate}` : null
-  const filteredClasses = availableClasses.filter((classItem) => classItem.dayId === selectedDayId)
-  const selectedDayLabel = reservationDayFilters.find((day) => day.dayId === selectedDayId)?.label ?? 'este dia'
-  const totalClasses = filteredClasses.length
-  const totalSpots = filteredClasses.reduce((sum, item) => sum + item.spots, 0)
-  const reservedCount = userActiveReservations.length
+  const [selectedDateKey, setSelectedDateKey] = useState(weekDays[0]?.dateKey ?? getChileDateKey())
+  const [processingClassKey, setProcessingClassKey] = useState('')
+  const [cancelTarget, setCancelTarget] = useState(null)
+
+  const selectedDay = weekDays.find((day) => day.dateKey === selectedDateKey) ?? weekDays[0]
+  const filteredClasses = availableClasses
+    .filter((classItem) => classItem.dayId === selectedDay?.dayId)
+    .sort((a, b) => String(a.time).localeCompare(String(b.time)))
+  const totalSpots = filteredClasses.reduce((sum, item) => sum + getSpots(item).available, 0)
+  const reservationByClassKey = useMemo(() => new Map(userActiveReservations.map((reservation) => [getClassKey(reservation), reservation])), [userActiveReservations])
 
   const refreshReservations = useCallback(async () => {
     setIsLoading(true)
@@ -321,6 +343,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
       time: reservation.class_schedule?.time?.slice(0, 5) ?? '',
       name: reservation.class_schedule?.class_name ?? 'Clase KUPAN',
       coach: reservation.class_schedule?.coach ?? 'Coach KUPAN',
+      isReserved: reservation.status === 'reserved',
     })))
     setMembership(result.membership)
     setHasActiveMembership(result.hasActiveMembership)
@@ -340,79 +363,93 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
       classItem.day === pendingReservation.day
     ))
     if (matchedClass?.dayId) {
-      setSelectedDayId(matchedClass.dayId)
+      const matchedDay = weekDays.find((day) => day.dayId === matchedClass.dayId)
+      if (matchedDay) setSelectedDateKey(matchedDay.dateKey)
     }
-    setSelectedClass(matchedClass ?? null)
-  }, [availableClasses, pendingReservation])
-
-  function handleSelect(classItem) {
-    if (classItem.isFull || classItem.isReserved) return
-    setSelectedClass(classItem)
-    setSuccessReservation(null)
-    setReservationMessage('')
-  }
-
-  async function handleConfirm(classItem) {
-    setIsSubmittingReservation(true)
-    const result = await createSupabaseReservation(currentUser?.id, classItem, hasActiveMembership)
-    if (!result.ok) {
-      setIsSubmittingReservation(false)
-      setReservationMessage(result.message)
-      return
-    }
-    setSuccessReservation(result.reservation)
-    setSelectedClass(null)
-    await refreshReservations()
-    setIsSubmittingReservation(false)
-  }
-
-  async function handleCancelReservation(reservationId) {
-    setCancellingReservationId(reservationId)
-    const result = await cancelSupabaseReservation(reservationId)
-    if (!result.ok) {
-      setCancellingReservationId('')
-      setReservationMessage(result.message)
-      return
-    }
-    setReservationMessage(result.message)
-    await refreshReservations()
-    setCancellingReservationId('')
-  }
-
-  function handleNewReservation() {
     onClearPendingReservation()
-    setSelectedClass(null)
-    setSuccessReservation(null)
+  }, [availableClasses, onClearPendingReservation, pendingReservation, weekDays])
+
+  async function handleReserve(classItem) {
+    if (!currentUser) {
+      setActivePage('login')
+      return
+    }
+
+    const classKey = getClassKey(classItem)
+    if (processingClassKey === classKey || classItem.isReserved) return
+
+    setProcessingClassKey(classKey)
+    setReservationMessage('')
+    const result = await createSupabaseReservation(currentUser.id, classItem, hasActiveMembership)
+
+    if (!result.ok) {
+      const completed = result.message.toLowerCase().includes('complet') || result.message.toLowerCase().includes('cupos')
+      setReservationMessage(completed ? 'La clase acaba de completarse. Actualizamos los cupos disponibles.' : result.message)
+      showToast({
+        type: completed ? 'warning' : 'error',
+        title: completed ? 'Clase completa' : 'No pudimos reservar',
+        description: completed ? 'Otro alumno tomó el ultimo cupo antes que tu.' : result.message,
+      })
+      await refreshReservations()
+      setProcessingClassKey('')
+      return
+    }
+
+    showToast({
+      type: 'success',
+      title: 'Reserva confirmada',
+      description: `${classItem.name} a las ${classItem.time} quedó guardada en tu agenda.`,
+    })
+    await refreshReservations()
+    setProcessingClassKey('')
+  }
+
+  function requestCancel(classItem) {
+    setCancelTarget(classItem)
+  }
+
+  async function confirmCancel() {
+    if (!cancelTarget?.id) return
+    const classKey = getClassKey(cancelTarget)
+    setProcessingClassKey(classKey)
+    const result = await cancelSupabaseReservation(cancelTarget.id)
+
+    if (!result.ok) {
+      setReservationMessage(result.message)
+      showToast({ type: 'error', title: 'No pudimos cancelar', description: result.message })
+      setProcessingClassKey('')
+      return
+    }
+
+    showToast({ type: 'success', title: 'Reserva cancelada', description: result.message || 'Tu cupo quedó liberado.' })
+    setCancelTarget(null)
+    await refreshReservations()
+    setProcessingClassKey('')
   }
 
   return (
-    <div className="space-y-6">
-      <MotionCard as="section" className="k-card overflow-hidden p-0">
-        <div className="border-b border-white/10 bg-black/25 p-5">
-          <p className="k-pill inline-flex text-kupan-flame">Reserva KUPAN</p>
-          <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">{text.reservationsTitle}</h2>
-          <p className="mt-3 text-sm leading-6 text-white/60">{text.reservationsBody}</p>
-          <a className="k-button-secondary mt-5 w-full" href={createWhatsAppUrl(whatsappMessages.reservation)} target="_blank" rel="noreferrer">
-            Reservar por WhatsApp
-          </a>
-        </div>
-        <div className="grid grid-cols-3 gap-0 border-t border-white/10">
-          <div className="p-4">
-            <p className="text-2xl font-black text-white">{totalClasses}</p>
-            <p className="text-[0.65rem] font-black uppercase text-white/60">Clases</p>
+    <div className="space-y-6 pb-24 md:pb-8">
+      <section className="space-y-3">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-red">Reservas</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-black leading-tight text-text-primary sm:text-4xl">Reserva tu proxima clase</h1>
+            <p className="mt-2 max-w-2xl text-base leading-7 text-text-secondary">
+              Elige el día, revisa cupos reales y toma tu clase en un solo paso.
+            </p>
           </div>
-          <div className="border-l border-white/10 p-4">
-            <p className="text-2xl font-black text-white">{totalSpots}</p>
-            <p className="text-[0.65rem] font-black uppercase text-white/60">Cupos vivos</p>
-          </div>
-          <div className="border-l border-white/10 p-4">
-            <p className="text-2xl font-black text-kupan-flame">{reservedCount}</p>
-            <p className="text-[0.65rem] font-black uppercase text-white/60">Reservas</p>
+          <div className="grid grid-cols-2 gap-2 sm:min-w-60">
+            <Card variant="standard" className="p-3 text-center">
+              <p className="text-2xl font-black text-text-primary">{filteredClasses.length}</p>
+              <p className="text-xs font-bold text-text-muted">clases</p>
+            </Card>
+            <Card variant="standard" className="p-3 text-center">
+              <p className="text-2xl font-black text-success">{totalSpots}</p>
+              <p className="text-xs font-bold text-text-muted">cupos</p>
+            </Card>
           </div>
         </div>
-      </MotionCard>
-
-      <SuccessMessage reservation={successReservation} onGoProfile={() => setActivePage('profile')} onNewReservation={handleNewReservation} />
+      </section>
 
       <PlanStatusCard
         currentUser={currentUser}
@@ -422,70 +459,63 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
         isLoading={isLoading}
       />
 
-      <BookingSummary
-        selectedClass={selectedClass}
-        currentUser={currentUser}
-        onConfirm={handleConfirm}
-        onGoLogin={() => setActivePage('login')}
-        hasActiveMembership={hasActiveMembership}
-        membership={membership}
-        remainingTokens={remainingTokens}
-        isSubmitting={isSubmittingReservation}
-      />
+      <section className="space-y-4">
+        <WeekSelector weekDays={weekDays} selectedDateKey={selectedDateKey} onSelect={setSelectedDateKey} />
 
-      <section>
-        <SectionTitle eyebrow="Disponibles" title="Clases para entrar al WOD" />
-        {isLoading ? <p className="k-panel mb-4 p-4 text-sm font-bold text-white/60">Cargando cupos reales desde Supabase...</p> : null}
-        {reservationMessage ? <p className="mb-4 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{reservationMessage}</p> : null}
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-          {reservationDayFilters.map((day) => (
-            <button
-              key={day.dayId}
-              type="button"
-              aria-label={`Mostrar clases de ${day.label}`}
-              aria-pressed={selectedDayId === day.dayId}
-              className={`min-w-16 rounded-lg px-4 py-3 text-sm font-black uppercase transition ${
-                selectedDayId === day.dayId ? 'bg-kupan-ember text-white shadow-glow' : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
-              }`}
-              onClick={() => {
-                setSelectedDayId(day.dayId)
-                setSelectedClass(null)
-                setSuccessReservation(null)
-              }}
-            >
-              {day.short}
-            </button>
-          ))}
-        </div>
-        {filteredClasses.length === 0 ? (
-          <MotionCard className="k-panel mb-4 p-4">
-            <p className="font-black uppercase text-white">No hay clases para {selectedDayLabel}.</p>
-            <p className="mt-1 text-sm text-white/60">Elige otro dia para ver cupos disponibles y reservar tu entrenamiento.</p>
-          </MotionCard>
+        {isLoading ? <LoadingState title="Cargando horarios" description="Estamos revisando cupos reales desde KUPAN." /> : null}
+
+        {reservationMessage ? (
+          <ErrorState title="Atencion" description={reservationMessage} actionLabel="Actualizar cupos" onAction={refreshReservations} />
         ) : null}
-        <div className="grid gap-3 md:grid-cols-2">
-          {filteredClasses.map((item, index) => (
-            <Motion.div
-              key={`${item.classScheduleId}-${item.reservationDate}`}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.12 }}
-              transition={{ duration: 0.22, delay: Math.min(index * 0.025, 0.16) }}
-            >
-              <ReservationCard
-                item={item}
-                isSelected={selectedClassKey === `${item.classScheduleId}-${item.reservationDate}`}
-                onSelect={handleSelect}
-              />
-            </Motion.div>
+
+        {!isLoading && !reservationMessage && filteredClasses.length === 0 ? (
+          <EmptyState
+            title="No hay clases programadas para este día."
+            description="Puedes revisar otro día de la semana para encontrar el mejor horario."
+          />
+        ) : null}
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          {filteredClasses.map((item) => (
+            <ClassCard
+              key={getClassKey(item)}
+              item={item}
+              reservation={reservationByClassKey.get(getClassKey(item))}
+              currentUser={currentUser}
+              hasActiveMembership={hasActiveMembership}
+              remainingTokens={remainingTokens}
+              onReserve={handleReserve}
+              onCancel={requestCancel}
+              processingKey={processingClassKey}
+            />
           ))}
         </div>
       </section>
 
-      <section>
-        <SectionTitle eyebrow="Mis cupos" title="Tu agenda KUPAN" />
-        <ReservationList reservations={userActiveReservations} onCancelReservation={handleCancelReservation} cancellingId={cancellingReservationId} />
+      <section className="space-y-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-text-muted">Mis reservas</p>
+          <h2 className="mt-1 text-2xl font-black text-text-primary">Tu agenda</h2>
+        </div>
+        <ReservationList reservations={userActiveReservations} onCancel={requestCancel} processingKey={processingClassKey} />
       </section>
+
+      <Dialog
+        isOpen={Boolean(cancelTarget)}
+        onClose={() => setCancelTarget(null)}
+        title="Cancelar reserva"
+        description={cancelTarget ? `¿Cancelar tu reserva de ${cancelTarget.name} a las ${cancelTarget.time}?` : ''}
+        isDestructive
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" fullWidth onClick={() => setCancelTarget(null)}>
+            Mantener reserva
+          </Button>
+          <Button type="button" variant="destructive" fullWidth isLoading={Boolean(cancelTarget && processingClassKey === getClassKey(cancelTarget))} onClick={confirmCancel}>
+            Sí, cancelar
+          </Button>
+        </div>
+      </Dialog>
     </div>
   )
 }
