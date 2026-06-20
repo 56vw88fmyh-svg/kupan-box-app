@@ -1,5 +1,5 @@
 import { SectionTitle } from '../components/SectionTitle.jsx'
-import { transferInfo } from '../data/mockData.js'
+import { transferInfo } from '../data/fallbackData.js'
 import { createWhatsAppUrl, whatsappMessages } from '../utils/whatsapp.js'
 
 function buildWhatsAppUrl(plan) {

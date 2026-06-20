@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { getHumanErrorMessage, logAppError } from './appState.js'
 
 export const notificationTypes = [
   'plan_expiring',
@@ -12,6 +13,11 @@ function getNotificationError(message = 'No pudimos cargar notificaciones.') {
   return { ok: false, message }
 }
 
+function getSafeNotificationError(scope, error, fallback) {
+  logAppError(scope, error)
+  return getNotificationError(getHumanErrorMessage(error, fallback))
+}
+
 export async function loadNotifications(profileId) {
   if (!isSupabaseConfigured || !supabase) return getNotificationError('Supabase aun no esta configurado.')
   if (!profileId) return { ok: true, notifications: [], unreadCount: 0 }
@@ -23,7 +29,7 @@ export async function loadNotifications(profileId) {
     .order('created_at', { ascending: false })
     .limit(20)
 
-  if (error) return getNotificationError(`No pudimos cargar notificaciones: ${error.message}`)
+  if (error) return getSafeNotificationError('notifications.load', error, 'No fue posible cargar notificaciones. Intenta nuevamente.')
 
   const notifications = data ?? []
   return {
@@ -41,7 +47,7 @@ export async function markNotificationRead(notificationId) {
     .update({ read: true })
     .eq('id', notificationId)
 
-  if (error) return getNotificationError(`No pudimos marcar la notificacion: ${error.message}`)
+  if (error) return getSafeNotificationError('notifications.mark_read', error, 'No fue posible marcar la notificación.')
   return { ok: true }
 }
 
@@ -55,6 +61,6 @@ export async function markAllNotificationsRead(profileId) {
     .eq('profile_id', profileId)
     .eq('read', false)
 
-  if (error) return getNotificationError(`No pudimos marcar notificaciones: ${error.message}`)
+  if (error) return getSafeNotificationError('notifications.mark_all_read', error, 'No fue posible marcar las notificaciones.')
   return { ok: true }
 }

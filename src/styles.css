@@ -3,42 +3,123 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-primary: #0B0B0C;
+    --bg-secondary: #141416;
+    --bg-card: #1B1B1E;
+    --bg-elevated: #232327;
+
+    --text-primary: #F5F5F5;
+    --text-secondary: #C7C7CC;
+    --text-muted: #92929A;
+    --text-disabled: #68686F;
+
+    --brand-red: #FF5A1F;
+    --brand-red-hover: #FF7A3D;
+    --brand-red-soft: rgba(255, 90, 31, 0.14);
+
+    --success: #3CCB7F;
+    --warning: #F5B942;
+    --error: #FF5A5F;
+    --info: #5CA8FF;
+
+    --border-default: #303036;
+    --border-strong: #45454D;
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --space-12: 3rem;
+
+    --radius-1: 0.5rem;
+    --radius-2: 0.75rem;
+    --radius-3: 1rem;
+    --radius-4: 1.375rem;
+
+    --color-bg-primary: 11 11 12;
+    --color-bg-secondary: 20 20 22;
+    --color-bg-card: 27 27 30;
+    --color-bg-elevated: 35 35 39;
+    --color-text-primary: 245 245 245;
+    --color-text-secondary: 199 199 204;
+    --color-text-muted: 146 146 154;
+    --color-text-disabled: 104 104 111;
+    --color-brand-red: 255 90 31;
+    --color-brand-red-hover: 255 122 61;
+    --color-success: 60 203 127;
+    --color-warning: 245 185 66;
+    --color-error: 255 90 95;
+    --color-info: 92 168 255;
+    --color-border-default: 48 48 54;
+    --color-border-strong: 69 69 77;
+  }
+
   * {
     box-sizing: border-box;
   }
 
   html {
-    background: #000000;
+    background: var(--bg-primary);
     -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+    scroll-padding-top: calc(5.25rem + env(safe-area-inset-top));
+    scroll-padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
   }
 
   body {
     min-width: 320px;
     margin: 0;
-    color: #ffffff;
+    color: var(--text-primary);
     background:
-      linear-gradient(135deg, rgba(255, 90, 31, 0.16) 0 1px, transparent 1px 18px),
-      linear-gradient(180deg, #111111 0%, #000000 40%, #000000 100%);
+      linear-gradient(135deg, rgba(240, 68, 68, 0.12) 0 1px, transparent 1px 18px),
+      linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 42%, #09090A 100%);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
     text-rendering: geometricPrecision;
+    overflow-x: hidden;
+    min-height: 100svh;
   }
 
   #root {
     min-height: 100svh;
+    min-height: 100dvh;
     isolation: isolate;
   }
 
   button,
   input,
-  textarea {
+  textarea,
+  select {
     font: inherit;
+    font-size: max(16px, 1rem);
+  }
+
+  input,
+  textarea,
+  select {
+    max-width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
   }
 
   button,
   a {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--brand-red-hover);
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    color: var(--text-primary);
+    background: rgba(255, 90, 31, 0.42);
   }
 }
 
@@ -48,57 +129,82 @@
   }
 
   .k-card {
-    @apply rounded-lg border border-white/10 bg-kupan-charcoal/90 shadow-[0_18px_54px_rgba(0,0,0,0.46)] backdrop-blur;
+    @apply min-w-0 rounded-xl border border-kupan-border bg-kupan-charcoal/90 shadow-[0_18px_54px_rgba(0,0,0,0.46)] backdrop-blur;
   }
 
   .k-panel {
-    @apply rounded-lg border border-white/10 bg-kupan-iron/80 shadow-[0_12px_34px_rgba(0,0,0,0.36)];
+    @apply min-w-0 rounded-xl border border-kupan-border bg-kupan-iron/90 shadow-[0_12px_34px_rgba(0,0,0,0.36)];
   }
 
   .k-pill {
-    @apply rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-kupan-bone;
+    @apply rounded-full border border-kupan-border bg-kupan-gray/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-kupan-bone;
   }
 
   .k-button {
-    @apply inline-flex min-h-12 items-center justify-center rounded-lg bg-kupan-ember px-4 py-3 text-sm font-black uppercase text-white shadow-glow transition duration-200 hover:-translate-y-0.5 hover:bg-kupan-flame hover:shadow-xl hover:shadow-kupan-ember/20 active:scale-[0.98];
+    @apply inline-flex min-h-12 items-center justify-center rounded-xl bg-kupan-ember px-4 py-3 text-sm font-black uppercase text-kupan-black shadow-glow transition duration-200 hover:-translate-y-0.5 hover:bg-kupan-flame hover:shadow-xl hover:shadow-kupan-ember/20 active:scale-[0.98];
   }
 
   .k-button-secondary {
-    @apply inline-flex min-h-12 items-center justify-center rounded-lg border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold uppercase text-white transition duration-200 hover:-translate-y-0.5 hover:border-kupan-flame/70 hover:bg-white/15 active:scale-[0.98];
+    @apply inline-flex min-h-12 items-center justify-center rounded-xl border border-kupan-border bg-kupan-gray/70 px-4 py-3 text-sm font-bold uppercase text-kupan-bone transition duration-200 hover:-translate-y-0.5 hover:border-kupan-flame/70 hover:bg-kupan-gray active:scale-[0.98];
   }
 
   .k-hero {
     background:
-      linear-gradient(115deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.88)),
-      repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 18px),
-      linear-gradient(135deg, #2a2a2a 0%, #111111 48%, #000000 100%);
+      linear-gradient(115deg, rgba(11, 11, 12, 0.18), rgba(11, 11, 12, 0.9)),
+      repeating-linear-gradient(135deg, rgba(245, 245, 245, 0.07) 0 1px, transparent 1px 18px),
+      linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-secondary) 48%, var(--bg-primary) 100%);
   }
 
   .k-stat {
-    @apply rounded-lg border border-white/10 bg-black/30 p-3;
+    @apply rounded-xl border border-kupan-border bg-kupan-black/40 p-3;
   }
 
   .k-app-shell {
     min-height: 100svh;
+    min-height: 100dvh;
     padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
   }
 
   .k-app-header {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
     padding-top: calc(0.9rem + env(safe-area-inset-top));
     box-shadow: 0 14px 42px rgba(0, 0, 0, 0.36);
   }
 
   .k-app-main {
     padding-inline: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
   }
 
   .k-bottom-nav {
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
     padding-bottom: calc(0.6rem + env(safe-area-inset-bottom));
     box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.62);
   }
 
   .k-tab-item {
     min-height: 4rem;
+  }
+
+  .k-scroll-x {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .k-scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+
+  .k-dialog-backdrop {
+    padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+  }
+
+  .k-dialog-panel {
+    max-height: min(92svh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1.5rem));
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -114,8 +220,96 @@
   }
 }
 
+@keyframes loading-bar {
+  0% {
+    width: 18%;
+    transform: translateX(0);
+  }
+
+  70% {
+    width: 72%;
+  }
+
+  100% {
+    width: 100%;
+    transform: translateX(0);
+  }
+}
+
+@keyframes kupan-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.025);
+  }
+}
+
+@keyframes soft-blink {
+  0%, 100% {
+    opacity: 0.55;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-page-enter {
     animation: none;
   }
+}
+
+.animate-loading-bar {
+  animation: loading-bar 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-kupan-pulse {
+  animation: kupan-pulse 1.4s ease-in-out infinite;
+}
+
+.animate-soft-blink {
+  animation: soft-blink 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-loading-bar,
+  .animate-kupan-pulse,
+  .animate-soft-blink {
+    animation: none;
+  }
+}
+
+@media (max-width: 374px) {
+  .k-app-main {
+    padding-inline: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+  }
+
+  .k-tab-item {
+    min-height: 3.55rem;
+    border-radius: 0.75rem;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .k-app-header {
+    position: static;
+  }
+
+  .k-app-shell {
+    padding-bottom: calc(4.7rem + env(safe-area-inset-bottom));
+  }
+
+  .k-tab-item {
+    min-height: 3.4rem;
+  }
+}
+
+input,
+select,
+textarea {
+  font-size: 16px !important;
 }

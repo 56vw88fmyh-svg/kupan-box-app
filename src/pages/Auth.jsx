@@ -1,19 +1,17 @@
 import { useState } from 'react'
+import { Button, Input } from '../components/ui/index.js'
 import { athleteLevels } from '../utils/auth.js'
 
 function AuthField({ label, type = 'text', value, onChange, autoComplete, required = false }) {
   return (
-    <label className="block">
-      <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">{label}</span>
-      <input
-        className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/30 focus:border-kupan-ember"
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        required={required}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
+    <Input
+      autoComplete={autoComplete}
+      label={label}
+      required={required}
+      type={type}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
   )
 }
 
@@ -104,9 +102,9 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
             </p>
           ) : null}
 
-          <button type="submit" className="k-button w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Conectando...' : isRegister ? 'Crear cuenta' : 'Iniciar sesión'}
-          </button>
+          <Button className="w-full" isLoading={isSubmitting} loadingLabel="Conectando" type="submit">
+            {isRegister ? 'Crear cuenta' : 'Iniciar sesión'}
+          </Button>
         </form>
       </section>
 
@@ -114,13 +112,13 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
         <p className="text-sm font-semibold text-white/60">
           {isRegister ? '¿Ya tienes cuenta?' : '¿Primera vez en la app?'}
         </p>
-        <button
-          type="button"
-          className="k-button-secondary mt-3 w-full"
+        <Button
+          className="mt-3 w-full"
+          variant="secondary"
           onClick={() => switchMode(isRegister ? 'login' : 'register')}
         >
           {isRegister ? 'Ir a login' : 'Registrarme'}
-        </button>
+        </Button>
       </section>
     </div>
   )

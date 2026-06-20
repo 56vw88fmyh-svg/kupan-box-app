@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
+import { ErrorState, PermissionDeniedState, SuccessState } from '../components/ui/index.js'
 import {
   cancelCoachReservation,
   loadCoachDashboard,
@@ -186,27 +187,17 @@ export function Coach({ currentUser, setActivePage }) {
 
   if (!currentUser) {
     return (
-      <section className="k-card p-5">
-        <p className="k-pill inline-flex text-kupan-flame">Modo Coach</p>
-        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Inicia sesión para entrar.</h2>
-        <button type="button" className="k-button mt-5 w-full" onClick={() => setActivePage('login')}>
-          Iniciar sesión
-        </button>
-      </section>
+      <ErrorState
+        actionLabel="Iniciar sesión"
+        error="session expired"
+        onAction={() => setActivePage('login')}
+        title="Inicia sesión para entrar"
+      />
     )
   }
 
   if (!canAccess) {
-    return (
-      <section className="k-card p-5">
-        <p className="k-pill inline-flex text-kupan-flame">Acceso denegado</p>
-        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Solo admin o coach KUPAN.</h2>
-        <p className="mt-3 text-sm leading-6 text-white/60">Tu perfil no tiene permiso para marcar asistencia.</p>
-        <button type="button" className="k-button-secondary mt-5 w-full" onClick={() => setActivePage('profile')}>
-          Volver a perfil
-        </button>
-      </section>
-    )
+    return <PermissionDeniedState onBack={() => setActivePage('profile')} />
   }
 
   const selectedClass = dashboard.classes.find((classItem) => classItem.id === selectedClassId) ?? dashboard.currentClass
@@ -240,14 +231,8 @@ export function Coach({ currentUser, setActivePage }) {
         </div>
       </section>
 
-      {message ? (
-        <p className={`rounded-lg border p-3 text-sm font-bold text-white ${
-          messageType === 'success' ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-kupan-flame/30 bg-kupan-flame/10'
-        }`}
-        >
-          {message}
-        </p>
-      ) : null}
+      {message && messageType === 'success' ? <SuccessState title="Acción realizada" description={message} /> : null}
+      {message && messageType !== 'success' ? <ErrorState title="No fue posible completar la acción" description={message} onAction={refreshCoach} /> : null}
 
       <div className="grid gap-3 md:grid-cols-2">
         <ClassSummary title="Clase actual" classItem={dashboard.currentClass} />
@@ -256,7 +241,7 @@ export function Coach({ currentUser, setActivePage }) {
 
       <section>
         <SectionTitle eyebrow="Asistencia" title="Alumnos reservados" />
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+        <div className="mb-4 flex gap-2 overflow-x-auto k-scroll-x pb-1">
           {dashboard.classes.map((classItem) => (
             <button
               key={classItem.id}

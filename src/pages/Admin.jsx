@@ -6,6 +6,7 @@ import { defaultAppText } from '../utils/adminContent.js'
 import { saveAppSetting } from '../utils/sharedContent.js'
 import { getCurrentSupabaseUser } from '../utils/auth.js'
 import { adminReserveForStudent } from '../utils/supabaseReservations.js'
+import { getHumanErrorMessage, logAppError } from '../utils/appState.js'
 
 const adminSectionMeta = {
   overview: { label: 'Resumen', module: 'Panel', icon: 'IN' },
@@ -23,48 +24,39 @@ const adminSectionMeta = {
 }
 
 const adminNavigationModules = [
+  { id: 'resumen', label: 'Resumen', icon: 'IN', items: [{ id: 'overview', label: 'Resumen', hint: 'Indicadores del box' }] },
+  { id: 'wod', label: 'WOD', icon: 'WD', items: [{ id: 'wod', label: 'WOD', hint: 'Programacion del dia' }] },
+  { id: 'horarios', label: 'Horarios', icon: 'HO', items: [{ id: 'schedule', label: 'Horarios', hint: 'Crear y editar clases' }] },
   {
-    id: 'alumnos',
-    label: 'Alumnos',
+    id: 'reservas',
+    label: 'Reservas',
+    icon: 'RE',
+    items: [
+      { id: 'reservations', label: 'Reservas', hint: 'Asistencia y estado' },
+      { id: 'reservations', label: 'Agregar alumno', target: 'manual-reservation', hint: 'Reserva manual' },
+    ],
+  },
+  {
+    id: 'usuarios',
+    label: 'Usuarios',
     icon: 'AL',
     items: [
-      { id: 'students', label: 'Ver alumnos', hint: 'Listado completo' },
+      { id: 'students', label: 'Alumnos', hint: 'Listado completo' },
       { id: 'create-student', label: 'Nuevo alumno', hint: 'Crear acceso' },
       { id: 'memberships', label: 'Membresias', hint: 'Planes activos' },
       { id: 'memberships', label: 'Historial', target: 'membership-history', hint: 'Ciclos y tokens' },
     ],
   },
+  { id: 'eventos', label: 'Eventos', icon: 'EV', items: [{ id: 'community', label: 'Eventos', hint: 'Publicaciones activas' }] },
+  { id: 'noticias', label: 'Noticias', icon: 'NT', items: [{ id: 'community', label: 'Noticias', hint: 'Comunidad' }] },
+  { id: 'planes', label: 'Planes', icon: 'PL', items: [{ id: 'plans', label: 'Planes', hint: 'Precios y cupos' }] },
   {
-    id: 'pagos',
-    label: 'Pagos',
-    icon: 'PG',
+    id: 'configuracion',
+    label: 'Configuracion',
+    icon: 'CF',
     items: [
-      { id: 'memberships', label: 'Registrar pago', target: 'membership-activate', hint: 'Activar plan' },
-      { id: 'memberships', label: 'Historial', target: 'membership-history', hint: 'Membresias' },
-      { id: 'memberships', label: 'Tokens', target: 'token-movements', hint: 'Ajustes' },
-      { id: 'plans', label: 'Planes', hint: 'Precios' },
-    ],
-  },
-  {
-    id: 'clases',
-    label: 'Clases',
-    icon: 'CL',
-    items: [
-      { id: 'schedule', label: 'Crear clase', hint: 'Horarios' },
-      { id: 'schedule', label: 'Ver clases', hint: 'Agenda semanal' },
-      { id: 'reservations', label: 'Reservas', hint: 'Reservas activas' },
-      { id: 'reservations', label: 'Agregar alumno', target: 'manual-reservation', hint: 'Reserva manual' },
-      { id: 'wod', label: 'WOD del dia', hint: 'Programacion' },
-    ],
-  },
-  {
-    id: 'contenido',
-    label: 'Contenido',
-    icon: 'CT',
-    items: [
-      { id: 'community', label: 'Noticias y eventos', hint: 'Comunidad' },
-      { id: 'birthdays', label: 'Cumpleanos', hint: 'Saludo rapido' },
       { id: 'texts', label: 'Textos app', hint: 'Copy principal' },
+      { id: 'birthdays', label: 'Cumpleanos', hint: 'Saludo rapido' },
       { id: 'prs', label: 'PR destacados', hint: 'Marcas' },
     ],
   },
@@ -232,7 +224,7 @@ function SmallRow({ title, meta, detail, action }) {
 
 function AdminSidebar({ modules, openModules, onToggleModule, activeSection, onNavigate, isCollapsed, onToggleCollapse }) {
   return (
-    <aside className={`k-card sticky top-[calc(4.75rem+env(safe-area-inset-top))] z-10 max-h-[calc(100vh-7rem)] overflow-hidden p-3 transition-all duration-300 lg:self-start ${
+    <aside className={`k-card sticky top-[calc(4.75rem+env(safe-area-inset-top))] z-10 max-h-[calc(100dvh-7rem)] overflow-hidden p-3 transition-all duration-300 lg:self-start ${
       isCollapsed ? 'lg:w-20' : 'lg:w-72'
     }`}
     >
@@ -251,7 +243,7 @@ function AdminSidebar({ modules, openModules, onToggleModule, activeSection, onN
         </button>
       </div>
 
-      <div className="max-h-[calc(100vh-12rem)] space-y-2 overflow-y-auto pr-1">
+      <div className="max-h-[calc(100dvh-12rem)] space-y-2 overflow-y-auto pr-1">
         {modules.map((module) => {
           const isOpen = openModules.includes(module.id)
           const moduleHasActive = module.items.some((item) => item.id === activeSection)
@@ -410,11 +402,13 @@ async function runAdminLoader([label, key, rpcName]) {
   try {
     const { data, error } = await supabase.rpc(rpcName)
     if (error) {
-      return { key, label, data: emptyAdminData[key], error: error.message }
+      logAppError(`admin.load_${key}`, error)
+      return { key, label, data: emptyAdminData[key], error: getHumanErrorMessage(error, `No fue posible cargar ${label}.`) }
     }
     return { key, label, data: data ?? emptyAdminData[key], error: null }
   } catch (error) {
-    return { key, label, data: emptyAdminData[key], error: error.message }
+    logAppError(`admin.load_${key}`, error)
+    return { key, label, data: emptyAdminData[key], error: getHumanErrorMessage(error, `No fue posible cargar ${label}.`) }
   }
 }
 
@@ -430,14 +424,15 @@ async function loadAdminData() {
   settledResults.forEach((result, index) => {
     if (result.status === 'rejected') {
       const [label, key] = adminLoaders[index]
-      errors.push({ key, label, message: `No pudimos cargar ${label}: ${result.reason?.message ?? 'Error desconocido'}` })
+      logAppError(`admin.load_${key}`, result.reason)
+      errors.push({ key, label, message: `No pudimos cargar ${label}. Revisa tu conexión y vuelve a intentarlo.` })
       data[key] = emptyAdminData[key]
       return
     }
 
     data[result.value.key] = result.value.data
     if (result.value.error) {
-      errors.push({ key: result.value.key, label: result.value.label, message: `No pudimos cargar ${result.value.label}: ${result.value.error}` })
+      errors.push({ key: result.value.key, label: result.value.label, message: `No pudimos cargar ${result.value.label}. ${result.value.error}` })
     }
   })
 
@@ -496,6 +491,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const membershipHistoryRef = useRef(null)
   const tokenMovementsRef = useRef(null)
   const manualReservationRef = useRef(null)
+  const scrollTimeoutRef = useRef(null)
 
   const activeUser = verifiedUser ?? currentUser
   const isAdmin = activeUser?.role === 'admin'
@@ -526,6 +522,10 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       isMounted = false
     }
   }, [currentUser])
+
+  useEffect(() => () => {
+    if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current)
+  }, [])
 
   const activeMembershipByProfile = useMemo(() => {
     const membershipsByProfile = new Map()
@@ -662,8 +662,10 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
     const targetRef = targetMap[target] ?? contentTopRef
 
-    window.setTimeout(() => {
+    if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current)
+    scrollTimeoutRef.current = window.setTimeout(() => {
       targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      scrollTimeoutRef.current = null
     }, 80)
   }
 
@@ -679,6 +681,23 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         ? current.filter((item) => item !== moduleId)
         : [...current, moduleId]
     ))
+  }
+
+  async function ensureFreshAdmin() {
+    setMessage('')
+    setMessageType('error')
+
+    const freshUser = await getCurrentSupabaseUser()
+    const allowed = freshUser?.role === 'admin' && freshUser?.status === 'active'
+
+    setVerifiedUser(freshUser ?? null)
+
+    if (!allowed) {
+      setMessage('Tu permiso admin ya no esta activo. Vuelve a iniciar sesion o solicita validar tu rol en Supabase.')
+      return false
+    }
+
+    return true
   }
 
   async function refreshData() {
@@ -740,6 +759,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function savePlan(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
     const payload = {
       name: planDraft.name.trim(),
       price: Number(planDraft.price),
@@ -759,6 +779,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function togglePlan(plan) {
+    if (!(await ensureFreshAdmin())) return
     const { error } = await supabase.from('plans').update({ active: !plan.active }).eq('id', plan.id)
     if (error) return setMessage('No pudimos actualizar el plan.')
     refreshData()
@@ -779,6 +800,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveMembership(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
     const selectedPlan = adminData.plans.find((plan) => plan.id === membershipDraft.plan_id)
     const startDate = membershipDraft.start_date || new Date().toISOString().slice(0, 10)
     const endDate = addDays(startDate, 30)
@@ -876,6 +898,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveMembershipEdit(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
 
     if (!membershipEditDraft.id) {
       setMessageType('error')
@@ -939,6 +962,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function updateMembershipStatus(membership, status) {
+    if (!(await ensureFreshAdmin())) return
     const { error } = await supabase.rpc('admin_update_membership', {
       target_membership_id: membership.id,
       target_plan_id: membership.plan_id,
@@ -964,6 +988,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function renewMembership(membership) {
+    if (!(await ensureFreshAdmin())) return
     const { error } = await supabase.rpc('admin_renew_membership', {
       target_membership_id: membership.id,
     })
@@ -980,6 +1005,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function extendMembershipSevenDays(membership) {
+    if (!(await ensureFreshAdmin())) return
     const { error } = await supabase.rpc('admin_extend_membership', {
       target_membership_id: membership.id,
       days_input: 7,
@@ -997,6 +1023,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function adjustMembershipTokens(membership) {
+    if (!(await ensureFreshAdmin())) return
     const tokens = getMembershipTokens(membership)
     const nextValue = window.prompt(
       `Tokens usados actuales: ${tokens.used}. Ingresa el nuevo total de tokens usados:`,
@@ -1036,6 +1063,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveWod(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
     const { error } = await supabase.from('wod').upsert(wodDraft, { onConflict: 'date' })
     if (error) return setMessage('No pudimos guardar el WOD.')
     setWodDraft(emptyWod)
@@ -1047,6 +1075,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveSchedule(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
     const payload = {
       day_of_week: Number(scheduleDraft.day_of_week),
       time: scheduleDraft.time,
@@ -1067,6 +1096,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function toggleSchedule(classItem) {
+    if (!(await ensureFreshAdmin())) return
     const { error } = await supabase.from('class_schedule').update({ active: !classItem.active }).eq('id', classItem.id)
     if (error) return setMessage('No pudimos actualizar el horario.')
     refreshData()
@@ -1088,6 +1118,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function savePost(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
     const payload = {
       type: postDraft.type,
       title: postDraft.title,
@@ -1107,6 +1138,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function togglePost(post) {
+    if (!(await ensureFreshAdmin())) return
     const { error } = await supabase.from('community_posts').update({ active: !post.active }).eq('id', post.id)
     if (error) return setMessage('No pudimos actualizar la publicacion.')
     refreshData()
@@ -1127,6 +1159,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveTexts(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
     const results = await Promise.all(
       Object.entries(settingKeys).map(([field, key]) => saveAppSetting(key, textDraft[field])),
     )
@@ -1145,6 +1178,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function updateReservationStatus(reservationId, status) {
+    if (!(await ensureFreshAdmin())) return
     const result = status === 'cancelled'
       ? await supabase.rpc('cancel_reservation', { target_reservation_id: reservationId })
       : await supabase.rpc('admin_mark_reservation', {
@@ -1166,6 +1200,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveManualReservation(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
     setMessage('')
     setMessageType('error')
     setIsSavingManualReservation(true)
@@ -1196,6 +1231,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   async function simulateApprovedPayment() {
+    if (!(await ensureFreshAdmin())) return
     setMessage('')
     setMessageType('error')
 
@@ -1228,6 +1264,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function createStudent(event) {
     event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
     setMessage('')
     setMessageType('error')
     setCreatedCredentials(null)
@@ -1392,7 +1429,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           </label>
           <p className="text-sm font-black uppercase text-white/60">{filteredProfiles.length} resultados</p>
         </div>
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <div className="mt-3 flex gap-2 overflow-x-auto k-scroll-x pb-1">
           {studentFilters.map((filter) => (
             <button
               key={filter.id}
@@ -1502,7 +1539,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
             </div>
             <TextArea label="Observaciones internas" value={studentDraft.internal_notes} onChange={(value) => setStudentDraft((current) => ({ ...current, internal_notes: value }))} />
             <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
-              Esta accion llama una Edge Function segura. La service_role key vive solo en Supabase, nunca en el frontend.
+              Esta accion llama una Edge Function segura. Las credenciales privadas viven solo en Supabase, nunca en el frontend.
             </div>
             <button type="submit" className="k-button w-full" disabled={isCreatingStudent}>
               {isCreatingStudent ? 'Creando alumno...' : 'Crear alumno'}

@@ -1,10 +1,17 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { mapReservationRow } from './supabaseReservations.js'
+import { getPersonalRecordHistory } from '../services/personalRecordsService.ts'
+import { getHumanErrorMessage, logAppError } from './appState.js'
 
 export const profileEditableLevels = ['Iniciado', 'Rookie', 'Scaled', 'RX']
 
 function getProfileError(message = 'No pudimos cargar tu perfil KUPAN. Intenta nuevamente.') {
   return { ok: false, message }
+}
+
+function getSafeProfileError(scope, error, fallback) {
+  logAppError(scope, error)
+  return getProfileError(getHumanErrorMessage(error, fallback))
 }
 
 export function calculateAge(birthDate) {
@@ -55,18 +62,13 @@ export async function loadSupabaseProfileData(profileId) {
     supabase.rpc('get_active_membership', { target_profile_id: profileId }),
     supabase
       .rpc('get_my_reservations'),
-    supabase
-      .from('personal_records')
-      .select('id, movement, value, unit, record_date, notes')
-      .eq('profile_id', profileId)
-      .order('record_date', { ascending: false })
-      .limit(5),
+    getPersonalRecordHistory(),
   ])
 
-  if (profileResult.error) return getProfileError('No pudimos cargar tus datos personales desde Supabase.')
-  if (membershipResult.error) return getProfileError('No pudimos cargar tu plan activo desde Supabase.')
-  if (reservationsResult.error) return getProfileError(`No pudimos cargar tus reservas desde Supabase: ${reservationsResult.error.message}`)
-  if (recordsResult.error) return getProfileError('No pudimos cargar tus ultimos PR desde Supabase.')
+  if (profileResult.error) return getSafeProfileError('profile.load_profile', profileResult.error, 'No fue posible cargar tus datos personales. Intenta nuevamente.')
+  if (membershipResult.error) return getSafeProfileError('profile.load_membership', membershipResult.error, 'No fue posible cargar tu plan activo. Intenta nuevamente.')
+  if (reservationsResult.error) return getSafeProfileError('profile.load_reservations', reservationsResult.error, 'No fue posible cargar tus reservas. Intenta nuevamente.')
+  const recordsIssue = recordsResult.ok ? '' : 'No pudimos cargar tus últimos PR desde Supabase.'
 
   return {
     ok: true,
@@ -74,7 +76,8 @@ export async function loadSupabaseProfileData(profileId) {
       profile: profileResult.data,
       membership: Array.isArray(membershipResult.data) ? membershipResult.data[0] : membershipResult.data,
       reservations: (reservationsResult.data ?? []).map(mapReservationRow),
-      records: recordsResult.data ?? [],
+      records: recordsResult.ok ? (recordsResult.data ?? []).slice(0, 5) : [],
+      recordsIssue,
     },
   }
 }
@@ -106,7 +109,7 @@ export async function updateSupabaseProfile(profileId, values) {
     .single()
 
   if (error) {
-    return getProfileError('No pudimos guardar tus cambios. Revisa los datos e intenta nuevamente.')
+    return getSafeProfileError('profile.update', error, 'No pudimos guardar tus cambios. Revisa los datos e intenta nuevamente.')
   }
 
   return { ok: true, profile: data, message: 'Perfil actualizado. A seguir entrenando fuerte.' }

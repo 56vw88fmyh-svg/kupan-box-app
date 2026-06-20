@@ -1,196 +1,338 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { MotionCard } from '../components/Motion.jsx'
-import { SectionTitle } from '../components/SectionTitle.jsx'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Input, LoadingState, useToast } from '../components/ui/index.js'
 import {
   createPersonalRecord,
   deletePersonalRecord,
   loadPersonalRecords,
   recordUnits,
+  retryPendingPersonalRecords,
   suggestedMovements,
   updatePersonalRecord,
 } from '../utils/personalRecords.js'
+import { migrateLegacyPrs } from '../services/prMigrationService.js'
+
+const categories = [
+  { id: 'strength', label: 'Fuerza', match: ['squat', 'deadlift', 'bench', 'press', 'thruster'] },
+  { id: 'weightlifting', label: 'Halterofilia', match: ['snatch', 'clean', 'jerk'] },
+  { id: 'gymnastics', label: 'Gimnásticos', match: ['pull up', 'chest to bar', 'muscle up', 'toes to bar', 'handstand', 'wall ball', 'box jump', 'burpee', 'double under'] },
+  { id: 'benchmarks', label: 'Benchmarks', match: ['fran', 'grace', 'isabel', 'helen', 'annie', 'diane', 'cindy', 'murph'] },
+  { id: 'cardio', label: 'Cardio', match: ['row', 'run', 'bike', 'ski', 'assault', 'carry'] },
+  { id: 'other', label: 'Otros', match: [] },
+]
 
 const emptyForm = {
+  customMovement: '',
   movement: '',
-  value: '',
-  unit: 'kg',
-  recordDate: new Date().toISOString().slice(0, 10),
   notes: '',
+  recordDate: new Date().toISOString().slice(0, 10),
+  reps: '',
+  resultType: 'kg',
+  rounds: '',
+  time: '',
+  unit: 'kg',
+  value: '',
 }
 
 function formatDate(date) {
   if (!date) return 'Sin fecha'
+  return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`))
+}
 
-  return new Intl.DateTimeFormat('es-CL', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(`${date}T00:00:00`))
+function normalizeName(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ')
+}
+
+function toTitleCase(value) {
+  return normalizeName(value).toLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toUpperCase())
+}
+
+function parsePositiveNumber(value) {
+  if (value === '' || value === null || value === undefined) return null
+  const number = Number(String(value).replace(',', '.'))
+  return Number.isFinite(number) && number >= 0 ? number : null
+}
+
+function parseTimeToSeconds(value) {
+  const text = normalizeName(value)
+  if (!text) return null
+  const parts = text.split(':').map(Number)
+  if (parts.length === 1) return parsePositiveNumber(parts[0])
+  if (parts.length === 2 && parts.every(Number.isFinite)) return parts[0] * 60 + parts[1]
+  if (parts.length === 3 && parts.every(Number.isFinite)) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  return null
+}
+
+function formatTime(seconds) {
+  const total = Math.max(Number(seconds) || 0, 0)
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
+  return `${minutes}:${String(rest).padStart(2, '0')}`
 }
 
 function formatValue(record) {
+  if (record.unit === 'tiempo') return formatTime(record.time_seconds ?? record.value)
+  if (record.rounds !== null && record.rounds !== undefined) return `${record.rounds} rondas + ${record.reps ?? 0} reps`
   return `${Number(record.value).toLocaleString('es-CL')} ${record.unit}`
 }
 
-function sortRecords(records, sortMode) {
-  return [...records].sort((a, b) => {
-    if (sortMode === 'best') {
-      if (a.unit === 'tiempo' && b.unit === 'tiempo') return Number(a.value) - Number(b.value)
-      return Number(b.value) - Number(a.value)
-    }
+function getCategoryForMovement(movement) {
+  const normalized = normalizeName(movement).toLowerCase()
+  return categories.find((category) => category.match.some((term) => normalized.includes(term))) ?? categories.at(-1)
+}
 
-    return new Date(`${b.record_date}T00:00:00`) - new Date(`${a.record_date}T00:00:00`)
+function compareRecords(a, b) {
+  if (!b) return -1
+  if (a.unit === 'tiempo') return Number(a.value) - Number(b.value)
+  if (a.rounds !== null && a.rounds !== undefined) {
+    const roundsDiff = Number(b.rounds ?? Math.floor(b.value)) - Number(a.rounds ?? Math.floor(a.value))
+    if (roundsDiff !== 0) return roundsDiff
+    return Number(b.reps ?? 0) - Number(a.reps ?? 0)
+  }
+  return Number(b.value) - Number(a.value)
+}
+
+function groupRecords(records) {
+  const groups = new Map()
+  records.forEach((record) => {
+    const key = `${normalizeName(record.movement).toLowerCase()}|${record.unit}`
+    const group = groups.get(key) ?? { history: [], movement: record.movement, unit: record.unit }
+    group.history.push(record)
+    groups.set(key, group)
   })
+
+  return [...groups.values()].map((group) => {
+    const history = [...group.history].sort((a, b) => new Date(`${b.record_date}T00:00:00`) - new Date(`${a.record_date}T00:00:00`))
+    const best = history.reduce((current, item) => (compareRecords(item, current) < 0 ? item : current), null)
+    const previousBest = history.filter((item) => item.id !== best.id).reduce((current, item) => (compareRecords(item, current) < 0 ? item : current), null)
+    const category = getCategoryForMovement(group.movement)
+    return { ...group, best, category, history, previousBest, trend: previousBest ? compareRecords(best, previousBest) < 0 ? 'up' : 'same' : 'new' }
+  }).sort((a, b) => a.movement.localeCompare(b.movement))
 }
 
-function RecordField({ label, children }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">{label}</span>
-      {children}
-    </label>
-  )
-}
+function buildPayload(formData) {
+  const movement = formData.movement === '__custom__' ? toTitleCase(formData.customMovement) : normalizeName(formData.movement)
+  if (!movement || movement.length < 2) return { ok: false, message: 'Selecciona un ejercicio o crea uno personalizado válido.' }
+  if (!formData.recordDate) return { ok: false, message: 'Selecciona la fecha del PR.' }
 
-function MovementSelect({ value, options, onChange }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const searchRef = useRef(null)
+  const base = { movement, recordDate: formData.recordDate, notes: normalizeName(formData.notes) }
 
-  const filteredOptions = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    if (!normalizedQuery) return options
-    return options.filter((movement) => movement.toLowerCase().includes(normalizedQuery))
-  }, [options, query])
-
-  useEffect(() => {
-    if (!isOpen) return
-    window.setTimeout(() => searchRef.current?.focus(), 80)
-  }, [isOpen])
-
-  function selectMovement(movement) {
-    onChange(movement)
-    setQuery('')
-    setIsOpen(false)
+  if (formData.resultType === 'tiempo') {
+    const seconds = parseTimeToSeconds(formData.time)
+    if (!seconds || seconds <= 0) return { ok: false, message: 'Ingresa un tiempo válido. Ejemplo: 08:45.' }
+    return { ok: true, payload: { ...base, value: seconds, unit: 'tiempo', timeSeconds: seconds } }
   }
 
+  if (formData.resultType === 'rounds_reps') {
+    const rounds = parsePositiveNumber(formData.rounds)
+    const reps = parsePositiveNumber(formData.reps || 0)
+    if (rounds === null || reps === null) return { ok: false, message: 'Ingresa rondas y repeticiones válidas.' }
+    return { ok: true, payload: { ...base, value: rounds, unit: 'reps', rounds, reps } }
+  }
+
+  const unit = formData.resultType
+  const value = parsePositiveNumber(formData.value)
+  if (value === null || value <= 0) return { ok: false, message: 'Ingresa un valor mayor a cero.' }
+  return { ok: true, payload: { ...base, value, unit } }
+}
+
+function getDefaultResultType(unit) {
+  if (unit === 'tiempo') return 'tiempo'
+  if (unit === 'metros') return 'metros'
+  if (unit === 'calorias') return 'calorias'
+  if (unit === 'reps') return 'reps'
+  return 'kg'
+}
+
+function MovementSelector({ customValue, movement, onChange }) {
+  const [query, setQuery] = useState('')
+  const options = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    const baseOptions = normalizedQuery
+      ? suggestedMovements.filter((item) => item.toLowerCase().includes(normalizedQuery))
+      : suggestedMovements
+    return baseOptions.slice(0, 80)
+  }, [query])
+
   return (
-    <div className="mt-2" onKeyDown={(event) => {
-      if (event.key === 'Escape') setIsOpen(false)
-    }}
-    >
-      <button
-        type="button"
-        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left text-sm font-black uppercase outline-none transition ${
-          isOpen ? 'border-kupan-ember bg-kupan-ember/10 text-white shadow-glow' : 'border-white/10 bg-black/35 text-white hover:border-kupan-ember/70'
-        }`}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        <span className={value ? 'text-white' : 'text-white/40'}>{value || 'Seleccionar movimiento'}</span>
-        <span className={`text-kupan-flame transition ${isOpen ? 'rotate-90' : ''}`}>{'>'}</span>
-      </button>
-
-      {isOpen ? (
-        <div className="mt-2 overflow-hidden rounded-lg border border-kupan-ember/40 bg-kupan-gray shadow-2xl">
-          <div className="border-b border-white/10 p-3">
-            <input
-              ref={searchRef}
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-4 py-3 text-base font-bold text-white outline-none transition placeholder:text-white/35 focus:border-kupan-ember"
-              type="search"
-              inputMode="search"
-              value={query}
-              placeholder="Buscar movimiento..."
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-
-          <div className="max-h-72 overflow-y-auto overscroll-contain p-2" role="listbox" aria-label="Movimientos PR KUPAN">
-            {filteredOptions.map((movement) => {
-              const isSelected = movement === value
-              return (
-                <button
-                  key={movement}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={`mb-1 flex min-h-11 w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-black uppercase transition last:mb-0 ${
-                    isSelected ? 'bg-kupan-ember text-white shadow-glow' : 'text-white/75 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white'
-                  }`}
-                  onClick={() => selectMovement(movement)}
-                >
-                  <span>{movement}</span>
-                  {isSelected ? <span className="text-xs">OK</span> : null}
-                </button>
-              )
-            })}
-
-            {filteredOptions.length === 0 ? (
-              <p className="px-3 py-4 text-sm font-bold text-white/55">No encontramos ese movimiento. Prueba con otro nombre.</p>
-            ) : null}
-          </div>
-        </div>
+    <div className="space-y-3">
+      <Input label="Buscar ejercicio" value={query} helpText="Primero busca en la lista KUPAN." onChange={(event) => setQuery(event.target.value)} />
+      <label className="block">
+        <span className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Ejercicio</span>
+        <select
+          className="mt-2 min-h-12 w-full rounded-xl border border-kupan-border bg-kupan-black/45 px-4 py-3 text-base font-bold text-kupan-bone outline-none transition focus:border-kupan-flame"
+          value={movement}
+          onChange={(event) => onChange({ movement: event.target.value })}
+        >
+          <option className="bg-kupan-black" value="">Seleccionar ejercicio</option>
+          {options.map((item) => <option key={item} className="bg-kupan-black" value={item}>{item}</option>)}
+          <option className="bg-kupan-black" value="__custom__">Crear ejercicio personalizado</option>
+        </select>
+      </label>
+      {movement === '__custom__' ? (
+        <Input
+          label="Ejercicio personalizado"
+          value={customValue}
+          helpText="Se normaliza el nombre antes de guardar. Evita duplicados como clean/Clean."
+          onChange={(event) => onChange({ customMovement: event.target.value })}
+        />
       ) : null}
     </div>
   )
 }
 
+function ResultFields({ formData, onChange }) {
+  return (
+    <div className="space-y-4">
+      <label className="block">
+        <span className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Tipo de marca</span>
+        <select
+          className="mt-2 min-h-12 w-full rounded-xl border border-kupan-border bg-kupan-black/45 px-4 py-3 text-base font-bold text-kupan-bone outline-none transition focus:border-kupan-flame"
+          value={formData.resultType}
+          onChange={(event) => onChange({ resultType: event.target.value, unit: event.target.value === 'rounds_reps' ? 'reps' : event.target.value })}
+        >
+          <option className="bg-kupan-black" value="kg">Peso</option>
+          <option className="bg-kupan-black" value="tiempo">Tiempo</option>
+          <option className="bg-kupan-black" value="rounds_reps">Rondas y repeticiones</option>
+          <option className="bg-kupan-black" value="metros">Distancia</option>
+          <option className="bg-kupan-black" value="calorias">Calorías</option>
+          <option className="bg-kupan-black" value="reps">Repeticiones</option>
+        </select>
+      </label>
+
+      {formData.resultType === 'tiempo' ? <Input label="Tiempo" value={formData.time} helpText="Ejemplo: 08:45" onChange={(event) => onChange({ time: event.target.value })} /> : null}
+      {formData.resultType === 'rounds_reps' ? (
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="Rondas" type="number" min="0" value={formData.rounds} onChange={(event) => onChange({ rounds: event.target.value })} />
+          <Input label="Repeticiones" type="number" min="0" value={formData.reps} onChange={(event) => onChange({ reps: event.target.value })} />
+        </div>
+      ) : null}
+      {!['tiempo', 'rounds_reps'].includes(formData.resultType) ? (
+        <Input
+          label={formData.resultType === 'kg' ? 'Peso' : formData.resultType === 'metros' ? 'Distancia' : formData.resultType === 'calorias' ? 'Calorías' : 'Repeticiones'}
+          type="number"
+          min="0"
+          step={formData.resultType === 'kg' ? '0.5' : '1'}
+          value={formData.value}
+          helpText={formData.resultType === 'kg' ? 'Kilos' : recordUnits.includes(formData.resultType) ? formData.resultType : ''}
+          onChange={(event) => onChange({ value: event.target.value })}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function RecordCard({ group, onOpen }) {
+  return (
+    <button type="button" className="w-full text-left" onClick={() => onOpen(group)}>
+      <Card variant="interactive" className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-text-muted">{group.category.label}</p>
+            <h3 className="mt-1 break-words text-lg font-black text-text-primary">{group.movement}</h3>
+            <p className="mt-2 text-2xl font-black text-kupan-flame">{formatValue(group.best)}</p>
+            <p className="mt-1 text-sm text-text-muted">{formatDate(group.best.record_date)}</p>
+          </div>
+          <Badge state={group.trend === 'up' ? 'success' : group.trend === 'new' ? 'available' : 'neutral'}>
+            {group.trend === 'up' ? 'Mejorando' : group.trend === 'new' ? 'Nuevo' : 'Estable'}
+          </Badge>
+        </div>
+      </Card>
+    </button>
+  )
+}
+
+function MigrationNotice({ migrationState, onRetry }) {
+  if (migrationState.status === 'idle') return null
+  const isProblem = ['error', 'warning'].includes(migrationState.status)
+  return (
+    <Card variant={isProblem ? 'warning' : 'standard'} className="p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-black text-text-primary">
+            {migrationState.status === 'migrating' ? 'Migrando tus récords' : migrationState.status === 'completed' ? 'Récords sincronizados' : 'No fue posible sincronizar algunos récords'}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-text-secondary">
+            {migrationState.status === 'migrating'
+              ? 'Estamos revisando si existen marcas antiguas guardadas en este dispositivo.'
+              : migrationState.message || 'Puedes reintentar sin borrar los datos locales.'}
+          </p>
+        </div>
+        {isProblem ? <Button type="button" variant="secondary" size="sm" onClick={onRetry}>Reintentar</Button> : null}
+      </div>
+    </Card>
+  )
+}
+
 export function PersonalRecords({ currentUser, setActivePage }) {
+  const { showToast } = useToast()
   const [records, setRecords] = useState([])
   const [formData, setFormData] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
-  const [movementFilter, setMovementFilter] = useState('Todos')
-  const [sortMode, setSortMode] = useState('date')
+  const [activeCategory, setActiveCategory] = useState('all')
   const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('error')
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [migrationAttempt, setMigrationAttempt] = useState(0)
+  const [migrationState, setMigrationState] = useState({ status: 'idle', message: '' })
+  const [selectedGroup, setSelectedGroup] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+
+  const refreshRecords = useCallback(async () => {
+    if (!currentUser?.id) return
+
+    setIsLoading(true)
+    const pendingResult = await retryPendingPersonalRecords()
+    const result = await loadPersonalRecords(currentUser.id)
+    setIsLoading(false)
+
+    if (!pendingResult.ok && pendingResult.status === 'pending') {
+      setMigrationState({ status: 'warning', message: pendingResult.message, result: pendingResult })
+    }
+
+    if (!result.ok) {
+      setMessage(result.message)
+      return
+    }
+
+    setRecords(result.records ?? [])
+    setMessage('')
+  }, [currentUser?.id])
 
   useEffect(() => {
     let isMounted = true
 
-    async function fetchRecords() {
+    async function syncAndFetchRecords() {
       if (!currentUser?.id) return
-
-      setIsLoading(true)
-      const result = await loadPersonalRecords(currentUser.id)
-
+      setMigrationState({ status: 'migrating', message: 'Migrando tus récords.' })
+      const migrationResult = await migrateLegacyPrs({ currentUser })
       if (!isMounted) return
 
-      setIsLoading(false)
+      const shouldShowMigrationState = migrationResult.status !== 'completed'
+        || migrationResult.migrated > 0
+        || migrationResult.skipped > 0
+        || migrationResult.invalid > 0
 
-      if (!result.ok) {
-        setMessage(result.message)
-        setMessageType('error')
-        return
-      }
+      setMigrationState(shouldShowMigrationState
+        ? { status: migrationResult.status, message: migrationResult.message, result: migrationResult }
+        : { status: 'idle', message: '' })
 
-      setRecords(result.records)
+      await refreshRecords()
     }
 
-    fetchRecords()
-
+    syncAndFetchRecords()
     return () => {
       isMounted = false
     }
-  }, [currentUser?.id])
+  }, [currentUser, migrationAttempt, refreshRecords])
 
-  const movementOptions = useMemo(() => {
-    const customMovements = records.map((record) => record.movement)
-    return ['Todos', ...new Set([...suggestedMovements, ...customMovements])]
-  }, [records])
+  const groupedRecords = useMemo(() => groupRecords(records), [records])
+  const visibleGroups = activeCategory === 'all' ? groupedRecords : groupedRecords.filter((group) => group.category.id === activeCategory)
+  const selectedHistory = selectedGroup ? groupedRecords.find((group) => `${group.movement}|${group.unit}` === `${selectedGroup.movement}|${selectedGroup.unit}`) : null
 
-  const visibleRecords = useMemo(() => {
-    const filteredRecords = movementFilter === 'Todos'
-      ? records
-      : records.filter((record) => record.movement === movementFilter)
-
-    return sortRecords(filteredRecords, sortMode)
-  }, [movementFilter, records, sortMode])
-
-  function updateForm(field, value) {
-    setFormData((current) => ({ ...current, [field]: value }))
+  function updateForm(partial) {
+    setFormData((current) => ({ ...current, ...partial }))
+    setMessage('')
   }
 
   function resetForm() {
@@ -200,254 +342,197 @@ export function PersonalRecords({ currentUser, setActivePage }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    setMessage('')
-    setMessageType('error')
-
-    if (!formData.movement || !suggestedMovements.includes(formData.movement)) {
-      setMessage('Selecciona un movimiento desde la lista KUPAN antes de guardar tu PR.')
+    const input = buildPayload(formData)
+    if (!input.ok) {
+      setMessage(input.message)
       return
     }
 
     setIsSaving(true)
-
-    const result = editingId
-      ? await updatePersonalRecord(editingId, formData)
-      : await createPersonalRecord(currentUser.id, formData)
-
+    const result = editingId ? await updatePersonalRecord(editingId, input.payload) : await createPersonalRecord(currentUser.id, input.payload)
     setIsSaving(false)
 
     if (!result.ok) {
       setMessage(result.message)
+      showToast({ type: result.status === 'pending' ? 'warning' : 'error', title: result.status === 'pending' ? 'Pendiente de sincronización' : 'No pudimos guardar', description: result.message })
       return
     }
 
-    setRecords((current) => (
-      editingId
-        ? current.map((record) => (record.id === result.record.id ? result.record : record))
-        : [result.record, ...current]
-    ))
-    setMessageType('success')
-    setMessage(result.message)
+    setRecords((current) => (editingId
+      ? current.map((record) => (record.id === result.record.id ? result.record : record))
+      : [result.record, ...current]))
+    showToast({ type: 'success', title: 'Guardado correctamente', description: result.message })
     resetForm()
   }
 
   function startEdit(record) {
     setEditingId(record.id)
     setFormData({
-      movement: record.movement,
-      value: String(record.value),
+      ...emptyForm,
+      movement: suggestedMovements.includes(record.movement) ? record.movement : '__custom__',
+      customMovement: suggestedMovements.includes(record.movement) ? '' : record.movement,
+      resultType: record.rounds !== null && record.rounds !== undefined ? 'rounds_reps' : getDefaultResultType(record.unit),
       unit: record.unit,
+      value: record.unit === 'tiempo' || record.rounds !== null && record.rounds !== undefined ? '' : String(record.value),
+      time: record.unit === 'tiempo' ? formatTime(record.time_seconds ?? record.value) : '',
+      rounds: record.rounds ?? '',
+      reps: record.reps ?? '',
       recordDate: record.record_date,
       notes: record.notes ?? '',
     })
-    setMessage('')
+    setSelectedGroup(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  async function handleDelete(recordId) {
-    setMessage('')
-    setMessageType('error')
-    const result = await deletePersonalRecord(recordId)
+  function requestDelete(record) {
+    setDeleteTarget(record)
+    setIsDeleteOpen(true)
+  }
 
+  async function confirmDelete() {
+    if (!deleteTarget?.id) return
+    const result = await deletePersonalRecord(deleteTarget.id)
     if (!result.ok) {
       setMessage(result.message)
+      showToast({ type: 'error', title: 'No pudimos eliminar', description: result.message })
       return
     }
-
-    setRecords((current) => current.filter((record) => record.id !== recordId))
-    if (editingId === recordId) resetForm()
-    setMessageType('success')
-    setMessage(result.message)
+    setRecords((current) => current.filter((record) => record.id !== deleteTarget.id))
+    if (editingId === deleteTarget.id) resetForm()
+    setIsDeleteOpen(false)
+    setDeleteTarget(null)
+    showToast({ type: 'success', title: 'PR eliminado', description: result.message })
   }
 
   if (!currentUser) {
     return (
-      <div className="space-y-6">
-        <MotionCard as="section" className="k-card p-5">
-          <p className="k-pill inline-flex text-kupan-flame">Mis PR</p>
-          <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Inicia sesion para registrar tus marcas.</h2>
-          <p className="mt-3 text-sm leading-6 text-white/60">
-            Tus PR son personales: cada alumno ve y modifica solo sus propias marcas.
-          </p>
-          <button type="button" className="k-button mt-5 w-full" onClick={() => setActivePage('login')}>
-            Iniciar sesion
-          </button>
-        </MotionCard>
+      <div className="space-y-6 pb-24 md:pb-8">
+        <Card as="section" variant="elevated" className="p-5">
+          <Badge state="neutral">Mis PR</Badge>
+          <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary">Inicia sesión para registrar tus marcas.</h1>
+          <p className="mt-3 text-base leading-7 text-text-secondary">Tus PR son personales y se guardan en Supabase para que no desaparezcan al actualizar la app.</p>
+          <Button type="button" className="mt-5" fullWidth onClick={() => setActivePage('login')}>Iniciar sesión</Button>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <MotionCard as="section" className="k-card overflow-hidden p-0">
-        <div className="border-b border-white/10 bg-black/25 p-5">
-          <p className="k-pill inline-flex text-kupan-flame">Mis PR</p>
-          <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Tus marcas cuentan la historia del trabajo.</h2>
-          <p className="mt-3 text-sm leading-6 text-white/60">
-            Registra tus mejores levantamientos, benchmarks y avances. Somos comunidad, esfuerzo y progreso.
-          </p>
-          <button type="button" className="k-button-secondary mt-5 w-full" onClick={() => setActivePage('ranking')}>
-            Ver ranking interno
-          </button>
+    <div className="space-y-6 pb-24 md:pb-8">
+      <Card as="section" variant="elevated" className="overflow-hidden p-0">
+        <div className="border-b border-border-default bg-bg-secondary p-5">
+          <Badge state="neutral">Récords personales</Badge>
+          <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">Tus marcas quedan guardadas.</h1>
+          <p className="mt-3 text-base leading-7 text-text-secondary">Supabase es la fuente principal. Si la conexión falla, mantenemos visibles los datos anteriores y puedes reintentar.</p>
         </div>
-        <div className="grid grid-cols-3 border-b border-white/10">
+        <div className="grid grid-cols-3 border-b border-border-default">
           <div className="p-4">
-            <p className="text-3xl font-black text-white">{records.length}</p>
-            <p className="text-[0.65rem] font-black uppercase text-white/60">PR guardados</p>
+            <p className="text-3xl font-black text-text-primary">{records.length}</p>
+            <p className="text-xs font-bold text-text-muted">historial</p>
           </div>
-          <div className="border-l border-white/10 p-4">
-            <p className="text-3xl font-black text-white">{new Set(records.map((record) => record.movement)).size}</p>
-            <p className="text-[0.65rem] font-black uppercase text-white/60">Movimientos</p>
+          <div className="border-l border-border-default p-4">
+            <p className="text-3xl font-black text-text-primary">{groupedRecords.length}</p>
+            <p className="text-xs font-bold text-text-muted">PR actuales</p>
           </div>
-          <div className="border-l border-white/10 p-4">
-            <p className="text-2xl font-black uppercase text-kupan-flame">{currentUser.level ?? 'KUPAN'}</p>
-            <p className="text-[0.65rem] font-black uppercase text-white/60">Nivel</p>
+          <div className="border-l border-border-default p-4">
+            <p className="text-2xl font-black text-kupan-flame">{currentUser.level ?? 'KUPAN'}</p>
+            <p className="text-xs font-bold text-text-muted">nivel</p>
           </div>
         </div>
-      </MotionCard>
+      </Card>
 
-      <MotionCard as="section" className="k-card p-5" delay={0.03}>
-        <SectionTitle eyebrow={editingId ? 'Editar PR' : 'Nuevo PR'} title={editingId ? 'Actualiza tu marca' : 'Registra progreso'} />
-        <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
-          <RecordField label="Movimiento">
-            <MovementSelect
-              value={formData.movement}
-              options={suggestedMovements}
-              onChange={(movement) => updateForm('movement', movement)}
-            />
-          </RecordField>
+      <MigrationNotice migrationState={migrationState} onRetry={() => setMigrationAttempt((current) => current + 1)} />
 
-          <div className="grid grid-cols-[1fr_0.75fr] gap-3">
-            <RecordField label="Valor">
-              <input
-                className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/30 focus:border-kupan-ember"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.value}
-                required
-                onChange={(event) => updateForm('value', event.target.value)}
-              />
-            </RecordField>
-            <RecordField label="Unidad">
-              <select
-                className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
-                value={formData.unit}
-                onChange={(event) => updateForm('unit', event.target.value)}
-              >
-                {recordUnits.map((unit) => (
-                  <option key={unit} className="bg-kupan-black text-white" value={unit}>
-                    {unit}
-                  </option>
-                ))}
-              </select>
-            </RecordField>
+      <Card as="section" variant="standard" className="p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-text-muted">{editingId ? 'Editar PR' : 'Añadir nuevo PR'}</p>
+            <h2 className="mt-1 text-2xl font-black text-text-primary">{editingId ? 'Actualiza tu marca' : 'Registra progreso'}</h2>
           </div>
-
-          <RecordField label="Fecha">
-            <input
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/30 focus:border-kupan-ember"
-              type="date"
-              value={formData.recordDate}
-              required
-              onChange={(event) => updateForm('recordDate', event.target.value)}
-            />
-          </RecordField>
-
-          <RecordField label="Notas">
+          {editingId ? <Button type="button" variant="secondary" size="sm" onClick={resetForm}>Cancelar edición</Button> : null}
+        </div>
+        <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+          <MovementSelector movement={formData.movement} customValue={formData.customMovement} onChange={updateForm} />
+          <ResultFields formData={formData} onChange={updateForm} />
+          <Input label="Fecha" type="date" value={formData.recordDate} onChange={(event) => updateForm({ recordDate: event.target.value })} />
+          <label className="block">
+            <span className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Notas</span>
             <textarea
-              className="mt-2 min-h-24 w-full resize-none rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/30 focus:border-kupan-ember"
+              className="mt-2 min-h-24 w-full resize-none rounded-xl border border-kupan-border bg-kupan-black/45 px-4 py-3 text-base font-bold leading-6 text-kupan-bone outline-none transition placeholder:text-white/35 focus:border-kupan-flame"
               value={formData.notes}
-              placeholder="Como se sintio, carga, estrategia o contexto."
-              onChange={(event) => updateForm('notes', event.target.value)}
+              placeholder="Contexto, escala usada o cómo se sintió."
+              onChange={(event) => updateForm({ notes: event.target.value })}
             />
-          </RecordField>
-
-          {message ? (
-            <p className={`rounded-lg border p-3 text-sm font-bold text-white ${
-              messageType === 'success'
-                ? 'border-emerald-400/30 bg-emerald-400/10'
-                : 'border-kupan-flame/30 bg-kupan-flame/10'
-            }`}
-            >
-              {message}
-            </p>
-          ) : null}
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button type="submit" className="k-button w-full" disabled={isSaving}>
-              {isSaving ? 'Guardando...' : editingId ? 'Guardar PR' : 'Crear PR'}
-            </button>
-            {editingId ? (
-              <button type="button" className="k-button-secondary w-full" onClick={resetForm}>
-                Cancelar edicion
-              </button>
-            ) : null}
-          </div>
+          </label>
+          {message ? <p className="rounded-xl border border-kupan-warning/30 bg-kupan-warning/10 p-3 text-sm font-semibold leading-6 text-text-secondary">{message}</p> : null}
+          <Button type="submit" fullWidth isLoading={isSaving}>{editingId ? 'Guardar cambios' : 'Guardar PR'}</Button>
         </form>
-      </MotionCard>
+      </Card>
 
-      <section>
-        <SectionTitle eyebrow="Historial" title="Tus marcas personales" />
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">Filtrar movimiento</span>
-            <select
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
-              value={movementFilter}
-              onChange={(event) => setMovementFilter(event.target.value)}
-            >
-              {movementOptions.map((movement) => (
-                <option key={movement} className="bg-kupan-black text-white" value={movement}>
-                  {movement}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">Ordenar</span>
-            <select
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
-              value={sortMode}
-              onChange={(event) => setSortMode(event.target.value)}
-            >
-              <option className="bg-kupan-black text-white" value="date">Fecha mas reciente</option>
-              <option className="bg-kupan-black text-white" value="best">Mejor marca</option>
-            </select>
-          </label>
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-text-muted">PR actuales</p>
+            <h2 className="mt-1 text-2xl font-black text-text-primary">Por categoría</h2>
+          </div>
+          {isLoading && records.length > 0 ? <Badge state="pending">Actualizando</Badge> : null}
         </div>
 
-        {isLoading ? <p className="k-panel p-4 text-sm font-bold text-white/60">Cargando tus PR desde Supabase...</p> : null}
-
-        {!isLoading && visibleRecords.length === 0 ? (
-          <MotionCard className="k-panel p-4">
-            <p className="font-black uppercase text-white">Aun no hay PR para mostrar.</p>
-            <p className="mt-1 text-sm leading-6 text-white/60">Registra tu primera marca y deja que el progreso hable.</p>
-          </MotionCard>
-        ) : null}
-
-        <div className="space-y-3">
-          {visibleRecords.map((record) => (
-            <MotionCard key={record.id} as="article" className="k-panel p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">{formatDate(record.record_date)}</p>
-                  <h3 className="mt-2 break-words text-xl font-black uppercase text-white">{record.movement}</h3>
-                  <p className="mt-1 text-2xl font-black text-kupan-flame">{formatValue(record)}</p>
-                  {record.notes ? <p className="mt-2 text-sm leading-6 text-white/60">{record.notes}</p> : null}
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => startEdit(record)}>
-                  Editar
-                </button>
-                <button type="button" className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white transition active:scale-[0.98]" onClick={() => handleDelete(record.id)}>
-                  Eliminar
-                </button>
-              </div>
-            </MotionCard>
+        <div className="flex gap-2 overflow-x-auto k-scroll-x pb-1">
+          <button type="button" className={`min-h-11 shrink-0 rounded-xl border px-4 text-sm font-black ${activeCategory === 'all' ? 'border-brand-red bg-brand-red text-white' : 'border-border-default bg-bg-card text-text-secondary'}`} onClick={() => setActiveCategory('all')}>Todos</button>
+          {categories.map((category) => (
+            <button key={category.id} type="button" className={`min-h-11 shrink-0 rounded-xl border px-4 text-sm font-black ${activeCategory === category.id ? 'border-brand-red bg-brand-red text-white' : 'border-border-default bg-bg-card text-text-secondary'}`} onClick={() => setActiveCategory(category.id)}>
+              {category.label}
+            </button>
           ))}
         </div>
+
+        {isLoading && records.length === 0 ? <LoadingState label="Cargando tus récords" lines={4} /> : null}
+        {!isLoading && message && records.length > 0 ? <ErrorState title="No se pudieron cargar tus récords" description="Mantenemos visibles tus datos anteriores. Puedes reintentar cuando vuelva la conexión." actionLabel="Reintentar" onAction={refreshRecords} /> : null}
+        {!isLoading && records.length === 0 && !message ? <EmptyState title="No tienes PR registrados." description="Agrega tu primera marca para comenzar tu historial." /> : null}
+        {!isLoading && visibleGroups.length === 0 && records.length > 0 ? <EmptyState title="No hay PR en esta categoría." description="Cambia de categoría o registra una nueva marca." /> : null}
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          {visibleGroups.map((group) => <RecordCard key={`${group.movement}-${group.unit}`} group={group} onOpen={setSelectedGroup} />)}
+        </div>
       </section>
+
+      <Dialog isOpen={Boolean(selectedHistory)} onClose={() => setSelectedGroup(null)} title={selectedHistory?.movement ?? 'Detalle PR'} description={selectedHistory ? `${selectedHistory.category.label} · ${selectedHistory.unit}` : ''}>
+        {selectedHistory ? (
+          <div className="space-y-4">
+            <Card variant="selected" className="p-4">
+              <p className="text-sm font-semibold text-text-secondary">Récord actual</p>
+              <p className="mt-1 text-3xl font-black text-kupan-flame">{formatValue(selectedHistory.best)}</p>
+              <p className="mt-1 text-sm text-text-muted">{formatDate(selectedHistory.best.record_date)}</p>
+              {selectedHistory.best.notes ? <p className="mt-3 text-sm leading-6 text-text-secondary">{selectedHistory.best.notes}</p> : null}
+            </Card>
+            <div className="space-y-3">
+              {selectedHistory.history.map((record) => (
+                <Card key={record.id} variant="standard" className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-black text-text-primary">{formatValue(record)}</p>
+                      <p className="mt-1 text-sm text-text-muted">{formatDate(record.record_date)}</p>
+                      {record.notes ? <p className="mt-2 text-sm leading-6 text-text-secondary">{record.notes}</p> : null}
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button type="button" variant="tertiary" size="sm" onClick={() => startEdit(record)}>Editar</Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => requestDelete(record)}>Eliminar</Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </Dialog>
+
+      <Dialog isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} title="Eliminar PR" description={deleteTarget ? `¿Eliminar ${deleteTarget.movement} del ${formatDate(deleteTarget.record_date)}?` : ''} isDestructive>
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" fullWidth onClick={() => setIsDeleteOpen(false)}>Mantener PR</Button>
+          <Button type="button" variant="destructive" fullWidth onClick={confirmDelete}>Sí, eliminar</Button>
+        </div>
+      </Dialog>
     </div>
   )
 }

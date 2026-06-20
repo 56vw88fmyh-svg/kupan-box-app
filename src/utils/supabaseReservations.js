@@ -1,10 +1,16 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { getHumanErrorMessage, logAppError } from './appState.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
 const shortDayNames = ['', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
 
 function getReservationError(message = 'No pudimos completar la reserva. Intenta nuevamente.') {
   return { ok: false, message }
+}
+
+function getSafeReservationError(scope, error, fallback) {
+  logAppError(scope, error)
+  return getReservationError(getHumanErrorMessage(error, fallback))
 }
 
 function toDateInput(date) {
@@ -67,9 +73,9 @@ export async function loadReservationData(profileId) {
       : Promise.resolve({ data: null, error: null }),
   ])
 
-  if (scheduleResult.error) return getReservationError(`No pudimos cargar los horarios reales: ${scheduleResult.error.message}`)
-  if (reservationsResult.error) return getReservationError(`No pudimos cargar tus reservas: ${reservationsResult.error.message}`)
-  if (membershipResult.error) return getReservationError(`No pudimos revisar tu membresia: ${membershipResult.error.message}`)
+  if (scheduleResult.error) return getSafeReservationError('reservations.load_schedule', scheduleResult.error, 'No fue posible cargar los horarios. Revisa tu conexión y vuelve a intentarlo.')
+  if (reservationsResult.error) return getSafeReservationError('reservations.load_user_reservations', reservationsResult.error, 'No fue posible cargar tus reservas. Revisa tu conexión y vuelve a intentarlo.')
+  if (membershipResult.error) return getSafeReservationError('reservations.load_membership', membershipResult.error, 'No fue posible revisar tu plan. Intenta nuevamente.')
 
   const userReservations = (reservationsResult.data ?? []).map(mapReservationRow)
   const membership = Array.isArray(membershipResult.data) ? membershipResult.data[0] : membershipResult.data
@@ -77,7 +83,7 @@ export async function loadReservationData(profileId) {
   const { data: remainingTokens, error: remainingTokensError } = membership?.id
     ? await supabase.rpc('membership_remaining_tokens', { target_membership_id: membership.id })
     : { data: null }
-  if (remainingTokensError) return getReservationError(`No pudimos calcular tus tokens: ${remainingTokensError.message}`)
+  if (remainingTokensError) return getSafeReservationError('reservations.remaining_tokens', remainingTokensError, 'No fue posible calcular tus tokens. Intenta nuevamente.')
 
   const classes = await Promise.all((scheduleResult.data ?? []).map(async (classItem) => {
     const reservationDate = getNextDateForDay(classItem.day_of_week)
@@ -152,11 +158,11 @@ export async function createSupabaseReservation(profileId, classItem, hasActiveM
     if (message.includes('duplicate') || message.includes('unique')) {
       return getReservationError('Ya tienes una reserva para esa clase y fecha.')
     }
-    if (message.includes('function') && message.includes('reserve_class')) return getReservationError('Falta ejecutar el SQL de reservas en Supabase. Ejecuta tokens-payments-reservations.sql.')
+    if (message.includes('function') && message.includes('reserve_class')) return getReservationError('Las reservas aún no están disponibles. Revisa la configuración con el administrador.')
     if (message.includes('tokens')) return getReservationError('No tienes tokens disponibles. Debes renovar tu plan.')
     if (message.includes('membresia') || message.includes('membresía')) return getReservationError('Necesitas una membresía activa y pagada para reservar.')
     if (message.includes('completa')) return getReservationError('Clase completa.')
-    return getReservationError(error.message || 'No pudimos confirmar tu reserva.')
+    return getSafeReservationError('reservations.reserve_class', error, 'No pudimos confirmar tu reserva. Revisa tu conexión y vuelve a intentarlo.')
   }
 
   return { ok: true, reservation: { ...data, ...classItem } }
@@ -167,7 +173,7 @@ export async function cancelSupabaseReservation(reservationId) {
     target_reservation_id: reservationId,
   })
 
-  if (error) return getReservationError(error.message || 'No pudimos cancelar la reserva.')
+  if (error) return getSafeReservationError('reservations.cancel_reservation', error, 'No pudimos cancelar la reserva. Intenta nuevamente.')
   return { ok: true, message: 'Reserva cancelada. Si correspondia, el token fue devuelto.' }
 }
 
@@ -194,10 +200,7 @@ export async function adminReserveForStudent({
     admin_note: note || null,
   })
 
-  if (error) {
-    const message = error.message || 'No pudimos agregar el alumno a la clase.'
-    return getReservationError(message)
-  }
+  if (error) return getSafeReservationError('reservations.admin_reserve_for_student', error, 'No pudimos agregar el alumno a la clase. Intenta nuevamente.')
 
   return {
     ok: true,

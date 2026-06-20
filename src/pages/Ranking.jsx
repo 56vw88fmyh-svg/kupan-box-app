@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
+import { EmptyState, ErrorState, LoadingState, StaleDataState } from '../components/ui/index.js'
 import { prMovements } from '../data/movements.js'
 import { formatRankingDate, loadPrRanking } from '../utils/ranking.js'
 
@@ -42,6 +43,7 @@ export function Ranking() {
   const [records, setRecords] = useState([])
   const [message, setMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const movementOptions = useMemo(() => ['Todos', ...prMovements], [])
 
@@ -60,7 +62,6 @@ export function Ranking() {
       setIsLoading(false)
       if (!result.ok) {
         setMessage(result.message)
-        setRecords([])
         return
       }
 
@@ -73,7 +74,7 @@ export function Ranking() {
     return () => {
       isMounted = false
     }
-  }, [level, movement])
+  }, [level, movement, reloadKey])
 
   return (
     <div className="space-y-6">
@@ -115,13 +116,11 @@ export function Ranking() {
 
       <section>
         <SectionTitle eyebrow="Tabla interna" title={movement === 'Todos' ? 'Todos los movimientos' : movement} />
-        {isLoading ? <p className="k-panel mb-4 p-4 text-sm font-bold text-white/60">Cargando ranking desde Supabase...</p> : null}
-        {message ? <p className="mb-4 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{message}</p> : null}
-        {!isLoading && records.length === 0 ? (
-          <MotionCard className="k-panel p-4">
-            <p className="font-black uppercase text-white">Aún no hay marcas para este filtro.</p>
-            <p className="mt-1 text-sm leading-6 text-white/60">Cuando un alumno registre un PR válido, aparecerá en el ranking.</p>
-          </MotionCard>
+        {isLoading && records.length === 0 ? <LoadingState label="Cargando ranking" lines={4} /> : null}
+        {isLoading && records.length > 0 ? <StaleDataState /> : null}
+        {message ? <ErrorState title="No fue posible actualizar el ranking" description={message} onAction={() => setReloadKey((current) => current + 1)} /> : null}
+        {!isLoading && records.length === 0 && !message ? (
+          <EmptyState title="Aún no hay marcas para este filtro." description="Cuando un alumno registre un PR válido, aparecerá en el ranking." />
         ) : null}
         <div className="space-y-3">
           {records.map((record, index) => (

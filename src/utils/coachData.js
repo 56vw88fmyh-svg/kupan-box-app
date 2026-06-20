@@ -1,9 +1,15 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { getHumanErrorMessage, logAppError } from './appState.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
 
 function getCoachError(message = 'No pudimos cargar el modo coach.') {
   return { ok: false, message }
+}
+
+function getSafeCoachError(scope, error, fallback) {
+  logAppError(scope, error)
+  return getCoachError(getHumanErrorMessage(error, fallback))
 }
 
 export function getChileNow() {
@@ -127,7 +133,7 @@ export async function loadCoachDashboard() {
       loadCoachReservations(today),
     ])
 
-    if (scheduleResult.error) return getCoachError(`No pudimos cargar clases de hoy: ${scheduleResult.error.message}`)
+    if (scheduleResult.error) return getSafeCoachError('coach.load_schedule', scheduleResult.error, 'No fue posible cargar las clases de hoy. Revisa tu conexión y vuelve a intentarlo.')
 
     const reservations = (reservationsResult ?? []).map(normalizeReservation)
     const classes = (scheduleResult.data ?? []).map((classItem) => decorateClass(classItem, reservations))
@@ -135,7 +141,7 @@ export async function loadCoachDashboard() {
 
     return { ok: true, today, classes, currentClass, nextClass }
   } catch (error) {
-    return getCoachError(`No pudimos cargar el modo coach: ${error.message}`)
+    return getSafeCoachError('coach.load_dashboard', error, 'No fue posible cargar el modo coach. Revisa tu conexión y vuelve a intentarlo.')
   }
 }
 
@@ -150,8 +156,8 @@ export async function loadCoachManualReservationOptions() {
       supabase.rpc('coach_get_manual_reservation_memberships'),
     ])
 
-    if (profilesResult.error) return getCoachError(`No pudimos cargar alumnos: ${profilesResult.error.message}`)
-    if (membershipsResult.error) return getCoachError(`No pudimos cargar membresias: ${membershipsResult.error.message}`)
+    if (profilesResult.error) return getSafeCoachError('coach.load_manual_profiles', profilesResult.error, 'No fue posible cargar alumnos para reserva manual.')
+    if (membershipsResult.error) return getSafeCoachError('coach.load_manual_memberships', membershipsResult.error, 'No fue posible revisar membresías para reserva manual.')
 
     return {
       ok: true,
@@ -159,7 +165,7 @@ export async function loadCoachManualReservationOptions() {
       memberships: membershipsResult.data ?? [],
     }
   } catch (error) {
-    return getCoachError(`No pudimos preparar reserva manual: ${error.message}`)
+    return getSafeCoachError('coach.load_manual_options', error, 'No fue posible preparar la reserva manual.')
   }
 }
 
@@ -169,7 +175,7 @@ export async function markCoachReservation(reservationId, status) {
     target_status: status,
   })
 
-  if (error) return getCoachError(error.message || 'No pudimos marcar asistencia.')
+  if (error) return getSafeCoachError('coach.mark_reservation', error, 'No pudimos marcar asistencia. Intenta nuevamente.')
   return { ok: true, message: status === 'attended' ? 'Asistencia marcada. Token consumido.' : 'No show marcado. Token consumido.' }
 }
 
@@ -178,6 +184,6 @@ export async function cancelCoachReservation(reservationId) {
     target_reservation_id: reservationId,
   })
 
-  if (error) return getCoachError(error.message || 'No pudimos cancelar la reserva.')
+  if (error) return getSafeCoachError('coach.cancel_reservation', error, 'No pudimos cancelar la reserva. Intenta nuevamente.')
   return { ok: true, message: 'Reserva cancelada. Si correspondia, el token fue devuelto.' }
 }
