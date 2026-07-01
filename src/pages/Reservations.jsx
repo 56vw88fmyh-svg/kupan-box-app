@@ -411,6 +411,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   async function confirmCancel() {
     if (!cancelTarget?.id) return
     const classKey = getClassKey(cancelTarget)
+    if (processingClassKey === classKey) return
     setProcessingClassKey(classKey)
     const result = await cancelSupabaseReservation(cancelTarget.id)
 
@@ -511,7 +512,14 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
           <Button type="button" variant="secondary" fullWidth onClick={() => setCancelTarget(null)}>
             Mantener reserva
           </Button>
-          <Button type="button" variant="destructive" fullWidth isLoading={Boolean(cancelTarget && processingClassKey === getClassKey(cancelTarget))} onClick={confirmCancel}>
+          <Button
+            type="button"
+            variant="destructive"
+            fullWidth
+            disabled={Boolean(cancelTarget && processingClassKey === getClassKey(cancelTarget))}
+            isLoading={Boolean(cancelTarget && processingClassKey === getClassKey(cancelTarget))}
+            onClick={confirmCancel}
+          >
             Sí, cancelar
           </Button>
         </div>

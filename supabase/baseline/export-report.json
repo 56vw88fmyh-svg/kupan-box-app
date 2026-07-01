@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "date": "2026-07-01T16:13:19.566Z",
+  "exportedAt": null,
+  "sourceType": "missing",
+  "sourceProjectRefMasked": "missing",
+  "schema": "public",
+  "schemaOnly": true,
+  "dataIncluded": false,
+  "tool": "supabase-cli",
+  "rawPath": "supabase/baseline/kupan-public-schema.raw.sql",
+  "finalPath": "supabase/baseline/kupan-public-schema.sql",
+  "toolVersion": "2.100.1",
+  "rawFile": "kupan-public-schema.raw.sql",
+  "sha256": null,
+  "bytes": null,
+  "supportsDbUrl": true,
+  "dryRun": true,
+  "executed": false,
+  "status": "BLOCKED"
+}

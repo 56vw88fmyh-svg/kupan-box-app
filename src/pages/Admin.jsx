@@ -1,128 +1,53 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { SectionTitle } from '../components/SectionTitle.jsx'
-import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
-import { buildBirthdayGreeting, formatBirthdayDayMonth, loadUpcomingBirthdays } from '../utils/birthdays.js'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { buildBirthdayGreeting, formatBirthdayDayMonth } from '../utils/birthdays.js'
 import { defaultAppText } from '../utils/adminContent.js'
-import { saveAppSetting } from '../utils/sharedContent.js'
 import { getCurrentSupabaseUser } from '../utils/auth.js'
-import { adminReserveForStudent } from '../utils/supabaseReservations.js'
-import { getHumanErrorMessage, logAppError } from '../utils/appState.js'
-
-const adminSectionMeta = {
-  overview: { label: 'Resumen', module: 'Panel', icon: 'IN' },
-  'create-student': { label: 'Nuevo alumno', module: 'Alumnos', icon: 'NA' },
-  students: { label: 'Ver alumnos', module: 'Alumnos', icon: 'AL' },
-  plans: { label: 'Planes', module: 'Pagos', icon: 'PL' },
-  memberships: { label: 'Membresias', module: 'Alumnos', icon: 'ME' },
-  reservations: { label: 'Reservas', module: 'Clases', icon: 'RE' },
-  wod: { label: 'WOD', module: 'Clases', icon: 'WD' },
-  schedule: { label: 'Horarios', module: 'Clases', icon: 'HO' },
-  community: { label: 'Comunidad', module: 'Contenido', icon: 'CO' },
-  texts: { label: 'Textos', module: 'Contenido', icon: 'TX' },
-  birthdays: { label: 'Cumpleanos', module: 'Comunidad', icon: 'CU' },
-  prs: { label: 'PR destacados', module: 'Comunidad', icon: 'PR' },
-}
-
-const adminNavigationModules = [
-  { id: 'resumen', label: 'Resumen', icon: 'IN', items: [{ id: 'overview', label: 'Resumen', hint: 'Indicadores del box' }] },
-  { id: 'wod', label: 'WOD', icon: 'WD', items: [{ id: 'wod', label: 'WOD', hint: 'Programacion del dia' }] },
-  { id: 'horarios', label: 'Horarios', icon: 'HO', items: [{ id: 'schedule', label: 'Horarios', hint: 'Crear y editar clases' }] },
-  {
-    id: 'reservas',
-    label: 'Reservas',
-    icon: 'RE',
-    items: [
-      { id: 'reservations', label: 'Reservas', hint: 'Asistencia y estado' },
-      { id: 'reservations', label: 'Agregar alumno', target: 'manual-reservation', hint: 'Reserva manual' },
-    ],
-  },
-  {
-    id: 'usuarios',
-    label: 'Usuarios',
-    icon: 'AL',
-    items: [
-      { id: 'students', label: 'Alumnos', hint: 'Listado completo' },
-      { id: 'create-student', label: 'Nuevo alumno', hint: 'Crear acceso' },
-      { id: 'memberships', label: 'Membresias', hint: 'Planes activos' },
-      { id: 'memberships', label: 'Historial', target: 'membership-history', hint: 'Ciclos y tokens' },
-    ],
-  },
-  { id: 'eventos', label: 'Eventos', icon: 'EV', items: [{ id: 'community', label: 'Eventos', hint: 'Publicaciones activas' }] },
-  { id: 'noticias', label: 'Noticias', icon: 'NT', items: [{ id: 'community', label: 'Noticias', hint: 'Comunidad' }] },
-  { id: 'planes', label: 'Planes', icon: 'PL', items: [{ id: 'plans', label: 'Planes', hint: 'Precios y cupos' }] },
-  {
-    id: 'configuracion',
-    label: 'Configuracion',
-    icon: 'CF',
-    items: [
-      { id: 'texts', label: 'Textos app', hint: 'Copy principal' },
-      { id: 'birthdays', label: 'Cumpleanos', hint: 'Saludo rapido' },
-      { id: 'prs', label: 'PR destacados', hint: 'Marcas' },
-    ],
-  },
-]
-
-const emptyPlan = { id: '', name: '', price: '', classes_per_week: '', is_unlimited: false, active: true }
-const emptyMembership = {
-  profile_id: '',
-  plan_id: '',
-  start_date: new Date().toISOString().slice(0, 10),
-  end_date: '',
-  status: 'active',
-  classes_total: '',
-  classes_used: '',
-  payment_status: 'paid',
-  payment_provider: 'manual_admin',
-  payment_reference: '',
-  notes: '',
-}
-const emptyMembershipEdit = {
-  id: '',
-  profile_id: '',
-  plan_id: '',
-  start_date: '',
-  end_date: '',
-  status: 'active',
-  classes_total: '',
-  classes_used: 0,
-  payment_status: 'paid',
-  payment_provider: '',
-  payment_reference: '',
-  notes: '',
-}
-const emptyWod = { date: new Date().toISOString().slice(0, 10), title: '', warmup: '', strength: '', workout: '', time_cap: '', notes: '' }
-const emptySchedule = { id: '', day_of_week: 1, time: '18:00', class_name: 'CrossFit', coach: 'Coach KUPAN', max_spots: 12, active: true }
-const emptyPost = { id: '', type: 'noticia', title: '', content: '', event_date: '', active: true }
-const settingKeys = {
-  homeEyebrow: 'home_eyebrow',
-  homeTitle: 'home_title',
-  homeBody: 'home_body',
-  reservationsTitle: 'reservations_title',
-  reservationsBody: 'reservations_body',
-  communityPhrase: 'community_phrase',
-}
-const emptyStudent = {
-  full_name: '',
-  email: '',
-  phone: '',
-  birth_date: '',
-  level: 'Iniciado',
-  status: 'active',
-  temporary_password: '',
-  internal_notes: '',
-  plan_id: '',
-  membership_start_date: '',
-  membership_end_date: '',
-}
-
-const emptyManualReservation = {
-  reservation_date: '',
-  class_schedule_id: '',
-  profile_id: '',
-  student_query: '',
-  note: '',
-  allow_without_membership: false,
-}
+import { getHumanErrorMessage } from '../utils/appState.js'
+import { buildMembershipActivationPayload } from '../utils/adminMutationBuilders.js'
+import { useAdminCommunications } from '../hooks/admin/useAdminCommunications.js'
+import { useAdminData } from '../hooks/admin/useAdminData.js'
+import { useAdminFeedback } from '../hooks/admin/useAdminFeedback.js'
+import { useAdminMemberships } from '../hooks/admin/useAdminMemberships.js'
+import { useAdminPlans } from '../hooks/admin/useAdminPlans.js'
+import { useAdminReservations } from '../hooks/admin/useAdminReservations.js'
+import { useAdminSchedule } from '../hooks/admin/useAdminSchedule.js'
+import { useAdminSettings } from '../hooks/admin/useAdminSettings.js'
+import { useAdminStudents } from '../hooks/admin/useAdminStudents.js'
+import { useAdminWod } from '../hooks/admin/useAdminWod.js'
+import { useAdminWodDraft } from '../hooks/admin/useAdminWodDraft.js'
+import { adminNavigationModules, adminSectionMeta, getAdminModuleId } from '../config/adminNavigation.js'
+import {
+  createEmptyManualReservationDraft,
+  createEmptyMembershipDraft,
+  createEmptyMembershipEditDraft,
+  createEmptyPlanDraft,
+  createEmptyPostDraft,
+  createEmptyScheduleDraft,
+  createEmptyStudentDraft,
+  createEmptyWodDraft,
+  settingKeys,
+  studentFilters,
+  weekdayLabels,
+} from '../constants/adminConstants.js'
+import { formatDate, formatMoney, getChileDateString, getDateTimeValue, toTime } from '../utils/adminFormatters.js'
+import { addDays, calculateDaysBetween, getChileDayOfWeek, getMembershipTokens, getPlanTokenTotal } from '../utils/adminMetrics.js'
+import {
+  AdminMobileModuleNav,
+  AdminPageHeader,
+} from '../components/admin/AdminDashboard.jsx'
+import { AdminSidebar, QuickActionButton } from '../components/admin/AdminUi.jsx'
+import { AdminBirthdaysModule } from '../components/admin/modules/AdminBirthdaysModule.jsx'
+import { AdminCommunicationsModule } from '../components/admin/modules/AdminCommunicationsModule.jsx'
+import { AdminCreateStudentModule } from '../components/admin/modules/AdminCreateStudentModule.jsx'
+import { AdminMembershipsModule } from '../components/admin/modules/AdminMembershipsModule.jsx'
+import { AdminOverviewModule } from '../components/admin/modules/AdminOverviewModule.jsx'
+import { AdminPersonalRecordsModule } from '../components/admin/modules/AdminPersonalRecordsModule.jsx'
+import { AdminPlansModule } from '../components/admin/modules/AdminPlansModule.jsx'
+import { AdminReservationsModule } from '../components/admin/modules/AdminReservationsModule.jsx'
+import { AdminScheduleModule } from '../components/admin/modules/AdminScheduleModule.jsx'
+import { AdminSettingsModule } from '../components/admin/modules/AdminSettingsModule.jsx'
+import { AdminStudentsModule } from '../components/admin/modules/AdminStudentsModule.jsx'
+import { AdminWodModule } from '../components/admin/modules/AdminWodModule.jsx'
 
 function buildWhatsAppUrl(phone, credentials) {
   const cleanedPhone = phone.replace(/\D/g, '')
@@ -140,349 +65,92 @@ function buildWhatsAppUrl(phone, credentials) {
   return `https://wa.me/${chilePhone}?text=${encodeURIComponent(text)}`
 }
 
-function Field({ label, value, onChange, type = 'text', required = false }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-black uppercase text-white/60">{label}</span>
-      <input
-        className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
-        type={type}
-        value={value ?? ''}
-        required={required}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  )
-}
-
-function TextArea({ label, value, onChange, rows = 4 }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-black uppercase text-white/60">{label}</span>
-      <textarea
-        className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-semibold leading-6 text-white outline-none transition focus:border-kupan-ember"
-        rows={rows}
-        value={value ?? ''}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </label>
-  )
-}
-
-function SelectField({ label, value, onChange, children }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-black uppercase text-white/60">{label}</span>
-      <select
-        className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
-        value={value ?? ''}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {children}
-      </select>
-    </label>
-  )
-}
-
-function ToggleField({ label, checked, onChange }) {
-  return (
-    <label className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/35 px-3 py-2">
-      <span className="text-xs font-black uppercase text-white/60">{label}</span>
-      <input
-        className="h-5 w-5 accent-kupan-ember"
-        type="checkbox"
-        checked={Boolean(checked)}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-    </label>
-  )
-}
-
-function AdminSection({ title, eyebrow, children }) {
-  return (
-    <section className="k-card p-5">
-      <SectionTitle eyebrow={eyebrow} title={title} />
-      <div className="space-y-4">{children}</div>
-    </section>
-  )
-}
-
-function SmallRow({ title, meta, detail, action }) {
-  return (
-    <article className="k-panel p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">{meta}</p>
-          <h3 className="mt-2 break-words text-lg font-black uppercase text-white">{title}</h3>
-          {detail ? <p className="mt-1 text-sm leading-6 text-white/60">{detail}</p> : null}
-        </div>
-        {action}
-      </div>
-    </article>
-  )
-}
-
-function AdminSidebar({ modules, openModules, onToggleModule, activeSection, onNavigate, isCollapsed, onToggleCollapse }) {
-  return (
-    <aside className={`k-card sticky top-[calc(4.75rem+env(safe-area-inset-top))] z-10 max-h-[calc(100dvh-7rem)] overflow-hidden p-3 transition-all duration-300 lg:self-start ${
-      isCollapsed ? 'lg:w-20' : 'lg:w-72'
-    }`}
-    >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className={isCollapsed ? 'lg:sr-only' : ''}>
-          <p className="text-[0.62rem] font-black uppercase tracking-[0.22em] text-kupan-flame">Menu admin</p>
-          <p className="mt-1 text-sm font-black uppercase text-white">Accesos rapidos</p>
-        </div>
-        <button
-          type="button"
-          className="hidden h-10 w-10 shrink-0 rounded-lg border border-white/10 bg-white/10 text-xs font-black text-white transition hover:bg-white/15 lg:block"
-          onClick={onToggleCollapse}
-          aria-label={isCollapsed ? 'Expandir menu admin' : 'Colapsar menu admin'}
-        >
-          {isCollapsed ? '>>' : '<<'}
-        </button>
-      </div>
-
-      <div className="max-h-[calc(100dvh-12rem)] space-y-2 overflow-y-auto pr-1">
-        {modules.map((module) => {
-          const isOpen = openModules.includes(module.id)
-          const moduleHasActive = module.items.some((item) => item.id === activeSection)
-
-          return (
-            <div key={module.id} className="rounded-lg border border-white/10 bg-white/[0.03]">
-              <button
-                type="button"
-                className={`flex min-h-12 w-full items-center gap-3 px-3 text-left transition ${moduleHasActive ? 'text-white' : 'text-white/70 hover:text-white'}`}
-                onClick={() => onToggleModule(module.id)}
-                aria-expanded={isOpen}
-              >
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[0.62rem] font-black ${moduleHasActive ? 'bg-kupan-ember text-white' : 'bg-white/10 text-white/70'}`}>
-                  {module.icon}
-                </span>
-                <span className={`min-w-0 flex-1 text-sm font-black uppercase ${isCollapsed ? 'lg:hidden' : ''}`}>{module.label}</span>
-                <span className={`text-xs font-black transition ${isOpen ? 'rotate-90' : ''} ${isCollapsed ? 'lg:hidden' : ''}`}>{'>'}</span>
-              </button>
-
-              {isOpen ? (
-                <div className={`space-y-1 px-2 pb-2 ${isCollapsed ? 'lg:hidden' : ''}`}>
-                  {module.items.map((item) => {
-                    const isActive = item.id === activeSection
-                    return (
-                      <button
-                        key={`${module.id}-${item.label}-${item.target ?? item.id}`}
-                        type="button"
-                        className={`w-full rounded-md px-3 py-2 text-left transition ${
-                          isActive ? 'bg-kupan-ember/95 text-white shadow-glow' : 'text-white/60 hover:bg-white/10 hover:text-white'
-                        }`}
-                        onClick={() => onNavigate(item)}
-                      >
-                        <span className="block text-xs font-black uppercase">{item.label}</span>
-                        <span className="mt-0.5 block text-[0.68rem] font-bold text-white/45">{item.hint}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : null}
-            </div>
-          )
-        })}
-      </div>
-    </aside>
-  )
-}
-
-function QuickActionButton({ label, icon, onClick, primary = false }) {
-  return (
-    <button
-      type="button"
-      className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-black uppercase tracking-[0.08em] transition ${
-        primary ? 'bg-kupan-ember text-white shadow-glow' : 'border border-white/10 bg-white/10 text-white/70 hover:bg-white/15 hover:text-white'
-      }`}
-      onClick={onClick}
-    >
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-[0.62rem]">{icon}</span>
-      <span>{label}</span>
-    </button>
-  )
-}
-
-function formatDate(date) {
-  if (!date) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${date}T00:00:00`))
-}
-
-function getChileDateString(date = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Santiago',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
-
-function formatMoney(value) {
-  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0))
-}
-
-function toTime(value) {
-  return value ? value.slice(0, 5) : ''
-}
-
-function addDays(dateText, days) {
-  const date = dateText ? new Date(`${dateText}T00:00:00`) : new Date()
-  date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
-}
-
-function calculateDaysBetween(startDate, endDate) {
-  const start = new Date(`${startDate}T00:00:00`)
-  const end = new Date(`${endDate}T00:00:00`)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 999
-  return Math.ceil((end.getTime() - start.getTime()) / 86400000)
-}
-
-function getPlanTokenTotal(plan) {
-  if (!plan || plan.is_unlimited) return ''
-  const match = String(plan.name ?? '').match(/\d+/)
-  if (match) return Number(match[0])
-  return plan.classes_per_week ? Number(plan.classes_per_week) * 4 : ''
-}
-
-function getMembershipTokens(membership) {
-  const isUnlimited = Boolean(membership.plan?.is_unlimited)
-  const total = membership.classes_total
-  const used = Number(membership.classes_used ?? 0)
-  return {
-    total: isUnlimited ? 'Ilimitado' : total ?? 0,
-    used: isUnlimited ? 'No descuenta' : used,
-    remaining: isUnlimited ? 'Ilimitado' : Math.max(Number(total ?? 0) - used, 0),
-  }
-}
-
-const emptyAdminData = {
-  profiles: [],
-  plans: [],
-  memberships: [],
-  reservations: [],
-  wod: [],
-  schedule: [],
-  posts: [],
-  settings: [],
-  birthdays: [],
-  upcomingBirthdays: [],
-  prs: [],
-  tokenMovements: [],
-}
-
-const adminLoaders = [
-  ['alumnos', 'profiles', 'admin_get_profiles'],
-  ['planes', 'plans', 'admin_get_plans'],
-  ['membresias', 'memberships', 'admin_get_memberships'],
-  ['reservas', 'reservations', 'admin_get_reservations'],
-  ['WOD', 'wod', 'admin_get_wod'],
-  ['horarios', 'schedule', 'admin_get_schedule'],
-  ['comunidad', 'posts', 'admin_get_community_posts'],
-  ['textos', 'settings', 'admin_get_app_settings'],
-  ['cumpleanos', 'birthdays', 'birthdays_this_month'],
-  ['PR destacados', 'prs', 'admin_get_personal_records'],
-  ['movimientos de tokens', 'tokenMovements', 'admin_get_token_movements'],
-]
-
-const studentFilters = [
-  { id: 'all', label: 'Todos' },
-  { id: 'active', label: 'Activos' },
-  { id: 'inactive', label: 'Inactivos' },
-  { id: 'plan-active', label: 'Plan activo' },
-  { id: 'plan-expired', label: 'Plan vencido' },
-  { id: 'no-tokens', label: 'Sin tokens' },
-  { id: 'expiring', label: 'Por vencer' },
-]
-
-async function runAdminLoader([label, key, rpcName]) {
-  try {
-    const { data, error } = await supabase.rpc(rpcName)
-    if (error) {
-      logAppError(`admin.load_${key}`, error)
-      return { key, label, data: emptyAdminData[key], error: getHumanErrorMessage(error, `No fue posible cargar ${label}.`) }
-    }
-    return { key, label, data: data ?? emptyAdminData[key], error: null }
-  } catch (error) {
-    logAppError(`admin.load_${key}`, error)
-    return { key, label, data: emptyAdminData[key], error: getHumanErrorMessage(error, `No fue posible cargar ${label}.`) }
-  }
-}
-
-async function loadAdminData() {
-  if (!isSupabaseConfigured || !supabase) {
-    return { ok: false, message: 'Supabase aun no esta configurado. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.' }
-  }
-
-  const settledResults = await Promise.allSettled(adminLoaders.map(runAdminLoader))
-  const data = { ...emptyAdminData }
-  const errors = []
-
-  settledResults.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      const [label, key] = adminLoaders[index]
-      logAppError(`admin.load_${key}`, result.reason)
-      errors.push({ key, label, message: `No pudimos cargar ${label}. Revisa tu conexión y vuelve a intentarlo.` })
-      data[key] = emptyAdminData[key]
-      return
-    }
-
-    data[result.value.key] = result.value.data
-    if (result.value.error) {
-      errors.push({ key: result.value.key, label: result.value.label, message: `No pudimos cargar ${result.value.label}. ${result.value.error}` })
-    }
-  })
-
-  return { ok: true, data, errors }
-}
-
 export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [activeSection, setActiveSection] = useState('overview')
-  const [openModules, setOpenModules] = useState(['alumnos', 'pagos'])
+  const [openModules, setOpenModules] = useState(['inicio', 'clases', 'alumnos'])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
   const [pendingFocusTarget, setPendingFocusTarget] = useState('')
+  const [dismissedAlertIds, setDismissedAlertIds] = useState([])
   const [verifiedUser, setVerifiedUser] = useState(currentUser)
   const [isCheckingAccess, setIsCheckingAccess] = useState(Boolean(currentUser))
-  const [adminData, setAdminData] = useState({
-    profiles: [],
-    plans: [],
-    memberships: [],
-    reservations: [],
-    wod: [],
-    schedule: [],
-    posts: [],
-    settings: [],
-    birthdays: [],
-    upcomingBirthdays: [],
-    prs: [],
-    tokenMovements: [],
-  })
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('error')
-  const [isLoading, setIsLoading] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState(null)
-  const [sectionErrors, setSectionErrors] = useState([])
+  const {
+    data: adminData,
+    isLoading,
+    isRefreshing,
+    sectionLoading,
+    sectionErrors,
+    lastUpdated,
+    reloadAll,
+    reloadSection,
+  } = useAdminData()
+  const {
+    message,
+    messageType,
+    showSuccess,
+    showError,
+    showWarning,
+    clearFeedback,
+  } = useAdminFeedback()
+  const {
+    saveWod: persistWod,
+    isSavingWod,
+  } = useAdminWod()
+  const {
+    saveSchedule: persistSchedule,
+    toggleSchedule: persistScheduleToggle,
+    isSavingSchedule,
+  } = useAdminSchedule()
+  const {
+    savePost: persistPost,
+    togglePost: persistPostToggle,
+    isSavingPost,
+  } = useAdminCommunications()
+  const {
+    saveTexts: persistTexts,
+    isSavingSettings,
+  } = useAdminSettings()
+  const {
+    savePlan: persistPlan,
+    togglePlan: persistPlanToggle,
+    isSavingPlan,
+  } = useAdminPlans()
+  const {
+    createStudent: persistStudent,
+    isCreatingStudent,
+  } = useAdminStudents()
+  const {
+    updateReservationStatus: persistReservationStatus,
+    saveManualReservation: persistManualReservation,
+    isSavingManualReservation,
+  } = useAdminReservations()
+  const {
+    saveMembership: persistMembership,
+    saveMembershipEdit: persistMembershipEdit,
+    updateMembershipStatus: persistMembershipStatus,
+    renewMembership: persistMembershipRenewal,
+    extendMembershipSevenDays: persistMembershipExtension,
+    adjustMembershipTokens: persistMembershipTokenAdjustment,
+    simulateApprovedPayment: persistApprovedPaymentSimulation,
+    isSavingMembership,
+    isSavingMembershipEdit,
+    isSimulatingPayment,
+  } = useAdminMemberships()
   const [studentQuery, setStudentQuery] = useState('')
   const [studentFilter, setStudentFilter] = useState('all')
-  const [planDraft, setPlanDraft] = useState(emptyPlan)
-  const [membershipDraft, setMembershipDraft] = useState(emptyMembership)
-  const [membershipEditDraft, setMembershipEditDraft] = useState(emptyMembershipEdit)
-  const [wodDraft, setWodDraft] = useState(emptyWod)
-  const [scheduleDraft, setScheduleDraft] = useState(emptySchedule)
-  const [postDraft, setPostDraft] = useState(emptyPost)
-  const [studentDraft, setStudentDraft] = useState(emptyStudent)
+  const [planDraft, setPlanDraft] = useState(() => createEmptyPlanDraft())
+  const [membershipDraft, setMembershipDraft] = useState(() => createEmptyMembershipDraft())
+  const [membershipEditDraft, setMembershipEditDraft] = useState(() => createEmptyMembershipEditDraft())
+  const [wodDraft, setWodDraft] = useState(() => createEmptyWodDraft())
+  const [scheduleDraft, setScheduleDraft] = useState(() => createEmptyScheduleDraft())
+  const [postDraft, setPostDraft] = useState(() => createEmptyPostDraft())
+  const [studentDraft, setStudentDraft] = useState(() => createEmptyStudentDraft())
   const [manualReservationDraft, setManualReservationDraft] = useState(() => ({
-    ...emptyManualReservation,
+    ...createEmptyManualReservationDraft(),
     reservation_date: getChileDateString(),
   }))
   const [textDraft, setTextDraft] = useState(defaultAppText)
   const [createdCredentials, setCreatedCredentials] = useState(null)
-  const [isCreatingStudent, setIsCreatingStudent] = useState(false)
-  const [isSavingManualReservation, setIsSavingManualReservation] = useState(false)
   const contentTopRef = useRef(null)
   const createStudentRef = useRef(null)
   const membershipsOverviewRef = useRef(null)
@@ -492,6 +160,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const tokenMovementsRef = useRef(null)
   const manualReservationRef = useRef(null)
   const scrollTimeoutRef = useRef(null)
+  const hasHydratedTextDraftRef = useRef(false)
+  const isTextDraftDirtyRef = useRef(false)
 
   const activeUser = verifiedUser ?? currentUser
   const isAdmin = activeUser?.role === 'admin'
@@ -582,6 +252,211 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
   }, [adminData, todayDate])
 
+  const currentModuleId = getAdminModuleId(activeSection)
+  const failedDataKeys = useMemo(() => new Set(sectionErrors.map((error) => error.key)), [sectionErrors])
+  const hasDataError = useCallback((key) => failedDataKeys.has(key), [failedDataKeys])
+  const todayDayOfWeek = getChileDayOfWeek()
+  const todayLabel = weekdayLabels[todayDayOfWeek] ?? 'Hoy'
+  const tomorrowDate = addDays(todayDate, 1)
+  const todayWod = adminData.wod.find((item) => item.date === todayDate)
+  const tomorrowWod = adminData.wod.find((item) => item.date === tomorrowDate)
+  const {
+    hasStoredDraft: hasStoredWodDraft,
+    storedDraft: storedWodDraft,
+    storedDraftMetadata: storedWodDraftMetadata,
+    storedDraftStatus: storedWodDraftStatus,
+    isDraftDirty: isWodDraftDirty,
+    storageError: wodDraftStorageError,
+    saveDraftNow: saveWodDraftNow,
+    discardStoredDraft: discardStoredWodDraft,
+    recoverStoredDraft: recoverStoredWodDraft,
+    markRemoteSaveSuccessful: markWodRemoteSaveSuccessful,
+  } = useAdminWodDraft({
+    draft: wodDraft,
+    onRecover: setWodDraft,
+    remoteWod: adminData.wod,
+  })
+
+  const todayClasses = useMemo(() => {
+    if (hasDataError('schedule') || hasDataError('reservations')) return null
+    return (
+    adminData.schedule
+      .filter((classItem) => Number(classItem.day_of_week) === todayDayOfWeek && classItem.active)
+      .sort((a, b) => String(a.time ?? '').localeCompare(String(b.time ?? '')))
+      .map((classItem) => {
+        const classReservations = adminData.reservations.filter((reservation) => (
+          reservation.class_schedule_id === classItem.id &&
+          reservation.reservation_date === todayDate &&
+          reservation.status !== 'cancelled'
+        ))
+        const reserved = classReservations.length
+        const attended = classReservations.filter((reservation) => reservation.status === 'attended').length
+        const maxSpots = Number(classItem.max_spots ?? 12)
+        const occupancy = maxSpots > 0 ? reserved / maxSpots : 0
+
+        return {
+          id: classItem.id,
+          time: toTime(classItem.time),
+          name: classItem.class_name ?? 'Clase KUPAN',
+          coach: classItem.coach || 'Sin coach asignado',
+          reserved,
+          attended,
+          maxSpots,
+          status: reserved >= maxSpots ? 'Completa' : occupancy >= 0.8 ? 'Alta ocupación' : 'Disponible',
+          wodStatus: todayWod ? 'Publicado' : 'Pendiente',
+        }
+      })
+    )
+  }, [adminData.reservations, adminData.schedule, hasDataError, todayDate, todayDayOfWeek, todayWod])
+
+  const upcomingExpirations = useMemo(() => (
+    adminData.memberships
+      .filter((membership) => membership.status === 'active' && membership.end_date >= todayDate)
+      .map((membership) => ({
+        ...membership,
+        daysRemaining: calculateDaysBetween(todayDate, membership.end_date),
+      }))
+      .filter((membership) => membership.daysRemaining <= 10)
+      .sort((a, b) => a.daysRemaining - b.daysRemaining)
+      .slice(0, 6)
+  ), [adminData.memberships, todayDate])
+
+  const pendingAlerts = useMemo(() => {
+    const alerts = []
+    const missingCoachClasses = todayClasses?.filter((classItem) => classItem.coach === 'Sin coach asignado' || classItem.coach.toLowerCase().includes('por definir')) ?? []
+    const highOccupancyClasses = todayClasses?.filter((classItem) => classItem.status === 'Alta ocupación' || classItem.status === 'Completa') ?? []
+    const expiredMemberships = hasDataError('memberships') ? [] : adminData.memberships.filter((membership) => membership.status === 'expired' || membership.end_date < todayDate)
+    const pendingPayments = hasDataError('memberships') ? [] : adminData.memberships.filter((membership) => membership.payment_status === 'pending')
+    const incompleteProfiles = hasDataError('profiles') ? [] : adminData.profiles.filter((profile) => !profile.phone || !profile.birth_date)
+
+    if (!hasDataError('wod') && !tomorrowWod) {
+      alerts.push({
+        id: 'tomorrow-wod',
+        label: 'Entrenamientos',
+        title: 'WOD de mañana pendiente',
+        description: 'Aún no hay WOD publicado para mañana. Puedes crearlo antes de que los alumnos revisen la app.',
+        priority: 'medium',
+        priorityLabel: 'Medio',
+        target: { id: 'wod' },
+      })
+    }
+
+    if (missingCoachClasses.length > 0) {
+      alerts.push({
+        id: 'missing-coach',
+        label: 'Clases',
+        title: `${missingCoachClasses.length} clase(s) sin coach claro`,
+        description: 'Revisa horarios del día y asigna entrenador para evitar dudas operativas.',
+        priority: 'medium',
+        priorityLabel: 'Medio',
+        target: { id: 'schedule' },
+      })
+    }
+
+    if (expiredMemberships.length > 0) {
+      alerts.push({
+        id: 'expired-memberships',
+        label: 'Planes y pagos',
+        title: `${expiredMemberships.length} plan(es) vencidos`,
+        description: 'Hay alumnos con membresía vencida. Revisa renovaciones o estados de pago.',
+        priority: 'high',
+        priorityLabel: 'Alto',
+        target: { id: 'memberships', target: 'membership-history' },
+      })
+    }
+
+    if (pendingPayments.length > 0) {
+      alerts.push({
+        id: 'pending-payments',
+        label: 'Pagos',
+        title: `${pendingPayments.length} pago(s) pendientes`,
+        description: 'Revisa membresías con pago pendiente antes de activar reservas.',
+        priority: 'high',
+        priorityLabel: 'Alto',
+        target: { id: 'memberships', target: 'membership-history' },
+      })
+    }
+
+    if (highOccupancyClasses.length > 0) {
+      alerts.push({
+        id: 'high-occupancy',
+        label: 'Clases',
+        title: 'Clases con alta ocupación',
+        description: 'Una o más clases están cerca del cupo máximo. Revisa cupos y reservas.',
+        priority: 'low',
+        priorityLabel: 'Info',
+        target: { id: 'reservations' },
+      })
+    }
+
+    if (incompleteProfiles.length > 0) {
+      alerts.push({
+        id: 'incomplete-profiles',
+        label: 'Alumnos',
+        title: `${incompleteProfiles.length} perfil(es) incompletos`,
+        description: 'Hay alumnos sin teléfono o fecha de nacimiento registrada.',
+        priority: 'low',
+        priorityLabel: 'Info',
+        target: { id: 'students' },
+      })
+    }
+
+    return alerts.filter((alert) => !dismissedAlertIds.includes(alert.id)).slice(0, 6)
+  }, [adminData.memberships, adminData.profiles, dismissedAlertIds, hasDataError, todayClasses, todayDate, tomorrowWod])
+
+  const weeklyOccupancy = useMemo(() => {
+    const activeClasses = adminData.schedule.filter((classItem) => classItem.active)
+    const capacity = activeClasses.reduce((sum, classItem) => sum + Number(classItem.max_spots ?? 12), 0)
+    const reserved = adminData.reservations.filter((reservation) => (
+      reservation.status !== 'cancelled' && reservation.reservation_date >= todayDate
+    )).length
+    if (capacity === 0) return 0
+    return Math.min(Math.round((reserved / capacity) * 100), 100)
+  }, [adminData.reservations, adminData.schedule, todayDate])
+
+  const newStudentsThisMonth = useMemo(() => {
+    const monthPrefix = todayDate.slice(0, 7)
+    return adminData.profiles.filter((profile) => String(profile.created_at ?? '').startsWith(monthPrefix)).length
+  }, [adminData.profiles, todayDate])
+
+  const recentActivity = useMemo(() => {
+    const reservationItems = adminData.reservations.slice(0, 4).map((reservation) => ({
+      id: `reservation-${reservation.id}`,
+      type: reservation.status === 'cancelled' ? 'Cancelación' : 'Reserva',
+      title: reservation.profile?.full_name ?? 'Alumno KUPAN',
+      detail: `${reservation.class_schedule?.class_name ?? 'Clase'} · ${formatDate(reservation.reservation_date)} · ${reservation.status}`,
+      sortDate: getDateTimeValue(reservation.reservation_date, reservation.class_schedule?.time),
+    }))
+
+    const membershipItems = adminData.memberships.slice(0, 4).map((membership) => ({
+      id: `membership-${membership.id}`,
+      type: 'Membresía',
+      title: membership.profile?.full_name ?? 'Alumno KUPAN',
+      detail: `${membership.plan?.name ?? 'Plan'} · ${membership.status} · vence ${formatDate(membership.end_date)}`,
+      sortDate: membership.updated_at ?? membership.created_at ?? membership.start_date,
+    }))
+
+    const wodItems = adminData.wod.slice(0, 3).map((wod) => ({
+      id: `wod-${wod.id}`,
+      type: 'WOD',
+      title: wod.title || 'WOD publicado',
+      detail: formatDate(wod.date),
+      sortDate: wod.updated_at ?? wod.created_at ?? wod.date,
+    }))
+
+    const prItems = adminData.prs.slice(0, 3).map((record) => ({
+      id: `pr-${record.id}`,
+      type: 'PR',
+      title: record.profile?.full_name ?? 'Atleta KUPAN',
+      detail: `${record.movement} · ${record.value} ${record.unit}`,
+      sortDate: record.created_at ?? record.record_date,
+    }))
+
+    return [...reservationItems, ...membershipItems, ...wodItems, ...prItems]
+      .sort((a, b) => String(b.sortDate ?? '').localeCompare(String(a.sortDate ?? '')))
+      .slice(0, 8)
+  }, [adminData.memberships, adminData.prs, adminData.reservations, adminData.wod])
+
   const filteredProfiles = useMemo(() => {
     const query = studentQuery.trim().toLowerCase()
 
@@ -606,6 +481,21 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       return true
     })
   }, [activeMembershipByProfile, adminData.profiles, latestMembershipByProfile, studentFilter, studentQuery, todayDate])
+
+  const featuredStudents = useMemo(() => (
+    filteredProfiles.slice(0, 6)
+  ), [filteredProfiles])
+
+  const dashboardValues = {
+    activeStudents: hasDataError('profiles') ? 'Sin cargar' : totals.activeStudents,
+    totalStudents: hasDataError('profiles') ? 'No disponible' : `${totals.students} registrados`,
+    todayReservations: hasDataError('reservations') ? 'Sin cargar' : totals.todayReservations,
+    todayClasses: hasDataError('schedule') ? 'No disponible' : `${todayClasses?.length ?? 0} clases`,
+    weeklyOccupancy: hasDataError('reservations') || hasDataError('schedule') ? 'Sin cargar' : `${weeklyOccupancy}%`,
+    expiredMemberships: hasDataError('memberships') ? 'Sin cargar' : totals.expiredMemberships,
+    upcomingExpirations: hasDataError('memberships') ? 'Sin cargar' : upcomingExpirations.length,
+    newStudentsThisMonth: hasDataError('profiles') ? 'Sin cargar' : newStudentsThisMonth,
+  }
 
   const manualReservationStudents = useMemo(() => {
     const query = manualReservationDraft.student_query.trim().toLowerCase()
@@ -683,9 +573,29 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     ))
   }
 
+  const buildTextDraftFromSettings = useCallback((settings) => ({
+    homeEyebrow: settings.find((item) => item.key === 'home_eyebrow')?.value ?? defaultAppText.homeEyebrow,
+    homeTitle: settings.find((item) => item.key === 'home_title')?.value ?? defaultAppText.homeTitle,
+    homeBody: settings.find((item) => item.key === 'home_body')?.value ?? defaultAppText.homeBody,
+    reservationsTitle: settings.find((item) => item.key === 'reservations_title')?.value ?? defaultAppText.reservationsTitle,
+    reservationsBody: settings.find((item) => item.key === 'reservations_body')?.value ?? defaultAppText.reservationsBody,
+    communityPhrase: settings.find((item) => item.key === 'community_phrase')?.value ?? defaultAppText.communityPhrase,
+  }), [])
+
+  const hydrateTextDraft = useCallback((settings, { force = false } = {}) => {
+    if (!force && (hasHydratedTextDraftRef.current || isTextDraftDirtyRef.current)) return
+    setTextDraft(buildTextDraftFromSettings(settings ?? []))
+    isTextDraftDirtyRef.current = false
+    hasHydratedTextDraftRef.current = true
+  }, [buildTextDraftFromSettings])
+
+  function updateTextDraftField(field, value) {
+    isTextDraftDirtyRef.current = true
+    setTextDraft((current) => ({ ...current, [field]: value }))
+  }
+
   async function ensureFreshAdmin() {
-    setMessage('')
-    setMessageType('error')
+    clearFeedback()
 
     const freshUser = await getCurrentSupabaseUser()
     const allowed = freshUser?.role === 'admin' && freshUser?.status === 'active'
@@ -693,54 +603,44 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     setVerifiedUser(freshUser ?? null)
 
     if (!allowed) {
-      setMessage('Tu permiso admin ya no esta activo. Vuelve a iniciar sesion o solicita validar tu rol en Supabase.')
+      showError('Tu permiso admin ya no esta activo. Vuelve a iniciar sesion o solicita validar tu rol en Supabase.')
       return false
     }
 
     return true
   }
 
-  async function refreshData() {
-    setIsLoading(true)
-    setMessage('')
-    const result = await loadAdminData()
-    setIsLoading(false)
+  const refreshData = useCallback(async (options = {}) => {
+    if (!options.silent) clearFeedback()
+    const result = await reloadAll()
 
-    if (!result.ok) {
-      setMessageType('error')
-      setMessage(result.message)
+    if (!result.success && !result.partial) {
+      if (!options.silent) showError(result.message ?? 'No pudimos cargar datos admin desde Supabase. Revisa RLS, role admin y tablas.')
       return
     }
 
-    setAdminData(result.data)
-    setSectionErrors(result.errors ?? [])
-    setLastUpdated(new Date())
-    setTextDraft({
-      homeEyebrow: result.data.settings.find((item) => item.key === 'home_eyebrow')?.value ?? defaultAppText.homeEyebrow,
-      homeTitle: result.data.settings.find((item) => item.key === 'home_title')?.value ?? defaultAppText.homeTitle,
-      homeBody: result.data.settings.find((item) => item.key === 'home_body')?.value ?? defaultAppText.homeBody,
-      reservationsTitle: result.data.settings.find((item) => item.key === 'reservations_title')?.value ?? defaultAppText.reservationsTitle,
-      reservationsBody: result.data.settings.find((item) => item.key === 'reservations_body')?.value ?? defaultAppText.reservationsBody,
-      communityPhrase: result.data.settings.find((item) => item.key === 'community_phrase')?.value ?? defaultAppText.communityPhrase,
-    })
+    hydrateTextDraft(result.data?.settings ?? [], { force: Boolean(options.hydrateTextDraft) })
 
-    const upcomingBirthdays = await loadUpcomingBirthdays(30)
-    if (upcomingBirthdays.ok) {
-      setAdminData((current) => ({ ...current, upcomingBirthdays: upcomingBirthdays.birthdays }))
-    }
-
-    if (result.errors?.length) {
-      setMessageType('error')
-      setMessage(`${result.errors.length} secciones tuvieron problemas. Revisa el detalle bajo los contadores.`)
+    if (result.failedSections?.length) {
+      if (!options.silent) showWarning(`${result.failedSections.length} secciones tuvieron problemas. Revisa el detalle bajo los contadores.`)
     } else {
-      setMessageType('success')
-      setMessage('Datos actualizados desde Supabase.')
+      if (!options.silent) showSuccess('Datos actualizados desde Supabase.')
     }
-  }
+  }, [clearFeedback, hydrateTextDraft, reloadAll, showError, showSuccess, showWarning])
+
+  const reloadAffectedSections = useCallback(async (sections = []) => {
+    if (!sections.length) {
+      await refreshData({ silent: true })
+      return
+    }
+
+    const uniqueSections = [...new Set(sections)]
+    await Promise.all(uniqueSections.map((section) => reloadSection(section)))
+  }, [refreshData, reloadSection])
 
   useEffect(() => {
     if (isAdmin) refreshData()
-  }, [isAdmin])
+  }, [isAdmin, refreshData])
 
   useEffect(() => {
     if (manualReservationDraft.class_schedule_id || adminData.schedule.length === 0) return
@@ -760,29 +660,19 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   async function savePlan(event) {
     event.preventDefault()
     if (!(await ensureFreshAdmin())) return
-    const payload = {
-      name: planDraft.name.trim(),
-      price: Number(planDraft.price),
-      classes_per_week: planDraft.classes_per_week === '' ? null : Number(planDraft.classes_per_week),
-      is_unlimited: planDraft.is_unlimited,
-      active: planDraft.active,
-    }
-    const { error } = planDraft.id
-      ? await supabase.from('plans').update(payload).eq('id', planDraft.id)
-      : await supabase.from('plans').insert(payload)
-    if (error) return setMessage('No pudimos guardar el plan.')
-    setPlanDraft(emptyPlan)
-    setMessageType('success')
-    setMessage('Plan guardado en Supabase.')
-    refreshData()
+    const result = await persistPlan(planDraft)
+    if (!result.success) return showError('No pudimos guardar el plan.')
+    setPlanDraft(createEmptyPlanDraft())
+    showSuccess('Plan guardado en Supabase.')
+    await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
 
   async function togglePlan(plan) {
     if (!(await ensureFreshAdmin())) return
-    const { error } = await supabase.from('plans').update({ active: !plan.active }).eq('id', plan.id)
-    if (error) return setMessage('No pudimos actualizar el plan.')
-    refreshData()
+    const result = await persistPlanToggle(plan)
+    if (!result.success) return showError('No pudimos actualizar el plan.')
+    await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
 
@@ -802,78 +692,45 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     event.preventDefault()
     if (!(await ensureFreshAdmin())) return
     const selectedPlan = adminData.plans.find((plan) => plan.id === membershipDraft.plan_id)
-    const startDate = membershipDraft.start_date || new Date().toISOString().slice(0, 10)
-    const endDate = addDays(startDate, 30)
-    const classesTotal = selectedPlan?.is_unlimited ? null : Number(membershipDraft.classes_total || getPlanTokenTotal(selectedPlan) || 0)
-    const initialClassesUsed = selectedPlan?.is_unlimited ? 0 : Number(membershipDraft.classes_used || 0)
-    const payload = {
-      profile_id: membershipDraft.profile_id,
-      plan_id: membershipDraft.plan_id,
-      start_date: startDate,
-      end_date: endDate,
-      expires_at: endDate,
-      status: 'active',
-      classes_total: classesTotal,
-      classes_used: initialClassesUsed,
-      payment_status: 'paid',
-      payment_provider: membershipDraft.payment_provider || 'manual_admin',
-      payment_reference: membershipDraft.payment_reference || `manual-${membershipDraft.profile_id}-${Date.now()}`,
-      activated_at: new Date().toISOString(),
-      auto_activated: false,
-      notes: membershipDraft.notes || null,
-    }
+    const payload = buildMembershipActivationPayload(membershipDraft, selectedPlan)
+    const classesTotal = payload.classes_total
+    const initialClassesUsed = payload.classes_used
 
     if (!payload.profile_id || !payload.plan_id || !payload.start_date || !payload.end_date) {
-      setMessageType('error')
-      setMessage('Selecciona alumno, plan, inicio y vencimiento.')
+      showError('Selecciona alumno, plan, inicio y vencimiento.')
       return
     }
 
     if (!selectedPlan) {
-      setMessageType('error')
-      setMessage('Selecciona un plan valido para activar la membresia.')
+      showError('Selecciona un plan valido para activar la membresia.')
       return
     }
 
     if (!selectedPlan.is_unlimited && (!Number.isFinite(classesTotal) || classesTotal <= 0)) {
-      setMessageType('error')
-      setMessage('Indica un total de tokens valido para el plan.')
+      showError('Indica un total de tokens valido para el plan.')
       return
     }
 
     if (initialClassesUsed < 0) {
-      setMessageType('error')
-      setMessage('Los tokens ya usados no pueden ser menores que 0.')
+      showError('Los tokens ya usados no pueden ser menores que 0.')
       return
     }
 
     if (!selectedPlan.is_unlimited && initialClassesUsed > classesTotal) {
-      setMessageType('error')
-      setMessage('Los tokens ya usados no pueden ser mayores que los tokens del plan.')
+      showError('Los tokens ya usados no pueden ser mayores que los tokens del plan.')
       return
     }
 
-    const { error } = await supabase.rpc('admin_activate_membership', {
-      target_profile_id: payload.profile_id,
-      target_plan_id: payload.plan_id,
-      membership_start_date: payload.start_date,
-      classes_total_override: payload.classes_total,
-      initial_classes_used: payload.classes_used,
-      payment_provider_input: payload.payment_provider,
-      payment_reference_input: payload.payment_reference,
-      notes_input: payload.notes,
-    })
+    const result = await persistMembership(membershipDraft, selectedPlan)
 
-    if (error) {
-      setMessageType('error')
-      setMessage(`No pudimos crear la membresia: ${error.message}`)
+    if (!result.success) {
+      showError(`No pudimos crear la membresia: ${result.error?.message ?? 'Error desconocido'}`)
       return
     }
 
-    setMembershipDraft(emptyMembership)
-    setMessageType('success')
-    setMessage(initialClassesUsed > 0 ? 'Plan activado con tokens ya usados registrados.' : 'Membresia creada en Supabase.')
-    refreshData()
+    setMembershipDraft(createEmptyMembershipDraft())
+    showSuccess(initialClassesUsed > 0 ? 'Plan activado con tokens ya usados registrados.' : 'Membresia creada en Supabase.')
+    await reloadAffectedSections(result.affectedSections)
   }
 
   function startEditMembership(membership) {
@@ -892,7 +749,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       payment_reference: membership.payment_reference ?? '',
       notes: membership.notes ?? '',
     })
-    setMessage('')
+    clearFeedback()
     setPendingFocusTarget('membership-edit')
   }
 
@@ -901,21 +758,18 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     if (!(await ensureFreshAdmin())) return
 
     if (!membershipEditDraft.id) {
-      setMessageType('error')
-      setMessage('Selecciona una membresia para editar.')
+      showError('Selecciona una membresia para editar.')
       return
     }
 
     const selectedPlan = adminData.plans.find((plan) => plan.id === membershipEditDraft.plan_id)
     if (!selectedPlan) {
-      setMessageType('error')
-      setMessage('Selecciona un plan valido para guardar la membresia.')
+      showError('Selecciona un plan valido para guardar la membresia.')
       return
     }
 
     if (!membershipEditDraft.start_date || Number.isNaN(new Date(`${membershipEditDraft.start_date}T00:00:00`).getTime())) {
-      setMessageType('error')
-      setMessage('La fecha de inicio no es valida.')
+      showError('La fecha de inicio no es valida.')
       return
     }
 
@@ -923,103 +777,64 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const editedClassesUsed = selectedPlan?.is_unlimited ? 0 : Number(membershipEditDraft.classes_used ?? 0)
 
     if (!selectedPlan?.is_unlimited && editedClassesUsed < 0) {
-      setMessageType('error')
-      setMessage('Los tokens usados no pueden ser menores que 0.')
+      showError('Los tokens usados no pueden ser menores que 0.')
       return
     }
 
     if (!selectedPlan?.is_unlimited && editedClassesUsed > editedClassesTotal) {
-      setMessageType('error')
-      setMessage('Los tokens usados no pueden ser mayores que los tokens totales.')
+      showError('Los tokens usados no pueden ser mayores que los tokens totales.')
       return
     }
 
-    const updatePayload = {
-      target_membership_id: membershipEditDraft.id,
-      target_plan_id: membershipEditDraft.plan_id,
-      start_date_input: membershipEditDraft.start_date,
-      status_input: membershipEditDraft.status,
-      payment_status_input: membershipEditDraft.payment_status,
-      payment_provider_input: membershipEditDraft.payment_provider || null,
-      payment_reference_input: membershipEditDraft.payment_reference || null,
-      notes_input: membershipEditDraft.notes || null,
-      classes_total_input: editedClassesTotal,
-      classes_used_input: editedClassesUsed,
-    }
+    const result = await persistMembershipEdit(membershipEditDraft, selectedPlan)
 
-    const { error } = await supabase.rpc('admin_update_membership', updatePayload)
-
-    if (error) {
-      setMessageType('error')
-      setMessage(`No pudimos guardar los cambios de membresia: ${error.message}`)
+    if (!result.success) {
+      showError(`No pudimos guardar los cambios de membresia: ${result.error?.message ?? 'Error desconocido'}`)
       return
     }
 
-    setMembershipEditDraft(emptyMembershipEdit)
-    setMessageType('success')
-    setMessage('Membresia actualizada.')
-    refreshData()
+    setMembershipEditDraft(createEmptyMembershipEditDraft())
+    showSuccess('Membresia actualizada.')
+    await reloadAffectedSections(result.affectedSections)
   }
 
   async function updateMembershipStatus(membership, status) {
     if (!(await ensureFreshAdmin())) return
-    const { error } = await supabase.rpc('admin_update_membership', {
-      target_membership_id: membership.id,
-      target_plan_id: membership.plan_id,
-      start_date_input: membership.start_date,
-      status_input: status,
-      payment_status_input: status === 'active' ? 'paid' : membership.payment_status ?? 'paid',
-      payment_provider_input: membership.payment_provider ?? null,
-      payment_reference_input: membership.payment_reference ?? null,
-      notes_input: membership.notes ?? null,
-      classes_total_input: membership.classes_total,
-      classes_used_input: membership.classes_used ?? 0,
-    })
+    const result = await persistMembershipStatus(membership, status)
 
-    if (error) {
-      setMessageType('error')
-      setMessage(`No pudimos cambiar estado de membresia: ${error.message}`)
+    if (!result.success) {
+      showError(`No pudimos cambiar estado de membresia: ${result.error?.message ?? 'Error desconocido'}`)
       return
     }
 
-    setMessageType('success')
-    setMessage(`Membresia actualizada a ${status}.`)
-    refreshData()
+    showSuccess(`Membresia actualizada a ${status}.`)
+    await reloadAffectedSections(result.affectedSections)
   }
 
   async function renewMembership(membership) {
     if (!(await ensureFreshAdmin())) return
-    const { error } = await supabase.rpc('admin_renew_membership', {
-      target_membership_id: membership.id,
-    })
+    const result = await persistMembershipRenewal(membership)
 
-    if (error) {
-      setMessageType('error')
-      setMessage(`No pudimos renovar la membresia: ${error.message}`)
+    if (!result.success) {
+      showError(`No pudimos renovar la membresia: ${result.error?.message ?? 'Error desconocido'}`)
       return
     }
 
-    setMessageType('success')
-    setMessage('Plan renovado. Se creo un nuevo ciclo de 30 dias sin acumular tokens anteriores.')
-    refreshData()
+    showSuccess('Plan renovado. Se creo un nuevo ciclo de 30 dias sin acumular tokens anteriores.')
+    await reloadAffectedSections(result.affectedSections)
   }
 
   async function extendMembershipSevenDays(membership) {
     if (!(await ensureFreshAdmin())) return
-    const { error } = await supabase.rpc('admin_extend_membership', {
-      target_membership_id: membership.id,
-      days_input: 7,
-    })
+    const result = await persistMembershipExtension(membership)
 
-    if (error) {
-      setMessageType('error')
-      setMessage(`No pudimos extender la membresia: ${error.message}`)
+    if (!result.success) {
+      showError(`No pudimos extender la membresia: ${result.error?.message ?? 'Error desconocido'}`)
       return
     }
 
-    setMessageType('success')
-    setMessage('Membresia extendida 7 dias.')
-    refreshData()
+    showSuccess('Membresia extendida 7 dias.')
+    await reloadAffectedSections(result.affectedSections)
   }
 
   async function adjustMembershipTokens(membership) {
@@ -1034,26 +849,19 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
     const parsedValue = Number(nextValue)
     if (!Number.isInteger(parsedValue) || parsedValue < 0) {
-      setMessageType('error')
-      setMessage('Ingresa un numero entero de tokens usados.')
+      showError('Ingresa un numero entero de tokens usados.')
       return
     }
 
-    const { error } = await supabase.rpc('admin_adjust_tokens', {
-      target_membership_id: membership.id,
-      classes_used_input: parsedValue,
-      reason_input: 'Ajuste manual admin desde acciones rapidas',
-    })
+    const result = await persistMembershipTokenAdjustment(membership, parsedValue)
 
-    if (error) {
-      setMessageType('error')
-      setMessage(`No pudimos ajustar tokens: ${error.message}`)
+    if (!result.success) {
+      showError(`No pudimos ajustar tokens: ${result.error?.message ?? 'Error desconocido'}`)
       return
     }
 
-    setMessageType('success')
-    setMessage('Tokens usados actualizados y movimiento manual registrado.')
-    refreshData()
+    showSuccess('Tokens usados actualizados y movimiento manual registrado.')
+    await reloadAffectedSections(result.affectedSections)
   }
 
   function prepareMembershipActivation(profileId = '') {
@@ -1064,42 +872,61 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   async function saveWod(event) {
     event.preventDefault()
     if (!(await ensureFreshAdmin())) return
-    const { error } = await supabase.from('wod').upsert(wodDraft, { onConflict: 'date' })
-    if (error) return setMessage('No pudimos guardar el WOD.')
-    setWodDraft(emptyWod)
-    setMessageType('success')
-    setMessage('WOD guardado en Supabase.')
-    refreshData()
+    saveWodDraftNow()
+    const result = await persistWod(wodDraft)
+    if (!result.success) return showError('No pudimos guardar el WOD.')
+    markWodRemoteSaveSuccessful()
+    setWodDraft(createEmptyWodDraft())
+    showSuccess('WOD guardado en Supabase.')
+    await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
+  }
+
+  function recoverWodDraft() {
+    if (isWodDraftDirty) {
+      const confirmed = window.confirm('Tienes cambios en el formulario actual. Si recuperas el borrador local, ese contenido será reemplazado. ¿Quieres continuar?')
+      if (!confirmed) return
+    }
+
+    if (!recoverStoredWodDraft()) return
+    showWarning('Borrador local recuperado. Revisa el contenido antes de guardar en Supabase.')
+  }
+
+  function discardWodDraft() {
+    if (storedWodDraft?.draft) {
+      const confirmed = window.confirm('Vas a descartar el borrador local no publicado. Esta acción no modifica el WOD guardado en Supabase. ¿Quieres continuar?')
+      if (!confirmed) return
+    }
+
+    discardStoredWodDraft()
+    showSuccess('Borrador local descartado.')
+  }
+
+  function saveWodDraftLocally() {
+    const saved = saveWodDraftNow()
+    if (saved) {
+      showSuccess('Borrador local guardado en este dispositivo.')
+      return
+    }
+    showWarning('No hay contenido suficiente para guardar un borrador local.')
   }
 
   async function saveSchedule(event) {
     event.preventDefault()
     if (!(await ensureFreshAdmin())) return
-    const payload = {
-      day_of_week: Number(scheduleDraft.day_of_week),
-      time: scheduleDraft.time,
-      class_name: scheduleDraft.class_name,
-      coach: scheduleDraft.coach,
-      max_spots: Number(scheduleDraft.max_spots),
-      active: scheduleDraft.active,
-    }
-    const { error } = scheduleDraft.id
-      ? await supabase.from('class_schedule').update(payload).eq('id', scheduleDraft.id)
-      : await supabase.from('class_schedule').insert(payload)
-    if (error) return setMessage('No pudimos guardar el horario.')
-    setScheduleDraft(emptySchedule)
-    setMessageType('success')
-    setMessage('Horario guardado en Supabase.')
-    refreshData()
+    const result = await persistSchedule(scheduleDraft)
+    if (!result.success) return showError('No pudimos guardar el horario.')
+    setScheduleDraft(createEmptyScheduleDraft())
+    showSuccess('Horario guardado en Supabase.')
+    await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
 
   async function toggleSchedule(classItem) {
     if (!(await ensureFreshAdmin())) return
-    const { error } = await supabase.from('class_schedule').update({ active: !classItem.active }).eq('id', classItem.id)
-    if (error) return setMessage('No pudimos actualizar el horario.')
-    refreshData()
+    const result = await persistScheduleToggle(classItem)
+    if (!result.success) return showError('No pudimos actualizar el horario.')
+    await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
 
@@ -1119,29 +946,19 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   async function savePost(event) {
     event.preventDefault()
     if (!(await ensureFreshAdmin())) return
-    const payload = {
-      type: postDraft.type,
-      title: postDraft.title,
-      content: postDraft.content,
-      event_date: postDraft.event_date || null,
-      active: postDraft.active,
-    }
-    const { error } = postDraft.id
-      ? await supabase.from('community_posts').update(payload).eq('id', postDraft.id)
-      : await supabase.from('community_posts').insert(payload)
-    if (error) return setMessage('No pudimos guardar la publicacion.')
-    setPostDraft(emptyPost)
-    setMessageType('success')
-    setMessage('Publicacion guardada en Supabase.')
-    refreshData()
+    const result = await persistPost(postDraft)
+    if (!result.success) return showError('No pudimos guardar la publicacion.')
+    setPostDraft(createEmptyPostDraft())
+    showSuccess('Publicacion guardada en Supabase.')
+    await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
 
   async function togglePost(post) {
     if (!(await ensureFreshAdmin())) return
-    const { error } = await supabase.from('community_posts').update({ active: !post.active }).eq('id', post.id)
-    if (error) return setMessage('No pudimos actualizar la publicacion.')
-    refreshData()
+    const result = await persistPostToggle(post)
+    if (!result.success) return showError('No pudimos actualizar la publicacion.')
+    await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
 
@@ -1160,159 +977,105 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   async function saveTexts(event) {
     event.preventDefault()
     if (!(await ensureFreshAdmin())) return
-    const results = await Promise.all(
-      Object.entries(settingKeys).map(([field, key]) => saveAppSetting(key, textDraft[field])),
-    )
-    const failed = results.find((result) => !result.ok)
+    const result = await persistTexts(textDraft, settingKeys)
 
-    if (failed) {
-      setMessageType('error')
-      setMessage(failed.message)
+    if (!result.success) {
+      showError(result.message || getHumanErrorMessage(result.error, 'No pudimos guardar el texto.'))
       return
     }
 
-    setMessageType('success')
-    setMessage('Textos principales guardados en Supabase.')
-    refreshData()
+    showSuccess('Textos principales guardados en Supabase.')
+    await reloadAffectedSections(result.affectedSections)
+    const settingsResult = await reloadSection('settings')
+    hydrateTextDraft(settingsResult.data ?? [], { force: true })
     onContentChange?.()
   }
 
   async function updateReservationStatus(reservationId, status) {
     if (!(await ensureFreshAdmin())) return
-    const result = status === 'cancelled'
-      ? await supabase.rpc('cancel_reservation', { target_reservation_id: reservationId })
-      : await supabase.rpc('admin_mark_reservation', {
-        target_reservation_id: reservationId,
-        target_status: status,
-      })
-    const { error } = result
+    const result = await persistReservationStatus(reservationId, status)
 
-    if (error) {
-      setMessageType('error')
-      setMessage(error.message || 'No pudimos actualizar la reserva.')
+    if (!result.success) {
+      showError(result.error?.message || 'No pudimos actualizar la reserva.')
       return
     }
 
-    setMessageType('success')
-    setMessage(status === 'cancelled' ? 'Reserva cancelada. Si correspondia, el token fue devuelto.' : 'Asistencia confirmada. El token queda consumido.')
-    refreshData()
+    showSuccess(status === 'cancelled' ? 'Reserva cancelada. Si correspondia, el token fue devuelto.' : 'Asistencia confirmada. El token queda consumido.')
+    await reloadAffectedSections(result.affectedSections)
   }
 
   async function saveManualReservation(event) {
     event.preventDefault()
     if (!(await ensureFreshAdmin())) return
-    setMessage('')
-    setMessageType('error')
-    setIsSavingManualReservation(true)
+    clearFeedback()
+    const result = await persistManualReservation(manualReservationDraft)
 
-    const result = await adminReserveForStudent({
-      profileId: manualReservationDraft.profile_id,
-      classScheduleId: manualReservationDraft.class_schedule_id,
-      reservationDate: manualReservationDraft.reservation_date,
-      allowWithoutMembership: manualReservationDraft.allow_without_membership,
-      note: manualReservationDraft.note,
-    })
-
-    setIsSavingManualReservation(false)
-
-    if (!result.ok) {
-      setMessage(result.message)
+    if (!result.success) {
+      showError(result.message)
       return
     }
 
-    setMessageType('success')
-    setMessage(result.message)
+    showSuccess(result.message)
     setManualReservationDraft((current) => ({
-      ...emptyManualReservation,
+      ...createEmptyManualReservationDraft(),
       reservation_date: current.reservation_date || getChileDateString(),
       class_schedule_id: current.class_schedule_id,
     }))
-    refreshData()
+    await reloadAffectedSections(result.affectedSections)
   }
 
   async function simulateApprovedPayment() {
     if (!(await ensureFreshAdmin())) return
-    setMessage('')
-    setMessageType('error')
+    clearFeedback()
 
     if (!membershipDraft.profile_id || !membershipDraft.plan_id) {
-      setMessage('Selecciona alumno y plan para simular un pago aprobado.')
+      showError('Selecciona alumno y plan para simular un pago aprobado.')
       return
     }
 
-    const { data, error } = await supabase.functions.invoke('payment-webhook', {
-      body: {
-        provider: 'manual_test',
-        payment_reference: `test-${membershipDraft.profile_id}-${membershipDraft.plan_id}-${Date.now()}`,
-        profile_id: membershipDraft.profile_id,
-        plan_id: membershipDraft.plan_id,
-        status: 'paid',
-        simulated: true,
-      },
-    })
+    const result = await persistApprovedPaymentSimulation(membershipDraft)
 
-    if (error || !data?.ok) {
-      setMessage(data?.message || 'No pudimos simular el pago. Revisa la Edge Function payment-webhook.')
+    if (!result.success) {
+      showError(result.message || 'No pudimos simular el pago. Revisa la Edge Function payment-webhook.')
       return
     }
 
-    setMessageType('success')
-    setMessage('Pago simulado aprobado. Membresia activada por 30 dias.')
-    setMembershipDraft(emptyMembership)
-    refreshData()
+    showSuccess('Pago simulado aprobado. Membresia activada por 30 dias.')
+    setMembershipDraft(createEmptyMembershipDraft())
+    await reloadAffectedSections(result.affectedSections)
   }
 
   async function createStudent(event) {
     event.preventDefault()
     if (!(await ensureFreshAdmin())) return
-    setMessage('')
-    setMessageType('error')
+    clearFeedback()
     setCreatedCredentials(null)
 
     if (!studentDraft.full_name.trim() || !studentDraft.email.trim() || !studentDraft.birth_date || !studentDraft.level || !studentDraft.status) {
-      setMessage('Completa nombre, email, fecha de nacimiento, nivel y estado.')
+      showError('Completa nombre, email, fecha de nacimiento, nivel y estado.')
       return
     }
 
     if (studentDraft.plan_id && !studentDraft.membership_start_date) {
-      setMessage('Si asignas plan inicial, agrega fecha de inicio. El vencimiento se calcula automaticamente a 30 dias.')
+      showError('Si asignas plan inicial, agrega fecha de inicio. El vencimiento se calcula automaticamente a 30 dias.')
       return
     }
 
-    setIsCreatingStudent(true)
+    const result = await persistStudent(studentDraft)
 
-    const { data, error } = await supabase.functions.invoke('create-student', {
-      body: {
-        full_name: studentDraft.full_name,
-        email: studentDraft.email,
-        phone: studentDraft.phone || null,
-        birth_date: studentDraft.birth_date,
-        level: studentDraft.level,
-        status: studentDraft.status,
-        temporary_password: studentDraft.temporary_password || null,
-        internal_notes: studentDraft.internal_notes || null,
-        plan_id: studentDraft.plan_id || null,
-        membership_start_date: studentDraft.membership_start_date || null,
-        membership_end_date: studentDraft.membership_start_date ? addDays(studentDraft.membership_start_date, 30) : null,
-      },
-    })
-
-    setIsCreatingStudent(false)
-
-    if (error || !data?.ok) {
-      setMessage(data?.message || 'No pudimos crear el alumno. Revisa la Edge Function y tu sesion admin.')
+    if (!result.success) {
+      showError(result.message || 'No pudimos crear el alumno. Revisa la Edge Function y tu sesion admin.')
       return
     }
 
-    setMessageType('success')
-    setMessage('Alumno creado en Supabase Auth y profiles.')
+    showSuccess('Alumno creado en Supabase Auth y profiles.')
     setCreatedCredentials({
-      email: data.email,
-      password: data.temporary_password,
-      phone: data.phone,
+      email: result.data.email,
+      password: result.data.temporary_password,
+      phone: result.data.phone,
     })
-    setStudentDraft(emptyStudent)
-    refreshData()
+    setStudentDraft(createEmptyStudentDraft())
+    await reloadAffectedSections(result.affectedSections)
   }
 
   async function copyCredentials() {
@@ -1324,15 +1087,21 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       `Clave temporal: ${createdCredentials.password}`,
     ].join('\n')
 
-    await window.navigator.clipboard.writeText(text)
-    setMessageType('success')
-    setMessage('Credenciales copiadas. Recuerda: la clave temporal se muestra solo ahora.')
+    try {
+      await window.navigator.clipboard.writeText(text)
+      showSuccess('Credenciales copiadas. Recuerda: la clave temporal se muestra solo ahora.')
+    } catch {
+      showError('No pudimos copiar las credenciales. Revisa los permisos del navegador.')
+    }
   }
 
   async function copyBirthdayGreeting(birthday) {
-    await window.navigator.clipboard.writeText(buildBirthdayGreeting(birthday))
-    setMessageType('success')
-    setMessage(`Saludo de cumpleaños copiado para ${birthday.full_name}.`)
+    try {
+      await window.navigator.clipboard.writeText(buildBirthdayGreeting(birthday))
+      showSuccess(`Saludo de cumpleaños copiado para ${birthday.full_name}.`)
+    } catch {
+      showError('No pudimos copiar el saludo. Revisa los permisos del navegador.')
+    }
   }
 
   if (!activeUser && !isCheckingAccess) {
@@ -1374,25 +1143,26 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="k-card p-5">
-        <p className="k-pill inline-flex text-kupan-flame">Admin Supabase</p>
-        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Control real del box</h2>
-        <p className="mt-3 text-sm leading-6 text-white/60">
-          Panel conectado a Supabase. Los cambios quedan guardados en la base de datos y protegidos por RLS.
-        </p>
-        <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-5">
-          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.students}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Alumnos totales</p></div>
-          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.activeStudents}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Alumnos activos</p></div>
-          <div className="k-stat"><p className="text-2xl font-black text-kupan-flame">{totals.expiredMemberships}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Planes vencidos</p></div>
-          <div className="k-stat"><p className="text-2xl font-black text-white">{totals.todayReservations}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Reservas hoy</p></div>
-          <div className="k-stat"><p className="text-2xl font-black text-kupan-flame">{totals.lowTokenMemberships}</p><p className="text-[0.68rem] font-black uppercase text-white/60">Tokens bajos</p></div>
+    <div className="space-y-6 pb-24 lg:pb-0">
+      <AdminPageHeader
+        dateLabel={`${todayLabel} · ${formatDate(todayDate)}`}
+        greeting={`Hola ${activeUser?.name ?? 'equipo KUPAN'}, revisa lo importante de hoy y resuelve rápido lo pendiente.`}
+        status={todayClasses === null ? 'No pudimos cargar clases o reservas. Actualiza datos para reintentar.' : todayClasses.length > 0 ? `${todayClasses.length} clase(s) programadas hoy · ${totals.todayReservations} reservas` : 'Hoy no hay clases activas programadas.'}
+        onAction={navigateAdmin}
+      />
+
+      <section className="k-card p-4">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Datos en vivo</p>
+            <p className="mt-1 text-sm font-bold leading-6 text-white/65">Panel conectado a Supabase y protegido por RLS.</p>
+          </div>
+          <button type="button" className="k-button min-h-12 w-full lg:w-auto" onClick={refreshData} disabled={isLoading || isRefreshing}>
+            {isLoading || isRefreshing ? 'Actualizando...' : 'Actualizar datos'}
+          </button>
         </div>
-        <button type="button" className="k-button mt-5 w-full" onClick={refreshData} disabled={isLoading}>
-          {isLoading ? 'Actualizando...' : 'Actualizar datos'}
-        </button>
         {lastUpdated ? (
-          <p className="mt-2 text-center text-xs font-bold uppercase tracking-[0.12em] text-white/45">
+          <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-white/50">
             Ultima actualizacion: {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(lastUpdated)}
           </p>
         ) : null}
@@ -1407,9 +1177,17 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         {sectionErrors.length > 0 ? (
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {sectionErrors.map((error) => (
-              <p key={`${error.key}-${error.label}`} className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-xs font-bold leading-5 text-white">
-                {error.message}
-              </p>
+              <div key={`${error.key}-${error.label}`} className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-xs font-bold leading-5 text-white">
+                <p>{error.message}</p>
+                <button
+                  type="button"
+                  className="mt-2 rounded-md border border-white/15 bg-white/10 px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.12em] text-white disabled:opacity-50"
+                  disabled={Boolean(sectionLoading[error.key])}
+                  onClick={() => reloadSection(error.key)}
+                >
+                  {sectionLoading[error.key] ? 'Reintentando...' : 'Reintentar'}
+                </button>
+              </div>
             ))}
           </div>
         ) : null}
@@ -1420,7 +1198,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           <label className="block">
             <span className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Buscar alumno</span>
             <input
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/35 focus:border-kupan-ember"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-base font-bold text-white outline-none transition placeholder:text-white/55 focus:border-kupan-ember"
               type="search"
               value={studentQuery}
               placeholder="Nombre, email o telefono..."
@@ -1446,14 +1224,15 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       </section>
 
       <div className="grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
-        <AdminSidebar
-          modules={adminNavigationModules}
-          openModules={openModules}
-          onToggleModule={toggleAdminModule}
-          activeSection={activeSection}
-          onNavigate={navigateAdmin}
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
+	        <AdminSidebar
+	          modules={adminNavigationModules}
+	          openModules={openModules}
+	          onToggleModule={toggleAdminModule}
+	          activeSection={activeSection}
+	          activeModuleId={currentModuleId}
+	          onNavigate={navigateAdmin}
+	          isCollapsed={isSidebarCollapsed}
+	          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
         />
 
         <div ref={contentTopRef} className="min-w-0 space-y-5 scroll-mt-28">
@@ -1477,7 +1256,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
               <label className="block">
                 <span className="sr-only">Busqueda rapida admin</span>
                 <input
-                  className="w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition placeholder:text-white/35 focus:border-kupan-ember"
+                  className="w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-base font-bold text-white outline-none transition placeholder:text-white/55 focus:border-kupan-ember"
                   type="search"
                   value={globalQuery}
                   placeholder="Buscar accion: alumno, pago, reservas, WOD..."
@@ -1506,574 +1285,196 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           </div>
 
       {activeSection === 'overview' ? (
-        <section className="grid gap-3 md:grid-cols-4">
-          <SmallRow title={`${totals.students} alumnos`} meta="Comunidad" detail="Perfiles registrados en Supabase." />
-          <SmallRow title={`${totals.activeMemberships} activas`} meta="Membresias" detail="Planes vigentes del box." />
-          <SmallRow title={`${totals.reservations} reservas`} meta="Agenda" detail="Reservas futuras confirmadas." />
-          <SmallRow title={`${adminData.prs.length} PR`} meta="Progreso" detail="Marcas recientes destacadas." />
-        </section>
+        <AdminOverviewModule
+          dashboardValues={dashboardValues}
+          dataStatus={{
+            profiles: hasDataError('profiles'),
+            reservations: hasDataError('reservations'),
+            schedule: hasDataError('schedule'),
+            memberships: hasDataError('memberships'),
+          }}
+          totals={totals}
+          todayClasses={todayClasses}
+          pendingAlerts={pendingAlerts}
+          upcomingExpirations={upcomingExpirations}
+          recentActivity={recentActivity}
+          featuredStudents={featuredStudents}
+          activeMembershipByProfile={activeMembershipByProfile}
+          onNavigate={navigateAdmin}
+          onDismissAlert={(alertId) => setDismissedAlertIds((current) => [...current, alertId])}
+        />
       ) : null}
 
       {activeSection === 'create-student' ? (
-        <div ref={createStudentRef} className="scroll-mt-28">
-        <AdminSection eyebrow="Crear alumno" title="Nuevo atleta KUPAN">
-          <form className="k-panel space-y-4 p-4" onSubmit={createStudent}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Nombre completo" value={studentDraft.full_name} required onChange={(value) => setStudentDraft((current) => ({ ...current, full_name: value }))} />
-              <Field label="Email" type="email" value={studentDraft.email} required onChange={(value) => setStudentDraft((current) => ({ ...current, email: value }))} />
-              <Field label="Fecha de nacimiento" type="date" value={studentDraft.birth_date} required onChange={(value) => setStudentDraft((current) => ({ ...current, birth_date: value }))} />
-              <Field label="Telefono opcional" type="tel" value={studentDraft.phone} onChange={(value) => setStudentDraft((current) => ({ ...current, phone: value }))} />
-              <SelectField label="Nivel" value={studentDraft.level} onChange={(value) => setStudentDraft((current) => ({ ...current, level: value }))}>
-                {['Iniciado', 'Rookie', 'Scaled', 'RX'].map((level) => <option key={level} className="bg-kupan-black" value={level}>{level}</option>)}
-              </SelectField>
-              <SelectField label="Estado" value={studentDraft.status} onChange={(value) => setStudentDraft((current) => ({ ...current, status: value }))}>
-                {['active', 'inactive'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
-              </SelectField>
-              <Field label="Contraseña temporal opcional" type="text" value={studentDraft.temporary_password} onChange={(value) => setStudentDraft((current) => ({ ...current, temporary_password: value }))} />
-              <SelectField label="Plan inicial opcional" value={studentDraft.plan_id} onChange={(value) => setStudentDraft((current) => ({ ...current, plan_id: value }))}>
-                <option className="bg-kupan-black" value="">Sin plan inicial</option>
-                {adminData.plans.filter((plan) => plan.active).map((plan) => <option key={plan.id} className="bg-kupan-black" value={plan.id}>{plan.name}</option>)}
-              </SelectField>
-              <Field label="Inicio plan" type="date" value={studentDraft.membership_start_date} onChange={(value) => setStudentDraft((current) => ({ ...current, membership_start_date: value }))} />
-              <Field label="Vencimiento plan" type="date" value={studentDraft.membership_start_date ? addDays(studentDraft.membership_start_date, 30) : ''} onChange={() => {}} />
-            </div>
-            <TextArea label="Observaciones internas" value={studentDraft.internal_notes} onChange={(value) => setStudentDraft((current) => ({ ...current, internal_notes: value }))} />
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
-              Esta accion llama una Edge Function segura. Las credenciales privadas viven solo en Supabase, nunca en el frontend.
-            </div>
-            <button type="submit" className="k-button w-full" disabled={isCreatingStudent}>
-              {isCreatingStudent ? 'Creando alumno...' : 'Crear alumno'}
-            </button>
-          </form>
-
-          {createdCredentials ? (
-            <div className="k-panel space-y-4 border-kupan-ember/40 bg-kupan-ember/10 p-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Credenciales temporales</p>
-                <h3 className="mt-2 text-2xl font-black uppercase text-white">Mostrar una sola vez</h3>
-                <p className="mt-2 text-sm leading-6 text-white/60">Guarda o envia estos datos ahora. La contraseña no queda visible en la app.</p>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/30 p-4">
-                <p className="text-sm font-black text-white">Correo: {createdCredentials.email}</p>
-                <p className="mt-2 text-sm font-black text-white">Clave temporal: {createdCredentials.password}</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button type="button" className="k-button-secondary" onClick={copyCredentials}>Copiar credenciales</button>
-                {createdCredentials.phone ? (
-                  <a className="k-button text-center" href={buildWhatsAppUrl(createdCredentials.phone, createdCredentials)} target="_blank" rel="noreferrer">
-                    Enviar por WhatsApp
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-        </AdminSection>
-        </div>
+        <AdminCreateStudentModule
+          formRef={createStudentRef}
+          draft={studentDraft}
+          plans={adminData.plans}
+          createdCredentials={createdCredentials}
+          isCreating={isCreatingStudent}
+          onDraftChange={setStudentDraft}
+          onSubmit={createStudent}
+          onCopyCredentials={copyCredentials}
+          getWhatsAppUrl={buildWhatsAppUrl}
+          addDays={addDays}
+        />
       ) : null}
 
       {activeSection === 'students' ? (
-        <AdminSection eyebrow="Alumnos" title="Perfiles registrados">
-          {filteredProfiles.length === 0 ? (
-            <SmallRow title="Sin resultados" meta="Filtro activo" detail="No encontramos alumnos con esa busqueda o filtro." />
-          ) : null}
-          {filteredProfiles.map((student) => (
-            <SmallRow key={student.id} title={student.full_name} meta={`${student.level} · ${student.status}`} detail={`${student.email}${student.phone ? ` · ${student.phone}` : ''}`} />
-          ))}
-        </AdminSection>
+        <AdminStudentsModule profiles={filteredProfiles} />
       ) : null}
 
       {activeSection === 'plans' ? (
-        <AdminSection eyebrow="Planes" title="Planes y precios">
-          <form className="k-panel grid gap-3 p-4 sm:grid-cols-2" onSubmit={savePlan}>
-            <Field label="Nombre" value={planDraft.name} required onChange={(value) => setPlanDraft((current) => ({ ...current, name: value }))} />
-            <Field label="Precio CLP" type="number" value={planDraft.price} required onChange={(value) => setPlanDraft((current) => ({ ...current, price: value }))} />
-            <Field label="Clases por semana" type="number" value={planDraft.classes_per_week} onChange={(value) => setPlanDraft((current) => ({ ...current, classes_per_week: value }))} />
-            <ToggleField label="Ilimitado" checked={planDraft.is_unlimited} onChange={(value) => setPlanDraft((current) => ({ ...current, is_unlimited: value }))} />
-            <ToggleField label="Activo" checked={planDraft.active} onChange={(value) => setPlanDraft((current) => ({ ...current, active: value }))} />
-            <button type="submit" className="k-button sm:col-span-2">{planDraft.id ? 'Guardar plan' : 'Crear plan'}</button>
-          </form>
-          {adminData.plans.map((plan) => (
-            <SmallRow
-              key={plan.id}
-              title={`${plan.name} · ${formatMoney(plan.price)}`}
-              meta={plan.active ? 'Activo' : 'Inactivo'}
-              detail={plan.is_unlimited ? 'Clases ilimitadas' : `${plan.classes_per_week ?? 'Sin'} clases por semana`}
-              action={(
-                <div className="grid shrink-0 gap-2">
-                  <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => editPlan(plan)}>Editar</button>
-                  <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => togglePlan(plan)}>{plan.active ? 'Desactivar' : 'Activar'}</button>
-                </div>
-              )}
-            />
-          ))}
-        </AdminSection>
+        <AdminPlansModule
+          draft={planDraft}
+          plans={adminData.plans}
+          onDraftChange={setPlanDraft}
+          onSave={savePlan}
+          onEdit={editPlan}
+          onToggle={togglePlan}
+          formatMoney={formatMoney}
+          isSaving={isSavingPlan}
+        />
       ) : null}
 
       {activeSection === 'memberships' ? (
-        <AdminSection eyebrow="Membresias" title="Gestion real de planes">
-          <div className="grid gap-2 sm:grid-cols-4">
-            <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => scrollToTarget('memberships-overview')}>Planes activos</button>
-            <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => scrollToTarget('membership-activate')}>Activar plan</button>
-            <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => scrollToTarget('membership-history')}>Historial</button>
-            <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => scrollToTarget('token-movements')}>Tokens</button>
-          </div>
-
-          <div ref={membershipsOverviewRef} className="grid scroll-mt-28 gap-3 md:grid-cols-2">
-            {filteredProfiles.map((profile) => {
-              const activeMembership = activeMembershipByProfile.get(profile.id)
-              const tokens = activeMembership ? getMembershipTokens(activeMembership) : null
-              return (
-                <article key={profile.id} className="k-panel p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">{activeMembership ? activeMembership.plan?.name ?? 'Plan KUPAN' : 'Sin plan activo'}</p>
-                      <h3 className="mt-2 break-words text-lg font-black uppercase text-white">{profile.full_name}</h3>
-                      <p className="mt-1 text-sm leading-6 text-white/60">{profile.email}</p>
-                    </div>
-                    <span className={`k-pill shrink-0 ${
-                      activeMembership?.status === 'active' ? 'text-kupan-flame' : activeMembership ? 'text-white/60' : 'text-kupan-red'
-                    }`}
-                    >
-                      {activeMembership?.status ?? 'sin plan'}
-                    </span>
-                  </div>
-
-                  {activeMembership ? (
-                    <>
-                      <div className="mt-4 grid grid-cols-4 gap-2">
-                        <div className="rounded-lg border border-white/10 bg-black/25 p-3">
-                          <p className="text-[0.62rem] font-black uppercase text-white/50">Total</p>
-                          <p className="mt-1 text-sm font-black uppercase text-white">{tokens.total}</p>
-                        </div>
-                        <div className="rounded-lg border border-white/10 bg-black/25 p-3">
-                          <p className="text-[0.62rem] font-black uppercase text-white/50">Usados</p>
-                          <p className="mt-1 text-sm font-black uppercase text-white">{tokens.used}</p>
-                        </div>
-                        <div className="rounded-lg border border-white/10 bg-black/25 p-3">
-                          <p className="text-[0.62rem] font-black uppercase text-white/50">Disponibles</p>
-                          <p className="mt-1 text-sm font-black uppercase text-kupan-flame">{tokens.remaining}</p>
-                        </div>
-                        <div className="rounded-lg border border-white/10 bg-black/25 p-3">
-                          <p className="text-[0.62rem] font-black uppercase text-white/50">Vence</p>
-                          <p className="mt-1 text-xs font-black uppercase text-white">{formatDate(activeMembership.end_date)}</p>
-                        </div>
-                      </div>
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        <button type="button" className="k-button px-3 py-2 text-xs" onClick={() => renewMembership(activeMembership)}>Renovar plan</button>
-                        <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => adjustMembershipTokens(activeMembership)}>Ajustar tokens usados</button>
-                        {activeMembership.status === 'paused' ? (
-                          <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(activeMembership, 'active')}>Activar plan</button>
-                        ) : (
-                          <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(activeMembership, 'paused')}>Congelar / pausar</button>
-                        )}
-                        <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => extendMembershipSevenDays(activeMembership)}>Extender 7 dias</button>
-                        <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => startEditMembership(activeMembership)}>Editar avanzado</button>
-                        {activeMembership.status !== 'cancelled' ? (
-                          <button type="button" className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white" onClick={() => updateMembershipStatus(activeMembership, 'cancelled')}>Cancelar plan</button>
-                        ) : null}
-                      </div>
-                    </>
-                  ) : (
-                    <button type="button" className="k-button mt-4 w-full" onClick={() => prepareMembershipActivation(profile.id)}>
-                      Activar plan
-                    </button>
-                  )}
-                </article>
-              )
-            })}
-            {filteredProfiles.length === 0 ? (
-              <SmallRow title="Sin resultados" meta="Filtro activo" detail="No encontramos alumnos con esa busqueda o filtro." />
-            ) : null}
-          </div>
-
-          <form ref={membershipActivateRef} className="k-panel grid scroll-mt-28 gap-3 p-4 sm:grid-cols-2" onSubmit={saveMembership}>
-            <div className="sm:col-span-2">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Activar plan</p>
-              <p className="mt-1 text-sm leading-6 text-white/60">Los planes duran 30 dias. Al activar una membresia, cualquier plan activo anterior del alumno pasa a historial como expired.</p>
-            </div>
-            <SelectField label="Alumno" value={membershipDraft.profile_id} onChange={(value) => setMembershipDraft((current) => ({ ...current, profile_id: value }))}>
-              <option className="bg-kupan-black" value="">Seleccionar alumno</option>
-              {adminData.profiles.map((profile) => <option key={profile.id} className="bg-kupan-black" value={profile.id}>{profile.full_name}</option>)}
-            </SelectField>
-            <SelectField label="Plan" value={membershipDraft.plan_id} onChange={(value) => {
-              const selectedPlan = adminData.plans.find((plan) => plan.id === value)
-              setMembershipDraft((current) => ({ ...current, plan_id: value, classes_total: getPlanTokenTotal(selectedPlan), classes_used: '' }))
-            }}>
-              <option className="bg-kupan-black" value="">Seleccionar plan</option>
-              {adminData.plans.map((plan) => <option key={plan.id} className="bg-kupan-black" value={plan.id}>{plan.name}</option>)}
-            </SelectField>
-            <Field label="Inicio" type="date" value={membershipDraft.start_date} required onChange={(value) => setMembershipDraft((current) => ({ ...current, start_date: value, end_date: current.end_date || addDays(value, 30) }))} />
-            <Field label="Vencimiento" type="date" value={addDays(membershipDraft.start_date, 30)} required onChange={() => {}} />
-            <Field label="Tokens del plan" type="number" value={membershipDraft.classes_total} onChange={(value) => setMembershipDraft((current) => ({ ...current, classes_total: value }))} />
-            <Field label="Tokens ya usados" type="number" value={selectedMembershipPlan?.is_unlimited ? '0' : membershipDraft.classes_used} onChange={(value) => setMembershipDraft((current) => ({ ...current, classes_used: value }))} />
-            <Field label="Proveedor pago" value={membershipDraft.payment_provider} onChange={(value) => setMembershipDraft((current) => ({ ...current, payment_provider: value }))} />
-            <Field label="Referencia pago" value={membershipDraft.payment_reference} onChange={(value) => setMembershipDraft((current) => ({ ...current, payment_reference: value }))} />
-            <Field label="Notas" value={membershipDraft.notes} onChange={(value) => setMembershipDraft((current) => ({ ...current, notes: value }))} />
-            <div className="rounded-lg border border-white/10 bg-black/30 p-4 sm:col-span-2">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Activar con tokens ya usados</p>
-              <p className="mt-2 text-sm font-bold leading-6 text-white/70">
-                Tokens del plan: {selectedMembershipPlan?.is_unlimited ? 'Ilimitado' : migrationTotalTokens || 0} · Tokens ya usados: {migrationUsedTokens} · Disponibles al activar: {migrationAvailableTokens}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-white/45">
-                Si el alumno venia entrenando antes de usar la app, registra aqui sus clases usadas. Quedara un movimiento en el historial.
-              </p>
-            </div>
-            <button type="submit" className="k-button sm:col-span-2">Activar con tokens ya usados</button>
-            <button type="button" className="k-button-secondary sm:col-span-2" onClick={simulateApprovedPayment}>
-              Simular pago aprobado
-            </button>
-          </form>
-
-          {membershipEditDraft.id ? (
-            <form ref={membershipEditRef} className="k-panel grid scroll-mt-28 gap-3 border-kupan-ember/40 bg-kupan-ember/10 p-4 sm:grid-cols-2" onSubmit={saveMembershipEdit}>
-              <div className="sm:col-span-2">
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Editar membresia</p>
-                <p className="mt-1 text-sm leading-6 text-white/60">Cambia plan, pausa, cancela, reactiva, extiende vencimiento o actualiza observaciones.</p>
-              </div>
-              <SelectField label="Plan" value={membershipEditDraft.plan_id} onChange={(value) => {
-                const nextPlan = adminData.plans.find((plan) => plan.id === value)
-                setMembershipEditDraft((current) => ({
-                  ...current,
-                  plan_id: value,
-                  classes_total: nextPlan?.is_unlimited ? '' : getPlanTokenTotal(nextPlan),
-                  classes_used: nextPlan?.is_unlimited ? 0 : current.classes_used,
-                }))
-              }}>
-                {adminData.plans.map((plan) => <option key={plan.id} className="bg-kupan-black" value={plan.id}>{plan.name}</option>)}
-              </SelectField>
-              <SelectField label="Estado" value={membershipEditDraft.status} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, status: value }))}>
-                {['active', 'expired', 'paused', 'cancelled'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
-              </SelectField>
-              <Field label="Inicio" type="date" value={membershipEditDraft.start_date} required onChange={(value) => setMembershipEditDraft((current) => ({ ...current, start_date: value }))} />
-              <Field label="Vencimiento" type="date" value={addDays(membershipEditDraft.start_date, 30)} required onChange={() => {}} />
-              <Field label="Tokens totales" type="number" value={membershipEditDraft.classes_total} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, classes_total: value }))} />
-              <Field label="Tokens usados" type="number" value={membershipEditDraft.classes_used} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, classes_used: value }))} />
-              <SelectField label="Pago" value={membershipEditDraft.payment_status} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, payment_status: value }))}>
-                {['pending', 'paid', 'failed', 'refunded'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
-              </SelectField>
-              <Field label="Proveedor pago" value={membershipEditDraft.payment_provider} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, payment_provider: value }))} />
-              <Field label="Referencia pago" value={membershipEditDraft.payment_reference} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, payment_reference: value }))} />
-              <div className="sm:col-span-2">
-                <Field label="Observaciones" value={membershipEditDraft.notes} onChange={(value) => setMembershipEditDraft((current) => ({ ...current, notes: value }))} />
-              </div>
-              <button type="submit" className="k-button">Guardar cambios</button>
-              <button type="button" className="k-button-secondary" onClick={() => setMembershipEditDraft(emptyMembershipEdit)}>Cerrar edicion</button>
-            </form>
-          ) : null}
-
-          <div ref={membershipHistoryRef} className="scroll-mt-28">
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Historial de membresias</p>
-            <div className="space-y-3">
-          {adminData.memberships.map((membership) => {
-            const tokens = getMembershipTokens(membership)
-            return (
-              <SmallRow
-                key={membership.id}
-                title={`${membership.profile?.full_name ?? 'Alumno'} · ${membership.plan?.name ?? 'Plan'}`}
-                meta={`${membership.status} · pago ${membership.payment_status ?? 'sin estado'} · vence ${formatDate(membership.end_date)}`}
-                detail={`Inicio ${formatDate(membership.start_date)} · tokens ${tokens.used}/${tokens.total} · disponibles ${tokens.remaining}${membership.notes ? ` · ${membership.notes}` : ''}`}
-                action={(
-                  <div className="grid shrink-0 gap-2">
-                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => renewMembership(membership)}>Renovar</button>
-                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => adjustMembershipTokens(membership)}>Tokens</button>
-                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => extendMembershipSevenDays(membership)}>+7 dias</button>
-                    <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => startEditMembership(membership)}>Avanzado</button>
-                    {membership.status === 'active' ? (
-                      <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(membership, 'paused')}>Pausar</button>
-                    ) : (
-                      <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => updateMembershipStatus(membership, 'active')}>Activar</button>
-                    )}
-                    {membership.status !== 'cancelled' ? (
-                      <button type="button" className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white" onClick={() => updateMembershipStatus(membership, 'cancelled')}>Cancelar</button>
-                    ) : null}
-                  </div>
-                )}
-              />
-            )
-          })}
-            </div>
-          </div>
-
-          <div ref={tokenMovementsRef} className="scroll-mt-28">
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Movimientos de tokens</p>
-            <div className="space-y-3">
-              {adminData.tokenMovements.map((movement) => (
-                <SmallRow
-                  key={movement.id}
-                  title={`${movement.profile?.full_name ?? 'Alumno'} · ${movement.movement_type}`}
-                  meta={`${movement.quantity > 0 ? '+' : ''}${movement.quantity} token · ${new Date(movement.created_at).toLocaleString('es-CL')}`}
-                  detail={movement.reason ?? 'Movimiento registrado'}
-                />
-              ))}
-            </div>
-          </div>
-        </AdminSection>
+        <AdminMembershipsModule
+          profiles={filteredProfiles}
+          plans={adminData.plans}
+          memberships={adminData.memberships}
+          tokenMovements={adminData.tokenMovements}
+          activeMembershipByProfile={activeMembershipByProfile}
+          refs={{
+            overview: membershipsOverviewRef,
+            activate: membershipActivateRef,
+            edit: membershipEditRef,
+            history: membershipHistoryRef,
+            tokenMovements: tokenMovementsRef,
+          }}
+          draft={membershipDraft}
+          editDraft={membershipEditDraft}
+          selectedMembershipPlan={selectedMembershipPlan}
+          migrationTotalTokens={migrationTotalTokens}
+          migrationUsedTokens={migrationUsedTokens}
+          migrationAvailableTokens={migrationAvailableTokens}
+          isSavingActivation={isSavingMembership}
+          isSavingEdit={isSavingMembershipEdit}
+          isSimulatingPayment={isSimulatingPayment}
+          actions={{
+            setDraft: setMembershipDraft,
+            setEditDraft: setMembershipEditDraft,
+            save: saveMembership,
+            saveEdit: saveMembershipEdit,
+            closeEdit: () => setMembershipEditDraft(createEmptyMembershipEditDraft()),
+            simulatePayment: simulateApprovedPayment,
+            renew: renewMembership,
+            adjustTokens: adjustMembershipTokens,
+            updateStatus: updateMembershipStatus,
+            extendSevenDays: extendMembershipSevenDays,
+            startEdit: startEditMembership,
+            prepareActivation: prepareMembershipActivation,
+          }}
+          formatDate={formatDate}
+          addDays={addDays}
+          getPlanTokenTotal={getPlanTokenTotal}
+          onScrollToTarget={scrollToTarget}
+        />
       ) : null}
 
       {activeSection === 'reservations' ? (
-        <AdminSection eyebrow="Reservas" title="Reservas activas">
-          <form ref={manualReservationRef} className="k-panel grid scroll-mt-28 gap-3 p-4 sm:grid-cols-2" onSubmit={saveManualReservation}>
-            <div className="sm:col-span-2">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Agregar alumno a clase</p>
-              <p className="mt-1 text-sm leading-6 text-white/60">
-                Toma reserva por un alumno desde el box. Si tiene plan activo se descuenta token; si es Full no descuenta.
-              </p>
-            </div>
-            <Field
-              label="Fecha"
-              type="date"
-              required
-              value={manualReservationDraft.reservation_date}
-              onChange={(value) => setManualReservationDraft((current) => ({ ...current, reservation_date: value }))}
-            />
-            <SelectField
-              label="Horario / clase"
-              value={manualReservationDraft.class_schedule_id}
-              onChange={(value) => setManualReservationDraft((current) => ({ ...current, class_schedule_id: value }))}
-            >
-              <option className="bg-kupan-black" value="">Seleccionar clase</option>
-              {adminData.schedule.filter((classItem) => classItem.active).map((classItem) => (
-                <option key={classItem.id} className="bg-kupan-black" value={classItem.id}>
-                  Dia {classItem.day_of_week} · {toTime(classItem.time)} · {classItem.class_name}
-                </option>
-              ))}
-            </SelectField>
-            <Field
-              label="Buscar alumno"
-              value={manualReservationDraft.student_query}
-              onChange={(value) => setManualReservationDraft((current) => ({ ...current, student_query: value }))}
-            />
-            <SelectField
-              label="Alumno"
-              value={manualReservationDraft.profile_id}
-              onChange={(value) => setManualReservationDraft((current) => ({ ...current, profile_id: value }))}
-            >
-              <option className="bg-kupan-black" value="">Seleccionar alumno</option>
-              {manualReservationStudents.map((profile) => (
-                <option key={profile.id} className="bg-kupan-black" value={profile.id}>
-                  {profile.full_name} · {profile.email}
-                </option>
-              ))}
-            </SelectField>
-            <div className="rounded-lg border border-white/10 bg-black/25 p-4 sm:col-span-2">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Estado del alumno</p>
-              {selectedManualProfile ? (
-                <p className="mt-2 text-sm font-bold leading-6 text-white/70">
-                  {selectedManualProfile.full_name} · {selectedManualMembership ? `plan ${selectedManualMembership.plan?.name ?? 'activo'} · tokens ${selectedManualTokens?.used}/${selectedManualTokens?.total} · disponibles ${selectedManualTokens?.remaining}` : 'sin plan activo'}
-                </p>
-              ) : (
-                <p className="mt-2 text-sm font-bold leading-6 text-white/60">Busca y selecciona un alumno para revisar su plan.</p>
-              )}
-            </div>
-            <div className="sm:col-span-2">
-              <TextArea
-                label="Nota opcional"
-                rows={3}
-                value={manualReservationDraft.note}
-                onChange={(value) => setManualReservationDraft((current) => ({ ...current, note: value }))}
-              />
-            </div>
-            <ToggleField
-              label="Permitir sin plan activo"
-              checked={manualReservationDraft.allow_without_membership}
-              onChange={(value) => setManualReservationDraft((current) => ({ ...current, allow_without_membership: value }))}
-            />
-            <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-xs font-bold leading-5 text-white/55">
-              Sobrecupo queda desactivado por ahora. Si la clase esta completa, Supabase bloqueara la reserva.
-            </div>
-            <button type="submit" className="k-button sm:col-span-2" disabled={isSavingManualReservation}>
-              {isSavingManualReservation ? 'Agregando...' : 'Agregar a clase'}
-            </button>
-          </form>
-
-          {adminData.reservations.map((reservation) => {
-            const isAttended = reservation.status === 'attended'
-            const isNoShow = reservation.status === 'no_show'
-            const isCancelled = reservation.status === 'cancelled'
-
-            return (
-              <SmallRow
-                key={reservation.id}
-                title={`${reservation.class_schedule?.class_name ?? 'Clase'} · ${toTime(reservation.class_schedule?.time)}`}
-                meta={`${formatDate(reservation.reservation_date)} · ${reservation.status}`}
-                detail={`${reservation.profile?.full_name ?? 'Alumno'} · Coach ${reservation.class_schedule?.coach ?? 'KUPAN'} · token ${reservation.token_charged ? 'cobrado' : 'no descuenta'}${reservation.notes ? ` · ${reservation.notes}` : ''}`}
-                action={(
-                  <div className="grid shrink-0 gap-2">
-                    <button
-                      type="button"
-                      className={`k-button-secondary px-3 py-2 text-xs ${isAttended ? 'border-emerald-400/40 bg-emerald-400/15 text-white' : ''}`}
-                      disabled={isAttended || isCancelled}
-                      onClick={() => updateReservationStatus(reservation.id, 'attended')}
-                    >
-                      {isAttended ? 'Asistencia OK' : 'Asistio'}
-                    </button>
-                    <button
-                      type="button"
-                      className={`k-button-secondary px-3 py-2 text-xs ${isNoShow ? 'border-kupan-flame/40 bg-kupan-flame/15 text-white' : ''}`}
-                      disabled={isNoShow || isCancelled}
-                      onClick={() => updateReservationStatus(reservation.id, 'no_show')}
-                    >
-                      {isNoShow ? 'No show OK' : 'No show'}
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white disabled:opacity-50"
-                      disabled={isAttended || isNoShow || isCancelled}
-                      onClick={() => updateReservationStatus(reservation.id, 'cancelled')}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                )}
-              />
-            )
-          })}
-        </AdminSection>
+        <AdminReservationsModule
+          formRef={manualReservationRef}
+          draft={manualReservationDraft}
+          scheduleItems={adminData.schedule}
+          reservations={adminData.reservations}
+          students={manualReservationStudents}
+          selectedProfile={selectedManualProfile}
+          selectedMembership={selectedManualMembership}
+          selectedTokens={selectedManualTokens}
+          isSaving={isSavingManualReservation}
+          onDraftChange={setManualReservationDraft}
+          onSave={saveManualReservation}
+          onUpdateStatus={updateReservationStatus}
+          formatDate={formatDate}
+          toTime={toTime}
+        />
       ) : null}
 
       {activeSection === 'wod' ? (
-        <AdminSection eyebrow="WOD" title="Programacion diaria">
-          <form className="k-panel space-y-3 p-4" onSubmit={saveWod}>
-            <Field label="Fecha" type="date" value={wodDraft.date} required onChange={(value) => setWodDraft((current) => ({ ...current, date: value }))} />
-            <Field label="Titulo" value={wodDraft.title} onChange={(value) => setWodDraft((current) => ({ ...current, title: value }))} />
-            <TextArea label="Warm up" value={wodDraft.warmup} onChange={(value) => setWodDraft((current) => ({ ...current, warmup: value }))} />
-            <TextArea label="Skill / Strength" value={wodDraft.strength} onChange={(value) => setWodDraft((current) => ({ ...current, strength: value }))} />
-            <TextArea label="WOD" value={wodDraft.workout} onChange={(value) => setWodDraft((current) => ({ ...current, workout: value }))} />
-            <Field label="Time cap" value={wodDraft.time_cap} onChange={(value) => setWodDraft((current) => ({ ...current, time_cap: value }))} />
-            <TextArea label="Notas" value={wodDraft.notes} onChange={(value) => setWodDraft((current) => ({ ...current, notes: value }))} />
-            <button type="submit" className="k-button w-full">Guardar WOD</button>
-          </form>
-          {adminData.wod.map((item) => (
-            <SmallRow key={item.id} title={item.title || 'WOD KUPAN'} meta={formatDate(item.date)} detail={item.time_cap || item.workout} />
-          ))}
-        </AdminSection>
+        <AdminWodModule
+          draft={wodDraft}
+          wodItems={adminData.wod}
+          onDraftChange={setWodDraft}
+          onSave={saveWod}
+          formatDate={formatDate}
+          isSaving={isSavingWod}
+          draftRecovery={{
+            hasStoredDraft: hasStoredWodDraft,
+            metadata: storedWodDraftMetadata,
+            status: storedWodDraftStatus,
+            isDirty: isWodDraftDirty,
+            storageError: wodDraftStorageError,
+            onRecover: recoverWodDraft,
+            onDiscard: discardWodDraft,
+            onSaveLocal: saveWodDraftLocally,
+          }}
+        />
       ) : null}
 
       {activeSection === 'schedule' ? (
-        <AdminSection eyebrow="Horarios" title="Clases del box">
-          <form className="k-panel grid gap-3 p-4 sm:grid-cols-2" onSubmit={saveSchedule}>
-            <Field label="Dia 1-7" type="number" value={scheduleDraft.day_of_week} required onChange={(value) => setScheduleDraft((current) => ({ ...current, day_of_week: value }))} />
-            <Field label="Hora" type="time" value={scheduleDraft.time} required onChange={(value) => setScheduleDraft((current) => ({ ...current, time: value }))} />
-            <Field label="Clase" value={scheduleDraft.class_name} required onChange={(value) => setScheduleDraft((current) => ({ ...current, class_name: value }))} />
-            <Field label="Coach" value={scheduleDraft.coach} onChange={(value) => setScheduleDraft((current) => ({ ...current, coach: value }))} />
-            <Field label="Cupos maximos" type="number" value={scheduleDraft.max_spots} onChange={(value) => setScheduleDraft((current) => ({ ...current, max_spots: value }))} />
-            <ToggleField label="Activo" checked={scheduleDraft.active} onChange={(value) => setScheduleDraft((current) => ({ ...current, active: value }))} />
-            <button type="submit" className="k-button sm:col-span-2">{scheduleDraft.id ? 'Guardar horario' : 'Crear horario'}</button>
-          </form>
-          {adminData.schedule.map((item) => (
-            <SmallRow
-              key={item.id}
-              title={`${item.class_name} · ${toTime(item.time)}`}
-              meta={`Dia ${item.day_of_week} · ${item.active ? 'Activo' : 'Inactivo'}`}
-              detail={`Coach ${item.coach ?? 'KUPAN'} · ${item.max_spots} cupos`}
-              action={(
-                <div className="grid shrink-0 gap-2">
-                  <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => editSchedule(item)}>Editar</button>
-                  <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => toggleSchedule(item)}>{item.active ? 'Pausar' : 'Activar'}</button>
-                </div>
-              )}
-            />
-          ))}
-        </AdminSection>
+        <AdminScheduleModule
+          draft={scheduleDraft}
+          scheduleItems={adminData.schedule}
+          onDraftChange={setScheduleDraft}
+          onSave={saveSchedule}
+          onEdit={editSchedule}
+          onToggle={toggleSchedule}
+          toTime={toTime}
+          isSaving={isSavingSchedule}
+        />
       ) : null}
 
       {activeSection === 'community' ? (
-        <AdminSection eyebrow="Comunidad" title="Eventos y noticias">
-          <form className="k-panel grid gap-3 p-4 sm:grid-cols-2" onSubmit={savePost}>
-            <SelectField label="Tipo" value={postDraft.type} onChange={(value) => setPostDraft((current) => ({ ...current, type: value }))}>
-              {['noticia', 'evento', 'ranking', 'comunidad'].map((type) => <option key={type} className="bg-kupan-black" value={type}>{type}</option>)}
-            </SelectField>
-            <Field label="Fecha evento" type="date" value={postDraft.event_date} onChange={(value) => setPostDraft((current) => ({ ...current, event_date: value }))} />
-            <Field label="Titulo" value={postDraft.title} required onChange={(value) => setPostDraft((current) => ({ ...current, title: value }))} />
-            <ToggleField label="Activo" checked={postDraft.active} onChange={(value) => setPostDraft((current) => ({ ...current, active: value }))} />
-            <div className="sm:col-span-2">
-              <TextArea label="Contenido" value={postDraft.content} onChange={(value) => setPostDraft((current) => ({ ...current, content: value }))} />
-            </div>
-            <button type="submit" className="k-button sm:col-span-2">{postDraft.id ? 'Guardar publicacion' : 'Crear publicacion'}</button>
-          </form>
-          {adminData.posts.map((post) => (
-            <SmallRow
-              key={post.id}
-              title={post.title}
-              meta={`${post.type ?? 'post'} · ${post.active ? 'Activo' : 'Inactivo'}`}
-              detail={post.content}
-              action={(
-                <div className="grid shrink-0 gap-2">
-                  <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => editPost(post)}>Editar</button>
-                  <button type="button" className="k-button-secondary px-3 py-2 text-xs" onClick={() => togglePost(post)}>{post.active ? 'Ocultar' : 'Activar'}</button>
-                </div>
-              )}
-            />
-          ))}
-        </AdminSection>
+        <AdminCommunicationsModule
+          draft={postDraft}
+          posts={adminData.posts}
+          onDraftChange={setPostDraft}
+          onSave={savePost}
+          onEdit={editPost}
+          onToggle={togglePost}
+          isSaving={isSavingPost}
+        />
       ) : null}
 
       {activeSection === 'texts' ? (
-        <AdminSection eyebrow="Textos principales" title="Copy compartido">
-          <form className="k-panel space-y-4 p-4" onSubmit={saveTexts}>
-            <Field label="Inicio · etiqueta" value={textDraft.homeEyebrow} onChange={(value) => setTextDraft((current) => ({ ...current, homeEyebrow: value }))} />
-            <Field label="Inicio · titulo" value={textDraft.homeTitle} onChange={(value) => setTextDraft((current) => ({ ...current, homeTitle: value }))} />
-            <TextArea label="Inicio · bajada" value={textDraft.homeBody} onChange={(value) => setTextDraft((current) => ({ ...current, homeBody: value }))} />
-            <Field label="Reservas · titulo" value={textDraft.reservationsTitle} onChange={(value) => setTextDraft((current) => ({ ...current, reservationsTitle: value }))} />
-            <TextArea label="Reservas · bajada" value={textDraft.reservationsBody} onChange={(value) => setTextDraft((current) => ({ ...current, reservationsBody: value }))} />
-            <Field label="Comunidad · frase" value={textDraft.communityPhrase} onChange={(value) => setTextDraft((current) => ({ ...current, communityPhrase: value }))} />
-            <button type="submit" className="k-button w-full">Guardar textos en Supabase</button>
-          </form>
-        </AdminSection>
+        <AdminSettingsModule
+          textDraft={textDraft}
+          onTextChange={updateTextDraftField}
+          onSave={saveTexts}
+          isSaving={isSavingSettings}
+        />
       ) : null}
 
       {activeSection === 'birthdays' ? (
-        <AdminSection eyebrow="Cumpleanos" title="Celebraciones KUPAN">
-          <div>
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Cumpleanos del mes</p>
-            <div className="space-y-3">
-              {adminData.birthdays.map((birthday) => (
-                <SmallRow
-                  key={birthday.profile_id}
-                  title={birthday.full_name}
-                  meta={formatBirthdayDayMonth(birthday.birth_day, birthday.birth_month ?? new Date().getMonth() + 1)}
-                  detail={`${birthday.turning_age ? `Cumple ${birthday.turning_age} · ` : ''}Nivel ${birthday.level}`}
-                  action={<button type="button" className="k-button-secondary shrink-0 px-3 py-2 text-xs" onClick={() => copyBirthdayGreeting(birthday)}>Copiar saludo</button>}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-3 text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Proximos 30 dias</p>
-            <div className="space-y-3">
-              {adminData.upcomingBirthdays.map((birthday) => (
-                <SmallRow
-                  key={birthday.profile_id}
-                  title={birthday.full_name}
-                  meta={`${formatBirthdayDayMonth(birthday.birth_day, birthday.birth_month)} · faltan ${birthday.days_until} dias`}
-                  detail={`${birthday.turning_age ? `Cumple ${birthday.turning_age} · ` : ''}${birthday.phone ? `Telefono ${birthday.phone}` : 'Sin telefono registrado'}`}
-                  action={<button type="button" className="k-button-secondary shrink-0 px-3 py-2 text-xs" onClick={() => copyBirthdayGreeting(birthday)}>Copiar saludo</button>}
-                />
-              ))}
-              {adminData.upcomingBirthdays.length === 0 ? (
-                <p className="k-panel p-4 text-sm font-bold text-white/60">No hay cumpleanos en los proximos 30 dias.</p>
-              ) : null}
-            </div>
-          </div>
-        </AdminSection>
+        <AdminBirthdaysModule
+          birthdays={adminData.birthdays}
+          upcomingBirthdays={adminData.upcomingBirthdays}
+          formatBirthdayDayMonth={formatBirthdayDayMonth}
+          onCopyGreeting={copyBirthdayGreeting}
+        />
       ) : null}
 
       {activeSection === 'prs' ? (
-        <AdminSection eyebrow="PR destacados" title="Marcas de la comunidad">
-          {adminData.prs.map((record) => (
-            <SmallRow
-              key={record.id}
-              title={`${record.movement} · ${record.value} ${record.unit}`}
-              meta={formatDate(record.record_date)}
-              detail={`${record.profile?.full_name ?? 'Atleta KUPAN'}${record.notes ? ` · ${record.notes}` : ''}`}
-            />
-          ))}
-        </AdminSection>
+        <AdminPersonalRecordsModule records={adminData.prs} formatDate={formatDate} />
       ) : null}
-        </div>
-      </div>
-      <div className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-30 grid gap-2 lg:bottom-5">
+	        </div>
+	      </div>
+      <AdminMobileModuleNav
+        modules={adminNavigationModules}
+        activeModuleId={currentModuleId}
+        onNavigate={navigateAdmin}
+      />
+      <div className="fixed bottom-5 right-4 z-30 hidden gap-2 lg:grid">
         <button
           type="button"
           className="flex h-12 w-12 items-center justify-center rounded-full bg-kupan-ember text-xs font-black text-white shadow-glow transition hover:scale-105"

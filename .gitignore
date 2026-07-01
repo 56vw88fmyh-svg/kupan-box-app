@@ -5,6 +5,13 @@ dist/
 .DS_Store
 .env
 .env.local
+.env.e2e
+.env.staging.local
+.env.schema.local
+.staging-e2e-resources.json
 .env.*.local
 .env.functions
 supabase/.temp/
+playwright-report/
+test-results/
+playwright/.auth/
