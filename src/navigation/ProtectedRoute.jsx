@@ -14,5 +14,9 @@ export function ProtectedRoute({ authChecked, currentUser, routePath, children }
     return <Navigate to={target} replace />
   }
 
+  if (currentUser?.forcePasswordChange && routePath !== '/cambio-password-obligatorio') {
+    return <Navigate to="/cambio-password-obligatorio" replace />
+  }
+
   return children
 }

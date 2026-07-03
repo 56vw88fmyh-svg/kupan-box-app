@@ -1,7 +1,7 @@
 {
   "name": "kupan-pwa",
   "private": true,
-  "version": "1.0.11",
+  "version": "1.0.12",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "check": "eslint . && vite build",
-    "test": "node src/navigation/routes.test.js && node src/services/prMigrationService.test.js && node src/services/personalRecordsService.test.ts && node src/utils/adminUtilities.test.js && node src/utils/adminWodDraft.test.js && node src/hooks/admin/useAdminData.test.js && node src/hooks/admin/useAdminFeedback.test.js && node src/hooks/admin/useAdminWodDraft.test.js && node src/components/admin/modules/adminModules.test.js && node src/components/admin/forms/adminForms.test.js && node src/hooks/admin/adminMutations.test.js && node scripts/staging/stagingScripts.test.mjs && node scripts/schema/schemaSecurity.test.mjs",
+    "test": "node src/navigation/routes.test.js && node src/services/prMigrationService.test.js && node src/services/personalRecordsService.test.ts && node src/utils/passwordSecurity.test.js && node src/utils/adminUtilities.test.js && node src/utils/adminWodDraft.test.js && node src/hooks/admin/useAdminData.test.js && node src/hooks/admin/useAdminFeedback.test.js && node src/hooks/admin/useAdminWodDraft.test.js && node src/components/admin/modules/adminModules.test.js && node src/components/admin/forms/adminForms.test.js && node src/hooks/admin/adminMutations.test.js && node scripts/staging/stagingScripts.test.mjs && node scripts/schema/schemaSecurity.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",

@@ -18,6 +18,7 @@ const Coach = lazy(() => import('./pages/Coach.jsx').then((module) => ({ default
 const Community = lazy(() => import('./pages/Community.jsx').then((module) => ({ default: module.Community })))
 const Home = lazy(() => import('./pages/Home.jsx').then((module) => ({ default: module.Home })))
 const PersonalRecords = lazy(() => import('./pages/PersonalRecords.jsx').then((module) => ({ default: module.PersonalRecords })))
+const PasswordUpdate = lazy(() => import('./pages/PasswordUpdate.jsx').then((module) => ({ default: module.PasswordUpdate })))
 const Profile = lazy(() => import('./pages/Profile.jsx').then((module) => ({ default: module.Profile })))
 const Ranking = lazy(() => import('./pages/Ranking.jsx').then((module) => ({ default: module.Ranking })))
 const Reservations = lazy(() => import('./pages/Reservations.jsx').then((module) => ({ default: module.Reservations })))
@@ -43,7 +44,7 @@ export default function App() {
     if (!result.ok) return result
 
     setCurrentUser(result.user)
-    navigate('/perfil')
+    navigate(result.user?.forcePasswordChange ? '/cambio-password-obligatorio' : '/perfil')
     return result
   }
 
@@ -135,13 +136,28 @@ export default function App() {
     if (alias) navigate(alias.to, { replace: true })
   }, [location.pathname, navigate])
 
+  useEffect(() => {
+    if (!authChecked || !currentUser?.forcePasswordChange) return
+    const allowedPaths = ['/cambio-password-obligatorio', '/login']
+    if (!allowedPaths.includes(location.pathname)) {
+      navigate('/cambio-password-obligatorio', { replace: true })
+    }
+  }, [authChecked, currentUser?.forcePasswordChange, location.pathname, navigate])
+
+
+  const mustChangePassword = Boolean(
+    currentUser?.forcePasswordChange && !['/cambio-password-obligatorio', '/login'].includes(location.pathname),
+  )
 
   return (
     <AppShell title={page.title} eyebrow={page.eyebrow} currentUser={currentUser}>
       {isLoading ? <LoadingScreen /> : null}
       <MotionPage key={location.pathname}>
         <Suspense fallback={<div className="k-card p-5 text-sm font-bold uppercase text-white/60">Cargando KUPAN...</div>}>
-          <Routes location={location}>
+          {mustChangePassword ? (
+            <Navigate to="/cambio-password-obligatorio" replace />
+          ) : (
+            <Routes location={location}>
                 <Route path="/" element={<Home setActivePage={goToPage} appContent={appContent} currentUser={currentUser} />} />
                 {routeAliases.map((alias) => <Route key={alias.from} path={alias.from} element={<Navigate to={alias.to} replace />} />)}
                 <Route
@@ -165,6 +181,15 @@ export default function App() {
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/comunidad/ranking" element={<Ranking />} />
                 <Route path="/login" element={<Auth onLogin={login} onRegister={register} />} />
+                <Route path="/actualizar-password" element={<PasswordUpdate currentUser={currentUser} onUserUpdate={setCurrentUser} />} />
+                <Route
+                  path="/cambio-password-obligatorio"
+                  element={currentUser ? (
+                    <PasswordUpdate currentUser={currentUser} forced onUserUpdate={setCurrentUser} />
+                  ) : (
+                    <Navigate to="/login?access=required" replace />
+                  )}
+                />
                 <Route
                   path="/admin"
                   element={(
@@ -182,7 +207,8 @@ export default function App() {
                   )}
                 />
                 <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+            </Routes>
+          )}
         </Suspense>
       </MotionPage>
       <PwaUpdateBanner />

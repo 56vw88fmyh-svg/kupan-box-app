@@ -13,6 +13,8 @@ export const secondaryRoutes = [
   { id: 'ranking', path: '/ranking', label: 'Ranking', title: 'Ranking KUPAN', eyebrow: 'Mejores marcas del box', parentId: 'community', hidden: true },
   { id: 'community-ranking', path: '/comunidad/ranking', label: 'Ranking', title: 'Ranking KUPAN', eyebrow: 'Mejores marcas del box', parentId: 'community', hidden: true, aliasOf: 'ranking' },
   { id: 'login', path: '/login', label: 'Login', title: 'Acceso KUPAN', eyebrow: 'Entrena acompañado', parentId: 'profile', hidden: true },
+  { id: 'password-update', path: '/actualizar-password', label: 'Actualizar contraseña', title: 'Actualizar contraseña', eyebrow: 'Acceso seguro', parentId: 'profile', hidden: true },
+  { id: 'force-password-change', path: '/cambio-password-obligatorio', label: 'Cambio de contraseña', title: 'Cambio de contraseña', eyebrow: 'Acceso seguro', parentId: 'profile', hidden: true },
   { id: 'admin', path: '/admin', label: 'Admin', title: 'Admin KUPAN', eyebrow: 'Panel Supabase', parentId: 'profile', hidden: true, roles: ['admin'] },
   { id: 'coach', path: '/coach', label: 'Coach', title: 'Modo Coach', eyebrow: 'Asistencia del día', parentId: 'profile', hidden: true, roles: ['admin', 'coach'] },
 ]

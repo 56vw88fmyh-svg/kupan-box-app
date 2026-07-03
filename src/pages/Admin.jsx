@@ -35,6 +35,7 @@ import {
   AdminMobileModuleNav,
   AdminPageHeader,
 } from '../components/admin/AdminDashboard.jsx'
+import { AdminPasswordModal } from '../components/admin/AdminPasswordModal.jsx'
 import { AdminSidebar, QuickActionButton } from '../components/admin/AdminUi.jsx'
 import { AdminBirthdaysModule } from '../components/admin/modules/AdminBirthdaysModule.jsx'
 import { AdminCommunicationsModule } from '../components/admin/modules/AdminCommunicationsModule.jsx'
@@ -151,6 +152,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }))
   const [textDraft, setTextDraft] = useState(defaultAppText)
   const [createdCredentials, setCreatedCredentials] = useState(null)
+  const [passwordStudent, setPasswordStudent] = useState(null)
   const contentTopRef = useRef(null)
   const createStudentRef = useRef(null)
   const membershipsOverviewRef = useRef(null)
@@ -1321,7 +1323,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       ) : null}
 
       {activeSection === 'students' ? (
-        <AdminStudentsModule profiles={filteredProfiles} />
+        <AdminStudentsModule profiles={filteredProfiles} onManagePassword={setPasswordStudent} />
       ) : null}
 
       {activeSection === 'plans' ? (
@@ -1492,6 +1494,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           ME
         </button>
       </div>
+      <AdminPasswordModal
+        isOpen={Boolean(passwordStudent)}
+        student={passwordStudent}
+        onClose={() => setPasswordStudent(null)}
+        onSuccess={() => showSuccess('Gestión de contraseña actualizada.')}
+      />
     </div>
   )
 }

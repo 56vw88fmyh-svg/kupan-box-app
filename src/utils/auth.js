@@ -78,6 +78,7 @@ export function mapSupabaseUser(user, profile = null) {
     level: profile?.level ?? metadata.level ?? 'Iniciado',
     role: profile?.role ?? 'student',
     status: profile?.status ?? 'active',
+    forcePasswordChange: metadata.force_password_change === true,
   }
 }
 
