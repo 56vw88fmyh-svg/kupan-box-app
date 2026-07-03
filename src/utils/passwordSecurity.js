@@ -87,12 +87,24 @@ export function getPasswordErrorMessage(error) {
     return 'El enlace venció o no es válido. Solicita un nuevo correo de recuperación.'
   }
 
+  if (message.includes('rate') || message.includes('limit') || message.includes('too many')) {
+    return 'Se alcanzó el límite de envíos. Espera unos minutos e intenta nuevamente.'
+  }
+
+  if (message.includes('email')) {
+    return 'El correo no es válido o no puede recibir recuperación.'
+  }
+
   if (message.includes('password')) {
     return 'La contraseña no cumple los requisitos de seguridad.'
   }
 
-  if (message.includes('network') || message.includes('fetch')) {
+  if (message.includes('network') || message.includes('fetch') || message.includes('failed to send')) {
     return 'No pudimos conectar. Revisa internet e intenta nuevamente.'
+  }
+
+  if (message.includes('function') || message.includes('edge')) {
+    return 'El servicio de seguridad no está disponible. Intenta nuevamente en unos minutos.'
   }
 
   return 'No pudimos completar la acción. Intenta nuevamente.'

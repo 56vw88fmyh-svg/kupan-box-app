@@ -13,7 +13,7 @@ export function AdminStudentsModule({ profiles, onManagePassword }) {
           title={student.full_name}
           meta={`${student.level} · ${student.status}`}
           detail={`${student.email}${student.phone ? ` · ${student.phone}` : ''}`}
-          action={onManagePassword ? (
+          action={onManagePassword && student.role === 'student' ? (
             <Button size="sm" type="button" variant="secondary" onClick={() => onManagePassword(student)}>
               Gestionar contraseña
             </Button>

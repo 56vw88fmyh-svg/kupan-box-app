@@ -83,11 +83,18 @@ export function PasswordUpdate({ currentUser, forced = false, onUserUpdate }) {
       return
     }
 
+    const { data: refreshedSession } = await supabase.auth.refreshSession()
+    const refreshedUser = refreshedSession?.user ?? data?.user
+
     setPassword('')
     setConfirmation('')
     setMessage(forced ? 'Tu contraseña fue actualizada correctamente.' : 'Contraseña actualizada correctamente.')
     setMessageType('success')
-    onUserUpdate?.((current) => current ? { ...current, forcePasswordChange: false } : current)
+    onUserUpdate?.((current) => current ? {
+      ...current,
+      email: refreshedUser?.email ?? current.email,
+      forcePasswordChange: refreshedUser?.user_metadata?.force_password_change === true,
+    } : current)
 
     window.setTimeout(() => {
       if (forced) {

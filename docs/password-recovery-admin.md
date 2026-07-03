@@ -49,6 +49,12 @@ Ejecutar en Supabase SQL Editor:
 supabase/sql/admin-security-audit.sql
 ```
 
+También existe migración versionada:
+
+```bash
+supabase/migrations/20260703162500_admin_security_audit.sql
+```
+
 La tabla `admin_security_audit` registra acciones sin guardar contraseñas, tokens ni enlaces.
 
 ## URLs permitidas en Supabase Auth
@@ -56,11 +62,15 @@ La tabla `admin_security_audit` registra acciones sin guardar contraseñas, toke
 Agregar en Authentication > URL Configuration:
 
 ```text
-https://kupan-app.vercel.app/actualizar-password
+Site URL:
+https://kupan-box-app.vercel.app
+
+Redirect URLs:
+https://kupan-box-app.vercel.app/actualizar-password
 http://localhost:5173/actualizar-password
 ```
 
-Si se usa otro dominio final, agregar también:
+Si se mantiene un alias adicional, agregarlo también:
 
 ```text
 https://DOMINIO-PRODUCCION/actualizar-password
@@ -73,7 +83,7 @@ https://DOMINIO-PRODUCCION/actualizar-password
 - Admin envía correo de recuperación.
 - El enlace abre `/actualizar-password`.
 - Admin asigna contraseña temporal.
+- La función rechaza cuentas admin/coach y auto-reset del propio admin.
 - Alumno inicia sesión con temporal.
 - Alumno queda obligado a `/cambio-password-obligatorio`.
 - Al cambiar contraseña, vuelve a Perfil y `force_password_change` queda en `false`.
-

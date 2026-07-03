@@ -20,5 +20,4 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY=...
 supabase functions deploy admin-reset-user-password
 ```
 
-La función valida el JWT del solicitante, confirma `profiles.role = 'admin'` y `profiles.status = 'active'`, conserva metadatos existentes y agrega `force_password_change: true`.
-
+La función valida el JWT del solicitante, confirma `profiles.role = 'admin'` y `profiles.status = 'active'`, exige que el usuario objetivo sea `profiles.role = 'student'`, bloquea auto-reset del admin, conserva metadatos existentes y agrega `force_password_change: true`.

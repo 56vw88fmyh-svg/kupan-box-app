@@ -18,11 +18,16 @@ function cleanText(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
 function validatePassword(password: string) {
   if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.'
   if (!/[A-Z]/.test(password)) return 'La contraseña debe incluir una letra mayúscula.'
   if (!/[a-z]/.test(password)) return 'La contraseña debe incluir una letra minúscula.'
   if (!/\d/.test(password)) return 'La contraseña debe incluir un número.'
+  if (!/[!@#$%^&*._-]/.test(password)) return 'La contraseña temporal debe incluir un símbolo.'
   if (password !== password.trim()) return 'La contraseña no puede tener espacios al inicio o al final.'
   return ''
 }
@@ -37,6 +42,7 @@ async function writeAudit(
     admin_user_id: adminUserId,
     target_user_id: targetUserId,
     action: 'temporary_password',
+    method: 'temporary_password',
     status,
   })
 }
@@ -94,6 +100,15 @@ serve(async (req) => {
     return jsonResponse({ ok: false, message: 'Debes enviar alumno y contraseña temporal.' }, 400)
   }
 
+  if (!isUuid(targetUserId)) {
+    return jsonResponse({ ok: false, message: 'Alumno invalido.' }, 400)
+  }
+
+  if (targetUserId === userData.user.id) {
+    await writeAudit(adminClient, userData.user.id, targetUserId, 'rejected_self_reset').catch(() => {})
+    return jsonResponse({ ok: false, message: 'No puedes reasignar tu propia contraseña desde este panel.' }, 403)
+  }
+
   const passwordError = validatePassword(temporaryPassword)
   if (passwordError) {
     await writeAudit(adminClient, userData.user.id, targetUserId, 'rejected').catch(() => {})
@@ -102,13 +117,18 @@ serve(async (req) => {
 
   const { data: targetProfile, error: targetProfileError } = await adminClient
     .from('profiles')
-    .select('id, email')
+    .select('id, email, role, status')
     .eq('id', targetUserId)
     .maybeSingle()
 
   if (targetProfileError || !targetProfile) {
     await writeAudit(adminClient, userData.user.id, targetUserId, 'not_found').catch(() => {})
     return jsonResponse({ ok: false, message: 'Alumno no encontrado.' }, 404)
+  }
+
+  if (targetProfile.role !== 'student') {
+    await writeAudit(adminClient, userData.user.id, targetUserId, 'rejected_role').catch(() => {})
+    return jsonResponse({ ok: false, message: 'Esta acción solo está permitida para cuentas de alumnos.' }, 403)
   }
 
   if (targetProfile.email && temporaryPassword.toLowerCase() === String(targetProfile.email).toLowerCase()) {
@@ -143,4 +163,3 @@ serve(async (req) => {
     message: 'Contraseña temporal asignada correctamente. El alumno deberá cambiarla al iniciar sesión.',
   })
 })
-
