@@ -70,7 +70,7 @@ async function writeAudit(
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
-      status: isAllowedOrigin(req) ? 204 : 403,
+      status: isAllowedOrigin(req) ? 200 : 403,
       headers: getCorsHeaders(req),
     })
   }
