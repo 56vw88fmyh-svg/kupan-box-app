@@ -28,7 +28,7 @@ Ubicación:
 supabase/functions/admin-reset-user-password
 ```
 
-Deploy:
+Despliegue:
 
 ```bash
 supabase functions deploy admin-reset-user-password
@@ -46,21 +46,31 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY=...
 
 No configurar `SUPABASE_SERVICE_ROLE_KEY` en React, Vercel, Netlify ni variables `VITE_`.
 
-## SQL requerido
+## Migración oficial
 
-Ejecutar en Supabase SQL Editor:
-
-```bash
-supabase/sql/admin-security-audit.sql
-```
-
-También existe migración versionada:
+La fuente oficial y versionada de auditoría es:
 
 ```bash
 supabase/migrations/20260703162500_admin_security_audit.sql
 ```
 
+Aplicar migraciones con una sola vía:
+
+```bash
+supabase login
+supabase link --project-ref TU_PROJECT_REF
+supabase db push
+```
+
+No ejecutar un SQL manual adicional después de `supabase db push`.
+
 La tabla `admin_security_audit` registra acciones sin guardar contraseñas, tokens ni enlaces.
+
+## Verificación de función
+
+```bash
+supabase functions list
+```
 
 ## URLs permitidas en Supabase Auth
 
