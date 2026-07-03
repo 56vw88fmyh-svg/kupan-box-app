@@ -57,11 +57,17 @@ export function AdminPasswordModal({ isOpen, student, onClose, onSuccess }) {
     setIsSubmitting(true)
     setMessage('Enviando correo...')
     setMessageType('success')
-    const result = await sendStudentRecoveryEmail(student)
-    setIsSubmitting(false)
-    setMessage(result.message)
-    setMessageType(result.ok ? 'success' : 'error')
-    if (result.ok) onSuccess?.()
+    try {
+      const result = await sendStudentRecoveryEmail(student)
+      setMessage(result.message)
+      setMessageType(result.ok ? 'success' : 'error')
+      if (result.ok) onSuccess?.()
+    } catch {
+      setMessage('No pudimos enviar el correo de recuperación. Revisa la conexión e intenta nuevamente.')
+      setMessageType('error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   function generatePassword() {
@@ -92,19 +98,25 @@ export function AdminPasswordModal({ isOpen, student, onClose, onSuccess }) {
 
     setIsSubmitting(true)
     setMessage('')
-    const result = await assignTemporaryPassword(student, temporaryPassword)
-    setIsSubmitting(false)
+    try {
+      const result = await assignTemporaryPassword(student, temporaryPassword)
 
-    if (!result.ok) {
+      if (!result.ok) {
+        setMessage(result.message)
+        setMessageType('error')
+        return
+      }
+
+      setResultPassword(temporaryPassword)
       setMessage(result.message)
+      setMessageType('success')
+      onSuccess?.()
+    } catch {
+      setMessage('No pudimos completar la gestión de contraseña. Intenta nuevamente.')
       setMessageType('error')
-      return
+    } finally {
+      setIsSubmitting(false)
     }
-
-    setResultPassword(temporaryPassword)
-    setMessage(result.message)
-    setMessageType('success')
-    onSuccess?.()
   }
 
   return (

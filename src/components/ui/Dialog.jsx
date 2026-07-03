@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from './Button.jsx'
 import { Card } from './Card.jsx'
 import { cn } from './utils.js'
@@ -72,14 +73,14 @@ export function Dialog({
     if (event.target === event.currentTarget) onClose?.()
   }
 
-  return (
-    <div className="k-dialog-backdrop fixed inset-0 z-50 flex items-end bg-black/72 backdrop-blur-sm sm:items-center sm:justify-center" onMouseDown={handleBackdropClick}>
+  return createPortal(
+    <div className="k-dialog-backdrop fixed inset-0 z-[80] flex items-end justify-center bg-black/72 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-[calc(0.75rem+env(safe-area-inset-top))] backdrop-blur-sm sm:items-center sm:px-4" onMouseDown={handleBackdropClick}>
       <Card
         ref={dialogRef}
         aria-describedby={description ? 'kupan-dialog-description' : undefined}
         aria-modal="true"
         aria-labelledby="kupan-dialog-title"
-        className={cn('k-dialog-panel w-full max-w-lg overflow-auto p-5 focus:outline-none', className)}
+        className={cn('k-dialog-panel w-full max-w-[94vw] overflow-auto p-5 focus:outline-none sm:max-w-lg', className)}
         role="dialog"
         tabIndex={-1}
         variant="elevated"
@@ -93,6 +94,7 @@ export function Dialog({
         </div>
         <div className="mt-5">{children}</div>
       </Card>
-    </div>
+    </div>,
+    document.body,
   )
 }

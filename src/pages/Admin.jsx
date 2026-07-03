@@ -630,6 +630,15 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
   }, [clearFeedback, hydrateTextDraft, reloadAll, showError, showSuccess, showWarning])
 
+  const openPasswordModal = useCallback((student) => {
+    if (!student?.id) {
+      showError('No se pudo cargar la información del alumno.')
+      return
+    }
+
+    setPasswordStudent(student)
+  }, [showError])
+
   const reloadAffectedSections = useCallback(async (sections = []) => {
     if (!sections.length) {
       await refreshData({ silent: true })
@@ -1323,7 +1332,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       ) : null}
 
       {activeSection === 'students' ? (
-        <AdminStudentsModule profiles={filteredProfiles} onManagePassword={setPasswordStudent} />
+        <AdminStudentsModule profiles={filteredProfiles} onManagePassword={openPasswordModal} />
       ) : null}
 
       {activeSection === 'plans' ? (
