@@ -3,13 +3,18 @@ create table if not exists public.admin_security_audit (
   admin_user_id uuid not null references public.profiles(id) on delete restrict,
   target_user_id uuid not null references public.profiles(id) on delete cascade,
   action text not null check (action in ('password_recovery_email', 'temporary_password')),
-  method text not null default 'temporary_password' check (method in ('recovery_email', 'temporary_password')),
+  method text not null default 'temporary_password',
   status text not null,
   created_at timestamptz not null default now()
 );
 
 alter table public.admin_security_audit
   add column if not exists method text not null default 'temporary_password';
+
+update public.admin_security_audit
+set method = 'recovery_email'
+where action = 'password_recovery_email'
+  and method = 'temporary_password';
 
 do $$
 begin

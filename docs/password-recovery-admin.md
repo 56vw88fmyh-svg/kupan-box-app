@@ -9,6 +9,11 @@ Admin puede abrir `Admin > Alumnos > Gestionar contraseña` y elegir:
 
 La contraseña actual nunca se muestra ni se recupera.
 
+La Edge Function restringe CORS a:
+
+- `https://kupan-box-app.vercel.app`
+- `http://localhost:5173`
+
 ## Edge Function
 
 Nombre:

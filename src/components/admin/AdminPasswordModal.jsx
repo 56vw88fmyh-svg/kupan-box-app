@@ -50,7 +50,7 @@ export function AdminPasswordModal({ isOpen, student, onClose, onSuccess }) {
   }
 
   async function handleRecoveryEmail() {
-    if (!student) return
+    if (!student || isSubmitting) return
     const confirmed = window.confirm(`¿Enviar correo de recuperación a ${studentEmail}?`)
     if (!confirmed) return
 
@@ -81,7 +81,7 @@ export function AdminPasswordModal({ isOpen, student, onClose, onSuccess }) {
 
   async function handleTemporaryPassword(event) {
     event.preventDefault()
-    if (!student) return
+    if (!student || isSubmitting) return
 
     const validation = validateSecurePassword(temporaryPassword, confirmation, studentEmail, { requireSymbol: true })
     setErrors(validation.errors)
