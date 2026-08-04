@@ -3,7 +3,18 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 export const athleteLevels = ['Iniciado', 'Rookie', 'Scaled', 'RX']
 
 function normalizeEmail(email) {
-  return email.trim().toLowerCase()
+  return String(email ?? '').trim().toLowerCase()
+}
+
+const productionAppUrl = 'https://kupan-box-app.vercel.app'
+
+function getPasswordRedirectUrl() {
+  const publicUrl = import.meta.env?.VITE_PUBLIC_APP_URL || import.meta.env?.VITE_APP_URL
+  const browserOrigin = typeof window !== 'undefined' ? window.location.origin : productionAppUrl
+  const browserHostname = typeof window !== 'undefined' ? window.location.hostname : ''
+  const isLocal = ['localhost', '127.0.0.1'].includes(browserHostname)
+  const origin = publicUrl || (isLocal ? browserOrigin : productionAppUrl)
+  return `${origin.replace(/\/$/, '')}/actualizar-password`
 }
 
 function getSupabaseConfigError() {
@@ -15,6 +26,11 @@ function getSupabaseConfigError() {
 
 export function getAuthErrorMessage(error) {
   const message = error?.message?.toLowerCase() ?? ''
+  const status = Number(error?.status ?? error?.statusCode ?? 0)
+
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'Estás sin conexión. Revisa internet y vuelve a intentarlo.'
+  }
 
   if (message.includes('invalid login credentials')) {
     return 'Correo o contraseña incorrectos. Revisa tus datos e intenta de nuevo.'
@@ -36,11 +52,46 @@ export function getAuthErrorMessage(error) {
     return 'La fecha de nacimiento es obligatoria para crear tu perfil KUPAN.'
   }
 
-  if (message.includes('network')) {
-    return 'No pudimos conectar con Supabase. Revisa tu conexion e intenta nuevamente.'
+  if (
+    message.includes('network')
+    || message.includes('fetch')
+    || message.includes('failed to fetch')
+    || message.includes('load failed')
+  ) {
+    return 'No pudimos conectar con KUPAN. Revisa internet y vuelve a intentarlo.'
+  }
+
+  if (
+    status >= 500
+    || message.includes('service unavailable')
+    || message.includes('gateway')
+    || message.includes('timeout')
+    || message.includes('temporarily unavailable')
+  ) {
+    return 'El servicio de acceso está temporalmente inactivo. Espera un momento y vuelve a intentarlo.'
+  }
+
+  if (status === 429 || message.includes('rate limit') || message.includes('too many requests')) {
+    return 'Se hicieron demasiados intentos. Espera unos minutos antes de volver a probar.'
   }
 
   return 'No pudimos completar la accion. Intenta nuevamente en unos segundos.'
+}
+
+export function isRetryableAuthError(error) {
+  const message = String(error?.message ?? '').toLowerCase()
+  const status = Number(error?.status ?? error?.statusCode ?? 0)
+
+  return (
+    (typeof navigator !== 'undefined' && navigator.onLine === false)
+    || status >= 500
+    || message.includes('network')
+    || message.includes('fetch')
+    || message.includes('load failed')
+    || message.includes('gateway')
+    || message.includes('timeout')
+    || message.includes('temporarily unavailable')
+  )
 }
 
 export async function getProfileByUser(user) {
@@ -107,11 +158,49 @@ export async function loginWithSupabase({ email, password }) {
   })
 
   if (error) {
-    return { ok: false, message: getAuthErrorMessage(error) }
+    return {
+      ok: false,
+      message: getAuthErrorMessage(error),
+      retryable: isRetryableAuthError(error),
+    }
   }
 
   const profile = await getProfileByUser(data.user)
   return { ok: true, user: mapSupabaseUser(data.user, profile) }
+}
+
+export async function requestPasswordRecovery(email) {
+  if (!isSupabaseConfigured || !supabase) return getSupabaseConfigError()
+
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail) {
+    return { ok: false, message: 'Ingresa tu correo para recuperar la contraseña.' }
+  }
+
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return {
+      ok: false,
+      retryable: true,
+      message: 'Estás sin conexión. Revisa internet y vuelve a intentarlo.',
+    }
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: getPasswordRedirectUrl(),
+  })
+
+  if (error) {
+    return {
+      ok: false,
+      message: getAuthErrorMessage(error),
+      retryable: isRetryableAuthError(error),
+    }
+  }
+
+  return {
+    ok: true,
+    message: 'Si el correo está registrado, recibirás un enlace para crear una nueva contraseña.',
+  }
 }
 
 export async function registerWithSupabase({ name, email, password, birthDate, level, phone }) {

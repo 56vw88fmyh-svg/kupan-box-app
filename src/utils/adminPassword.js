@@ -5,13 +5,11 @@ function getConfigError() {
   return { ok: false, message: 'Supabase no está configurado para gestionar contraseñas.' }
 }
 
-const productionAppUrl = 'https://kupan-box-app.vercel.app'
-
 function getRedirectUrl() {
   const publicUrl = import.meta.env?.VITE_PUBLIC_APP_URL || import.meta.env?.VITE_APP_URL
   const browserOrigin = window.location.origin
   const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  const origin = publicUrl || (isLocal ? browserOrigin : productionAppUrl)
+  const origin = publicUrl || (isLocal ? browserOrigin : 'https://kupan-box-app.vercel.app')
   return `${origin.replace(/\/$/, '')}/actualizar-password`
 }
 

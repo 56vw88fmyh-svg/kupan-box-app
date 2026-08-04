@@ -4,14 +4,16 @@ const ignoredConsoleFragments = [
   'Download the React DevTools',
 ]
 
-export function attachConsoleGuard(page, testInfo) {
+export function attachConsoleGuard(page, testInfo, options = {}) {
   const consoleMessages = []
   const pageErrors = []
   const requestFailures = []
+  const allowedConsoleFragments = options.allowedConsoleFragments ?? []
 
   page.on('console', (message) => {
     const text = message.text()
     if (ignoredConsoleFragments.some((fragment) => text.includes(fragment))) return
+    if (allowedConsoleFragments.some((fragment) => text.includes(fragment))) return
     if (['error', 'warning'].includes(message.type())) {
       consoleMessages.push({ type: message.type(), text })
     }
