@@ -1,0 +1,81 @@
+name: Disponibilidad KUPAN
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: kupan-uptime
+  cancel-in-progress: true
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      APP_URL: https://kupan-box-app.vercel.app
+      SUPABASE_URL: ${{ secrets.KUPAN_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.KUPAN_SUPABASE_ANON_KEY }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Validar configuración
+        id: config
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+
+      - name: Comprobar web, Auth y base de datos
+        id: health
+        if: steps.config.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 2 --retry-delay 5 --max-time 20 "$APP_URL/login" >/dev/null
+          curl --fail --silent --show-error --retry 2 --retry-delay 5 --max-time 20 \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/auth/v1/health" >/dev/null
+          curl --fail --silent --show-error --retry 2 --retry-delay 5 --max-time 20 \
+            -X POST \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "$SUPABASE_URL/rest/v1/rpc/kupan_health_check" >/dev/null
+
+      - name: Abrir o actualizar alerta
+        if: steps.config.outcome == 'failure' || steps.health.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='Alerta disponibilidad KUPAN'
+          issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number // empty')"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          body="La comprobación automática detectó un problema en la web, Auth, base de datos o configuración. Revisa la ejecución: $run_url"
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body" --assignee "$GITHUB_REPOSITORY_OWNER"
+          fi
+
+      - name: Cerrar alerta recuperada
+        if: steps.config.outcome == 'success' && steps.health.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          title='Alerta disponibilidad KUPAN'
+          issue_number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body 'KUPAN volvió a responder correctamente en la comprobación automática.'
+            gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" --reason completed
+          fi
+
+      - name: Marcar comprobación fallida
+        if: steps.config.outcome == 'failure' || steps.health.outcome == 'failure'
+        run: exit 1
