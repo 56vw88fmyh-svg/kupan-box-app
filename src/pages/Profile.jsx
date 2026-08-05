@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { motion as Motion } from 'framer-motion'
+import { AnimatePresence, motion as Motion } from 'framer-motion'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
 import { updateCurrentUserPassword } from '../utils/auth.js'
@@ -650,40 +650,46 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
           </p>
         ) : null}
 
-        <Motion.div
-          initial={false}
-          animate={isEditOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }}
-          transition={{ duration: 0.22, ease: 'easeOut' }}
-          className="overflow-hidden"
-        >
-          <form className="mt-4 space-y-4" onSubmit={handleSaveProfile}>
-            <EditableField label="Nombre completo" value={formData.fullName} required onChange={(value) => setFormData((current) => ({ ...current, fullName: value }))} />
-            <EditableField label="Telefono" type="tel" value={formData.phone} onChange={(value) => setFormData((current) => ({ ...current, phone: value }))} />
-            <EditableField label="Fecha de nacimiento" type="date" value={formData.birthDate} required onChange={(value) => setFormData((current) => ({ ...current, birthDate: value }))} />
-            <label className="block">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">Nivel</span>
-              <select
-                className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
-                value={formData.level}
-                onChange={(event) => setFormData((current) => ({ ...current, level: event.target.value }))}
-              >
-                {profileEditableLevels.map((levelOption) => (
-                  <option key={levelOption} className="bg-kupan-black text-white" value={levelOption}>
-                    {levelOption}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <AnimatePresence initial={false}>
+          {isEditOpen ? (
+            <Motion.div
+              key="profile-editor"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
+              <form className="mt-4 space-y-4" onSubmit={handleSaveProfile}>
+                <EditableField label="Nombre completo" value={formData.fullName} required onChange={(value) => setFormData((current) => ({ ...current, fullName: value }))} />
+                <EditableField label="Telefono" type="tel" value={formData.phone} onChange={(value) => setFormData((current) => ({ ...current, phone: value }))} />
+                <EditableField label="Fecha de nacimiento" type="date" value={formData.birthDate} required onChange={(value) => setFormData((current) => ({ ...current, birthDate: value }))} />
+                <label className="block">
+                  <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">Nivel</span>
+                  <select
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
+                    value={formData.level}
+                    onChange={(event) => setFormData((current) => ({ ...current, level: event.target.value }))}
+                  >
+                    {profileEditableLevels.map((levelOption) => (
+                      <option key={levelOption} className="bg-kupan-black text-white" value={levelOption}>
+                        {levelOption}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
-              Email, plan, rol y estado de membresia quedan protegidos. Si necesitas cambiarlos, debe hacerlo un admin.
-            </div>
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
+                  Email, plan, rol y estado de membresia quedan protegidos. Si necesitas cambiarlos, debe hacerlo un admin.
+                </div>
 
-            <button type="submit" className="k-button w-full" disabled={isSavingProfile}>
-              {isSavingProfile ? 'Guardando...' : 'Guardar cambios'}
-            </button>
-          </form>
-        </Motion.div>
+                <button type="submit" className="k-button w-full" disabled={isSavingProfile}>
+                  {isSavingProfile ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+              </form>
+            </Motion.div>
+          ) : null}
+        </AnimatePresence>
       </MotionCard>
 
       <MotionCard as="section" className="k-card p-5" delay={0.045}>
@@ -714,20 +720,26 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
           </p>
         ) : null}
 
-        <Motion.div
-          initial={false}
-          animate={isPasswordOpen ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }}
-          transition={{ duration: 0.22, ease: 'easeOut' }}
-          className="overflow-hidden"
-        >
-          <form className="mt-4 space-y-4" onSubmit={handleChangePassword}>
-            <EditableField label="Nueva contraseña" type="password" value={passwordForm.password} required onChange={(value) => setPasswordForm((current) => ({ ...current, password: value }))} />
-            <EditableField label="Confirmar contraseña" type="password" value={passwordForm.confirmPassword} required onChange={(value) => setPasswordForm((current) => ({ ...current, confirmPassword: value }))} />
-            <button type="submit" className="k-button-secondary w-full" disabled={isSavingPassword}>
-              {isSavingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
-            </button>
-          </form>
-        </Motion.div>
+        <AnimatePresence initial={false}>
+          {isPasswordOpen ? (
+            <Motion.div
+              key="password-editor"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="overflow-hidden"
+            >
+              <form className="mt-4 space-y-4" onSubmit={handleChangePassword}>
+                <EditableField label="Nueva contraseña" type="password" value={passwordForm.password} required onChange={(value) => setPasswordForm((current) => ({ ...current, password: value }))} />
+                <EditableField label="Confirmar contraseña" type="password" value={passwordForm.confirmPassword} required onChange={(value) => setPasswordForm((current) => ({ ...current, confirmPassword: value }))} />
+                <button type="submit" className="k-button-secondary w-full" disabled={isSavingPassword}>
+                  {isSavingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
+                </button>
+              </form>
+            </Motion.div>
+          ) : null}
+        </AnimatePresence>
       </MotionCard>
 
       <MotionCard as="section" className="k-card p-5" delay={0.06}>

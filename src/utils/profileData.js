@@ -133,9 +133,7 @@ export async function loadSupabaseProfileData(profileId) {
 
   const [profileResult, membershipResult, reservationsResult, recordsResult] = await Promise.all([
     supabase
-      .from('profiles')
-      .select('id, full_name, email, phone, birth_date, level, role, status')
-      .eq('id', profileId)
+      .rpc('get_my_profile')
       .maybeSingle(),
     supabase.rpc('get_active_membership', { target_profile_id: profileId }),
     supabase
