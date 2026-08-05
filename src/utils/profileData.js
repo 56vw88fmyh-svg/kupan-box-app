@@ -5,6 +5,35 @@ import { getHumanErrorMessage, logAppError } from './appState.js'
 
 export const profileEditableLevels = ['Iniciado', 'Rookie', 'Scaled', 'RX']
 
+export function getMembershipTokenSummary(membership, remainingTokensOverride = undefined) {
+  const isUnlimited = Boolean(membership?.plan?.is_unlimited ?? membership?.is_unlimited)
+
+  if (isUnlimited) {
+    return {
+      isUnlimited: true,
+      total: null,
+      used: 0,
+      remaining: null,
+    }
+  }
+
+  const totalValue = Number(membership?.classes_total)
+  const usedValue = Number(membership?.classes_used ?? 0)
+  const total = Number.isFinite(totalValue) ? Math.max(totalValue, 0) : 0
+  const used = Number.isFinite(usedValue) ? Math.min(Math.max(usedValue, 0), total) : 0
+  const overrideValue = Number(remainingTokensOverride)
+  const remaining = remainingTokensOverride !== undefined && remainingTokensOverride !== null && Number.isFinite(overrideValue)
+    ? Math.min(Math.max(overrideValue, 0), total)
+    : Math.max(total - used, 0)
+
+  return {
+    isUnlimited: false,
+    total,
+    used,
+    remaining,
+  }
+}
+
 function getProfileError(message = 'No pudimos cargar tu perfil KUPAN. Intenta nuevamente.') {
   return { ok: false, message }
 }
@@ -69,16 +98,69 @@ export async function loadSupabaseProfileData(profileId) {
   if (membershipResult.error) return getSafeProfileError('profile.load_membership', membershipResult.error, 'No fue posible cargar tu plan activo. Intenta nuevamente.')
   if (reservationsResult.error) return getSafeProfileError('profile.load_reservations', reservationsResult.error, 'No fue posible cargar tus reservas. Intenta nuevamente.')
   const recordsIssue = recordsResult.ok ? '' : 'No pudimos cargar tus últimos PR desde Supabase.'
+  const membership = Array.isArray(membershipResult.data) ? membershipResult.data[0] : membershipResult.data
+  let membershipWithPlan = membership ?? null
+  let remainingTokens = null
+  let membershipIssue = ''
+
+  if (membership?.id) {
+    const [remainingTokensResult, planResult] = await Promise.all([
+      supabase.rpc('membership_remaining_tokens', { target_membership_id: membership.id }),
+      membership.plan_id
+        ? supabase
+          .from('plans')
+          .select('id, name, price, is_unlimited')
+          .eq('id', membership.plan_id)
+          .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ])
+
+    if (remainingTokensResult.error) {
+      logAppError('profile.load_remaining_tokens', remainingTokensResult.error)
+      membershipIssue = 'No pudimos confirmar el saldo de tokens. Mostramos el cálculo disponible en tu membresía.'
+    } else {
+      remainingTokens = remainingTokensResult.data
+    }
+
+    if (planResult.error) {
+      logAppError('profile.load_plan', planResult.error)
+    }
+
+    membershipWithPlan = {
+      ...membership,
+      plan: planResult.data ?? undefined,
+    }
+  }
 
   return {
     ok: true,
     data: {
       profile: profileResult.data,
-      membership: Array.isArray(membershipResult.data) ? membershipResult.data[0] : membershipResult.data,
+      membership: membershipWithPlan,
+      remainingTokens,
+      membershipIssue,
       reservations: (reservationsResult.data ?? []).map(mapReservationRow),
       records: recordsResult.ok ? (recordsResult.data ?? []).slice(0, 5) : [],
       recordsIssue,
     },
+  }
+}
+
+export function subscribeToProfileData(profileId, onChange) {
+  if (!isSupabaseConfigured || !supabase || !profileId || typeof onChange !== 'function') {
+    return () => {}
+  }
+
+  const profileFilter = `profile_id=eq.${profileId}`
+  const channel = supabase
+    .channel(`profile-sync:${profileId}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'memberships', filter: profileFilter }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'membership_token_movements', filter: profileFilter }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations', filter: profileFilter }, onChange)
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
   }
 }
 

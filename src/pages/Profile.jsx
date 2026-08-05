@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion as Motion } from 'framer-motion'
 import { MotionCard } from '../components/Motion.jsx'
@@ -7,8 +7,10 @@ import { updateCurrentUserPassword } from '../utils/auth.js'
 import {
   calculateAge,
   calculateDaysRemaining,
+  getMembershipTokenSummary,
   loadSupabaseProfileData,
   profileEditableLevels,
+  subscribeToProfileData,
   updateSupabaseProfile,
 } from '../utils/profileData.js'
 
@@ -48,11 +50,129 @@ function formatCurrency(value) {
 }
 
 function ProfileField({ label, value }) {
+  const displayValue = value === null || value === undefined || value === '' ? 'Sin registrar' : value
+
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
       <p className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-      <p className="mt-2 break-words text-sm font-black uppercase text-white">{value || 'Sin registrar'}</p>
+      <p className="mt-2 break-words text-sm font-black uppercase text-white">{displayValue}</p>
     </div>
+  )
+}
+
+function formatUpdatedTime(date) {
+  if (!date) return 'Pendiente de sincronizar'
+
+  return new Intl.DateTimeFormat('es-CL', {
+    timeZone: 'America/Santiago',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+function MembershipSummary({
+  membership,
+  planName,
+  planPrice,
+  tokenSummary,
+  daysRemaining,
+  isLoading,
+  isRefreshing,
+  lastUpdatedAt,
+  message,
+  onRefresh,
+}) {
+  const membershipEndDate = membership?.end_date ?? membership?.expires_at
+  const hasMembership = Boolean(membership)
+  const statusLabel = hasMembership ? 'Plan activo' : 'Sin plan activo'
+  const progress = tokenSummary.isUnlimited || tokenSummary.total <= 0
+    ? 0
+    : Math.min((tokenSummary.used / tokenSummary.total) * 100, 100)
+
+  return (
+    <MotionCard as="section" className="k-card overflow-hidden p-0" delay={0.02}>
+      <div className="flex flex-col gap-4 border-b border-white/10 bg-black/25 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Membresía KUPAN</p>
+          <h2 className="mt-2 text-3xl font-black uppercase leading-none text-white">
+            {isLoading ? 'Revisando tu plan...' : planName ?? 'Activa tu plan'}
+          </h2>
+          <p className="mt-2 text-sm font-bold text-white/55">
+            {statusLabel} · Actualizado {formatUpdatedTime(lastUpdatedAt)}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="k-button-secondary min-h-12 w-full sm:w-auto"
+          disabled={isLoading || isRefreshing}
+          onClick={onRefresh}
+        >
+          {isRefreshing ? 'Actualizando...' : 'Actualizar plan'}
+        </button>
+      </div>
+
+      {message ? (
+        <p className="mx-5 mt-5 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold leading-6 text-white">
+          {message}
+        </p>
+      ) : null}
+
+      {hasMembership ? (
+        <div className="p-5">
+          <div className="grid gap-3 sm:grid-cols-[1.25fr_1fr]">
+            <div className="rounded-lg border border-kupan-ember/35 bg-kupan-ember/10 p-5">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Tokens disponibles</p>
+              <p className="mt-2 text-5xl font-black uppercase leading-none text-white">
+                {tokenSummary.isUnlimited ? 'Full' : tokenSummary.remaining}
+              </p>
+              <p className="mt-3 text-sm font-bold uppercase text-white/60">
+                {tokenSummary.isUnlimited ? 'Entrena sin descuento de tokens' : `de ${tokenSummary.total} clases del plan`}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-1">
+              <ProfileField label="Tokens usados" value={tokenSummary.isUnlimited ? 'No descuenta' : tokenSummary.used} />
+              <ProfileField label="Vencimiento" value={formatDate(membershipEndDate)} />
+            </div>
+          </div>
+
+          {!tokenSummary.isUnlimited ? (
+            <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.025] p-4">
+              <div className="flex flex-col items-start gap-2 text-xs font-black uppercase text-white/55 sm:flex-row sm:items-center sm:justify-between">
+                <span>Uso del plan</span>
+                <span className="break-words text-kupan-flame">{tokenSummary.used} usados · {tokenSummary.remaining} disponibles</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10" aria-label={`${tokenSummary.used} de ${tokenSummary.total} tokens utilizados`}>
+                <Motion.div
+                  className="h-full rounded-full bg-kupan-ember"
+                  initial={false}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <ProfileField label="Inicio" value={formatDate(membership.start_date)} />
+            <ProfileField label="Días restantes" value={daysRemaining !== null ? `${daysRemaining} días` : 'Sin registrar'} />
+            <ProfileField label="Tokens totales" value={tokenSummary.isUnlimited ? 'Ilimitado' : tokenSummary.total} />
+            <ProfileField label="Estado" value={membership.status === 'active' ? 'Activa' : membership.status} />
+          </div>
+
+          <p className="mt-4 text-sm font-bold leading-6 text-white/55">
+            {planPrice ? `${formatCurrency(planPrice)} · ` : ''}Los tokens no utilizados vencen al terminar el plan y no son acumulables.
+          </p>
+        </div>
+      ) : (
+        <div className="p-5">
+          <div className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4">
+            <p className="font-black uppercase text-white">Aún no tienes una membresía activa.</p>
+            <p className="mt-2 text-sm leading-6 text-white/65">Cuando el administrador active tu plan, aparecerá aquí automáticamente con sus tokens y vencimiento.</p>
+          </div>
+        </div>
+      )}
+    </MotionCard>
   )
 }
 
@@ -85,13 +205,10 @@ function StudentDashboard({
   message,
   activeMembership,
   nextReservation,
-  classesRemaining,
-  isUnlimitedPlan,
   setActivePage,
 }) {
   const planIsActive = Boolean(activeMembership?.status === 'active')
   const showPlanWarning = !isLoading && !planIsActive
-  const membershipEndDate = activeMembership?.end_date ?? activeMembership?.expires_at
   const classItem = getReservationClass(nextReservation)
   const dayLabel = classItem?.day_of_week ? dayNames[classItem.day_of_week] : nextReservation?.day
   const classTime = classItem?.time?.slice?.(0, 5) ?? classItem?.time ?? ''
@@ -116,8 +233,8 @@ function StudentDashboard({
         <p className="m-5 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{message}</p>
       ) : null}
 
-      <div className="grid gap-3 p-5 sm:grid-cols-3">
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 sm:col-span-3">
+      <div className="p-5">
+        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Próxima clase</p>
           {isLoading ? (
             <>
@@ -139,27 +256,6 @@ function StudentDashboard({
           )}
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
-          <p className="text-xs font-black uppercase text-white/55">Tokens disponibles</p>
-          <p className="mt-2 text-3xl font-black uppercase text-white">
-            {isLoading ? '...' : planIsActive ? (isUnlimitedPlan ? 'Full' : classesRemaining) : 'Sin plan'}
-          </p>
-          <p className="mt-1 text-xs font-bold uppercase text-kupan-flame">
-            {isLoading ? 'cargando' : planIsActive ? (isUnlimitedPlan ? 'Ilimitado' : 'clases restantes') : 'activa tu membresía'}
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
-          <p className="text-xs font-black uppercase text-white/55">Vence</p>
-          <p className="mt-2 text-xl font-black uppercase text-white">{isLoading ? 'Cargando...' : planIsActive ? formatDate(membershipEndDate) : 'Sin plan activo'}</p>
-          <p className="mt-1 text-xs font-bold uppercase text-kupan-flame">30 días desde activación</p>
-        </div>
-
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
-          <p className="text-xs font-black uppercase text-white/55">Estado</p>
-          <p className="mt-2 text-xl font-black uppercase text-white">{isLoading ? 'Conectando' : planIsActive ? 'Listo para entrenar' : 'Plan requerido'}</p>
-          <p className="mt-1 text-xs font-bold uppercase text-kupan-flame">{isLoading ? 'Supabase' : planIsActive ? 'somos comunidad' : 'habla con el box'}</p>
-        </div>
       </div>
 
       {showPlanWarning ? (
@@ -182,8 +278,12 @@ function StudentDashboard({
 
 export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) {
   const location = useLocation()
+  const profileRequestIdRef = useRef(0)
   const [profileData, setProfileData] = useState(null)
   const [isFetchingProfile, setIsFetchingProfile] = useState(false)
+  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState(null)
+  const [membershipSyncMessage, setMembershipSyncMessage] = useState('')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileMessage, setProfileMessage] = useState('')
   const [messageType, setMessageType] = useState('error')
@@ -200,42 +300,83 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
     level: 'Iniciado',
   })
 
-  useEffect(() => {
-    let isMounted = true
+  const refreshProfile = useCallback(async ({ background = false, syncForm = false } = {}) => {
+    if (!currentUser?.id) return false
 
-    async function fetchProfile() {
-      if (!currentUser?.id) return
+    const requestId = profileRequestIdRef.current + 1
+    profileRequestIdRef.current = requestId
 
-      setIsFetchingProfile(true)
-      const result = await loadSupabaseProfileData(currentUser.id)
+    if (background) setIsRefreshingProfile(true)
+    else setIsFetchingProfile(true)
 
-      if (!isMounted) return
+    const result = await loadSupabaseProfileData(currentUser.id)
 
-      setIsFetchingProfile(false)
+    if (requestId !== profileRequestIdRef.current) return false
 
-      if (!result.ok) {
-        setProfileMessage(result.message)
-        setMessageType('error')
-        return
-      }
+    setIsFetchingProfile(false)
+    setIsRefreshingProfile(false)
 
-      const nextProfile = result.data.profile
-      setProfileData(result.data)
+    if (!result.ok) {
+      setMembershipSyncMessage(result.message)
+      return false
+    }
+
+    const nextProfile = result.data.profile
+    setProfileData(result.data)
+    setLastUpdatedAt(new Date())
+    setMembershipSyncMessage(result.data.membershipIssue ?? '')
+
+    if (syncForm) {
       setFormData({
         fullName: nextProfile?.full_name ?? currentUser.name ?? '',
         phone: nextProfile?.phone ?? '',
         birthDate: nextProfile?.birth_date ?? '',
         level: nextProfile?.level ?? 'Iniciado',
       })
-      setProfileMessage('')
     }
 
-    fetchProfile()
+    return true
+  }, [currentUser?.id, currentUser?.name])
+
+  useEffect(() => {
+    refreshProfile({ syncForm: true })
 
     return () => {
-      isMounted = false
+      profileRequestIdRef.current += 1
     }
-  }, [currentUser?.id, currentUser?.name])
+  }, [refreshProfile])
+
+  useEffect(() => {
+    if (!currentUser?.id) return undefined
+
+    let refreshTimer = null
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        refreshProfile({ background: true })
+      }, 300)
+    }
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') scheduleRefresh()
+    }
+    const periodicRefresh = window.setInterval(refreshWhenVisible, 90000)
+    const unsubscribe = subscribeToProfileData(currentUser.id, scheduleRefresh)
+
+    window.addEventListener('focus', scheduleRefresh)
+    window.addEventListener('online', scheduleRefresh)
+    window.addEventListener('pageshow', scheduleRefresh)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+
+    return () => {
+      window.clearTimeout(refreshTimer)
+      window.clearInterval(periodicRefresh)
+      window.removeEventListener('focus', scheduleRefresh)
+      window.removeEventListener('online', scheduleRefresh)
+      window.removeEventListener('pageshow', scheduleRefresh)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      unsubscribe()
+    }
+  }, [currentUser?.id, refreshProfile])
 
   const supabaseProfile = profileData?.profile
   const activeMembership = profileData?.membership
@@ -255,11 +396,8 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
   const plan = activeMembership?.plan
   const planName = plan?.name ?? activeMembership?.plan_name
   const planPrice = plan?.price
-  const isUnlimitedPlan = Boolean(plan?.is_unlimited ?? activeMembership?.is_unlimited)
-  const classesTotal = activeMembership?.classes_total
-  const classesUsed = activeMembership?.classes_used ?? 0
-  const classesRemaining = isUnlimitedPlan ? null : Math.max(Number(classesTotal ?? 0) - Number(classesUsed), 0)
-  const daysRemaining = calculateDaysRemaining(activeMembership?.end_date)
+  const tokenSummary = getMembershipTokenSummary(activeMembership, profileData?.remainingTokens)
+  const daysRemaining = calculateDaysRemaining(activeMembership?.end_date ?? activeMembership?.expires_at)
   const nextReservation = useMemo(() => {
     const today = getChileDateString()
 
@@ -442,13 +580,24 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         </div>
       </MotionCard>
 
+      <MembershipSummary
+        membership={activeMembership}
+        planName={planName}
+        planPrice={planPrice}
+        tokenSummary={tokenSummary}
+        daysRemaining={daysRemaining}
+        isLoading={isFetchingProfile}
+        isRefreshing={isRefreshingProfile}
+        lastUpdatedAt={lastUpdatedAt}
+        message={membershipSyncMessage}
+        onRefresh={() => refreshProfile({ background: true })}
+      />
+
       <StudentDashboard
         isLoading={isFetchingProfile}
         message={profileMessage && messageType === 'error' ? profileMessage : ''}
         activeMembership={activeMembership}
         nextReservation={nextReservation}
-        classesRemaining={classesRemaining}
-        isUnlimitedPlan={isUnlimitedPlan}
         setActivePage={setActivePage}
       />
 
@@ -573,31 +722,6 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
             </button>
           </form>
         </Motion.div>
-      </MotionCard>
-
-      <MotionCard as="section" className="k-card p-5" delay={0.05}>
-        <SectionTitle eyebrow="Plan activo" title={planName ?? 'Sin plan activo'} />
-        {activeMembership ? (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ProfileField label="Plan" value={`${planName ?? 'Plan KUPAN'} ${planPrice ? `· ${formatCurrency(planPrice)}` : ''}`} />
-              <ProfileField label="Inicio" value={formatDate(activeMembership.start_date)} />
-              <ProfileField label="Vencimiento" value={formatDate(activeMembership.end_date)} />
-              <ProfileField label="Dias restantes" value={daysRemaining !== null ? `${daysRemaining} dias` : 'Sin registrar'} />
-              <ProfileField label="Tokens totales" value={isUnlimitedPlan ? 'Ilimitado' : classesTotal} />
-              <ProfileField label="Tokens usados" value={isUnlimitedPlan ? 'No descuenta' : classesUsed} />
-              <ProfileField label="Tokens disponibles" value={isUnlimitedPlan ? 'Ilimitado' : classesRemaining} />
-              <ProfileField label="Estado membresia" value={activeMembership.status === 'active' ? 'Activa' : activeMembership.status} />
-            </div>
-            <p className="mt-4 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4 text-sm font-bold leading-6 text-white">
-              Los tokens no utilizados vencen al terminar el plan y no son acumulables.
-            </p>
-          </>
-        ) : (
-          <p className="text-sm leading-6 text-white/60">
-            Aun no hay una membresia activa asociada a tu perfil. Escríbenos para activar tu plan y seguir entrenando.
-          </p>
-        )}
       </MotionCard>
 
       <MotionCard as="section" className="k-card p-5" delay={0.06}>
