@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v15'
+const CACHE_VERSION = 'v16'
 const STATIC_CACHE = `kupan-static-${CACHE_VERSION}`
 const HTML_CACHE = `kupan-html-${CACHE_VERSION}`
 const APP_SHELL = [

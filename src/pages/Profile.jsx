@@ -333,6 +333,12 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         birthDate: nextProfile?.birth_date ?? '',
         level: nextProfile?.level ?? 'Iniciado',
       })
+      if (result.data.profileIssue) {
+        setMessageType('error')
+        setProfileMessage(result.data.profileIssue)
+      } else {
+        setProfileMessage('')
+      }
     }
 
     return true
@@ -595,7 +601,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
 
       <StudentDashboard
         isLoading={isFetchingProfile}
-        message={profileMessage && messageType === 'error' ? profileMessage : ''}
+        message={profileData?.reservationsIssue ?? ''}
         activeMembership={activeMembership}
         nextReservation={nextReservation}
         setActivePage={setActivePage}

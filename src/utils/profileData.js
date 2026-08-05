@@ -73,6 +73,55 @@ export function calculateDaysRemaining(endDate) {
   return Math.max(Math.ceil(diff / 86400000), 0)
 }
 
+function getChileDateString(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+async function loadMembershipWithFallback(profileId, rpcResult) {
+  if (!rpcResult.error) {
+    return {
+      membership: Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data,
+      error: null,
+    }
+  }
+
+  logAppError('profile.load_membership_rpc', rpcResult.error)
+  const today = getChileDateString()
+  const directResult = await supabase
+    .from('memberships')
+    .select(`
+      id,
+      profile_id,
+      plan_id,
+      start_date,
+      end_date,
+      expires_at,
+      status,
+      payment_status,
+      classes_total,
+      classes_used,
+      plan:plans(id, name, price, is_unlimited)
+    `)
+    .eq('profile_id', profileId)
+    .eq('status', 'active')
+    .eq('payment_status', 'paid')
+    .lte('start_date', today)
+    .gte('end_date', today)
+    .order('end_date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  return {
+    membership: directResult.data,
+    error: directResult.error,
+  }
+}
+
 export async function loadSupabaseProfileData(profileId) {
   if (!isSupabaseConfigured || !supabase) {
     return getProfileError('Supabase aun no esta configurado. Agrega tus variables en .env.local.')
@@ -94,14 +143,20 @@ export async function loadSupabaseProfileData(profileId) {
     getPersonalRecordHistory(),
   ])
 
-  if (profileResult.error) return getSafeProfileError('profile.load_profile', profileResult.error, 'No fue posible cargar tus datos personales. Intenta nuevamente.')
-  if (membershipResult.error) return getSafeProfileError('profile.load_membership', membershipResult.error, 'No fue posible cargar tu plan activo. Intenta nuevamente.')
-  if (reservationsResult.error) return getSafeProfileError('profile.load_reservations', reservationsResult.error, 'No fue posible cargar tus reservas. Intenta nuevamente.')
+  const profileIssue = profileResult.error
+    ? getSafeProfileError('profile.load_profile', profileResult.error, 'No fue posible cargar tus datos personales. Intenta nuevamente.').message
+    : ''
+  const reservationsIssue = reservationsResult.error
+    ? getSafeProfileError('profile.load_reservations', reservationsResult.error, 'No fue posible cargar tus reservas. Intenta nuevamente.').message
+    : ''
   const recordsIssue = recordsResult.ok ? '' : 'No pudimos cargar tus últimos PR desde Supabase.'
-  const membership = Array.isArray(membershipResult.data) ? membershipResult.data[0] : membershipResult.data
+  const loadedMembership = await loadMembershipWithFallback(profileId, membershipResult)
+  const membership = loadedMembership.membership
   let membershipWithPlan = membership ?? null
   let remainingTokens = null
-  let membershipIssue = ''
+  let membershipIssue = loadedMembership.error
+    ? getSafeProfileError('profile.load_membership_fallback', loadedMembership.error, 'No fue posible cargar tu plan activo. Intenta nuevamente.').message
+    : ''
 
   if (membership?.id) {
     const [remainingTokensResult, planResult] = await Promise.all([
@@ -136,10 +191,12 @@ export async function loadSupabaseProfileData(profileId) {
     ok: true,
     data: {
       profile: profileResult.data,
+      profileIssue,
       membership: membershipWithPlan,
       remainingTokens,
       membershipIssue,
-      reservations: (reservationsResult.data ?? []).map(mapReservationRow),
+      reservations: reservationsResult.error ? [] : (reservationsResult.data ?? []).map(mapReservationRow),
+      reservationsIssue,
       records: recordsResult.ok ? (recordsResult.data ?? []).slice(0, 5) : [],
       recordsIssue,
     },
