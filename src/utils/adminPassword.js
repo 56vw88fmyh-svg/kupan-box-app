@@ -2,7 +2,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { getPasswordErrorMessage } from './passwordSecurity.js'
 
 function getConfigError() {
-  return { ok: false, message: 'Supabase no está configurado para gestionar contraseñas.' }
+  return { ok: false, message: 'El servicio de acceso no está configurado para gestionar contraseñas.' }
 }
 
 function getRedirectUrl() {

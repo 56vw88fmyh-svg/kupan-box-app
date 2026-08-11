@@ -34,7 +34,7 @@ export function AdminCreateStudentForm({
       </div>
       <TextArea label="Observaciones internas" value={draft.internal_notes} onChange={(value) => onDraftChange((current) => ({ ...current, internal_notes: value }))} />
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
-        Esta accion llama una Edge Function segura. Las credenciales privadas viven solo en Supabase, nunca en el frontend.
+        Esta acción usa un servicio protegido. Las credenciales privadas nunca se guardan en la app.
       </div>
       <button type="submit" className="k-button w-full" disabled={isDisabled}>
         {isSubmitting ? 'Creando alumno...' : 'Crear alumno'}

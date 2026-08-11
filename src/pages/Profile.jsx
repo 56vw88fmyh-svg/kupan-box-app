@@ -14,16 +14,8 @@ import {
   updateSupabaseProfile,
 } from '../utils/profileData.js'
 
-const weeklyProgress = [
-  { day: 'L', done: true },
-  { day: 'M', done: true },
-  { day: 'M', done: false },
-  { day: 'J', done: true },
-  { day: 'V', done: false },
-  { day: 'S', done: true },
-]
-
 const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
+const weekDayInitials = ['L', 'M', 'M', 'J', 'V', 'S']
 
 function getChileDateString(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -32,6 +24,26 @@ function getChileDateString(date = new Date()) {
     month: '2-digit',
     day: '2-digit',
   }).format(date)
+}
+
+function buildWeeklyProgress(reservations) {
+  const todayKey = getChileDateString()
+  const today = new Date(`${todayKey}T12:00:00`)
+  const mondayOffset = (today.getDay() + 6) % 7
+  const monday = new Date(today)
+  monday.setDate(today.getDate() - mondayOffset)
+  const attendedDates = new Set(
+    reservations
+      .filter((reservation) => reservation.status === 'attended')
+      .map((reservation) => reservation.reservation_date ?? reservation.reservationDate),
+  )
+
+  return weekDayInitials.map((day, index) => {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + index)
+    const dateKey = getChileDateString(date)
+    return { day, date: dateKey, done: attendedDates.has(dateKey) }
+  })
 }
 
 function formatDate(date) {
@@ -81,6 +93,7 @@ function MembershipSummary({
   lastUpdatedAt,
   message,
   onRefresh,
+  onRenew,
 }) {
   const membershipEndDate = membership?.end_date ?? membership?.expires_at
   const hasMembership = Boolean(membership)
@@ -94,7 +107,7 @@ function MembershipSummary({
       <div className="flex flex-col gap-4 border-b border-white/10 bg-black/25 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Membresía KUPAN</p>
-          <h2 className="mt-2 text-3xl font-black uppercase leading-none text-white">
+          <h2 className="k-display mt-2 text-4xl font-black uppercase leading-none text-white">
             {isLoading ? 'Revisando tu plan...' : planName ?? 'Activa tu plan'}
           </h2>
           <p className="mt-2 text-sm font-bold text-white/55">
@@ -160,15 +173,22 @@ function MembershipSummary({
             <ProfileField label="Estado" value={membership.status === 'active' ? 'Activa' : membership.status} />
           </div>
 
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <ProfileField label="Estado de pago" value={membership.payment_status === 'paid' ? 'Pagado' : membership.payment_status ?? 'Sin registrar'} />
+            <ProfileField label="Valor del plan" value={planPrice ? formatCurrency(planPrice) : 'Consultar'} />
+          </div>
+
           <p className="mt-4 text-sm font-bold leading-6 text-white/55">
             {planPrice ? `${formatCurrency(planPrice)} · ` : ''}Los tokens no utilizados vencen al terminar el plan y no son acumulables.
           </p>
+          <button type="button" className="k-button mt-4 w-full" onClick={onRenew}>Ver opciones de renovación</button>
         </div>
       ) : (
         <div className="p-5">
           <div className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4">
             <p className="font-black uppercase text-white">Aún no tienes una membresía activa.</p>
             <p className="mt-2 text-sm leading-6 text-white/65">Cuando el administrador active tu plan, aparecerá aquí automáticamente con sus tokens y vencimiento.</p>
+            <button type="button" className="k-button mt-4 w-full" onClick={onRenew}>Ver planes KUPAN</button>
           </div>
         </div>
       )}
@@ -226,7 +246,7 @@ function StudentDashboard({
       </div>
 
       {isLoading ? (
-        <p className="border-b border-white/10 p-5 text-sm font-bold text-white/60">Cargando tu información real desde Supabase...</p>
+        <p className="border-b border-white/10 p-5 text-sm font-bold text-white/60">Cargando tu información segura...</p>
       ) : null}
 
       {message ? (
@@ -239,7 +259,7 @@ function StudentDashboard({
           {isLoading ? (
             <>
               <h3 className="mt-2 text-2xl font-black uppercase leading-tight text-white">Revisando tus reservas...</h3>
-              <p className="mt-2 text-sm leading-6 text-white/60">Estamos cargando tu próxima clase desde Supabase.</p>
+              <p className="mt-2 text-sm leading-6 text-white/60">Estamos cargando tu próxima clase.</p>
             </>
           ) : nextReservation ? (
             <>
@@ -393,7 +413,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
   const accessRestricted = new window.URLSearchParams(location.search).get('access') === 'restricted'
 
   const profileName = supabaseProfile?.full_name ?? currentUser?.name ?? 'Atleta KUPAN'
-  const email = supabaseProfile?.email ?? currentUser?.email ?? 'Inicia sesion para guardar tu progreso'
+  const email = supabaseProfile?.email ?? currentUser?.email ?? 'Inicia sesión para guardar tu progreso'
   const phone = supabaseProfile?.phone ?? currentUser?.phone ?? ''
   const birthDate = supabaseProfile?.birth_date ?? currentUser?.birthDate ?? ''
   const age = calculateAge(birthDate)
@@ -401,7 +421,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
   const status = supabaseProfile?.status ?? currentUser?.status ?? 'active'
   const plan = activeMembership?.plan
   const planName = plan?.name ?? activeMembership?.plan_name
-  const planPrice = plan?.price
+  const planPrice = activeMembership?.agreed_price ?? plan?.price
   const tokenSummary = getMembershipTokenSummary(activeMembership, profileData?.remainingTokens)
   const daysRemaining = calculateDaysRemaining(activeMembership?.end_date ?? activeMembership?.expires_at)
   const nextReservation = useMemo(() => {
@@ -421,15 +441,20 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
       })[0] ?? null
   }, [supabaseReservations])
 
+  const weeklyProgress = useMemo(() => buildWeeklyProgress(supabaseReservations), [supabaseReservations])
   const weeklyCompleted = weeklyProgress.filter((item) => item.done).length
   const weeklyGoal = weeklyProgress.length
   const weeklyPercent = Math.round((weeklyCompleted / weeklyGoal) * 100)
-  const attendance = supabaseReservations.filter((reservation) => reservation.status === 'attended').length
+  const currentMonth = getChileDateString().slice(0, 7)
+  const attendance = supabaseReservations.filter((reservation) => (
+    reservation.status === 'attended'
+    && String(reservation.reservation_date ?? reservation.reservationDate ?? '').startsWith(currentMonth)
+  )).length
   const motivation = 'Entrena fuerte, entrena acompañado. El progreso se construye apareciendo.'
 
   const stats = useMemo(() => ([
     { label: 'Reservas', value: visibleReservations.length },
-    { label: 'Asistencias', value: attendance },
+    { label: 'Asist. mes', value: attendance },
     { label: 'Nivel', value: level },
   ]), [attendance, level, visibleReservations.length])
 
@@ -531,10 +556,10 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
           <p className="k-pill inline-flex text-kupan-flame">Perfil KUPAN</p>
           <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Entra a tu cuenta y entrena acompañado.</h2>
           <p className="mt-3 text-sm leading-6 text-white/60">
-            Inicia sesion para ver tu plan, reservas, datos personales y progreso dentro del box.
+            Inicia sesión para ver tu plan, reservas, datos personales y progreso dentro del box.
           </p>
           <button type="button" className="k-button mt-5 w-full" onClick={() => setActivePage('login')}>
-            Iniciar sesion
+            Iniciar sesión
           </button>
         </MotionCard>
       </div>
@@ -547,7 +572,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         <MotionCard as="section" className="k-card border-kupan-flame/30 bg-kupan-flame/10 p-5">
           <p className="k-pill inline-flex text-kupan-flame">Acceso restringido</p>
           <h2 className="mt-3 text-2xl font-black uppercase leading-tight text-white">Ese panel requiere permiso administrativo.</h2>
-          <p className="mt-2 text-sm leading-6 text-white/70">Tu cuenta sigue segura en el perfil de alumno. Si necesitas entrar al panel admin, pide que validen tu rol en Supabase.</p>
+          <p className="mt-2 text-sm leading-6 text-white/70">Tu cuenta sigue segura en el perfil de alumno. Si necesitas entrar al panel admin, pide que validen tu permiso.</p>
         </MotionCard>
       ) : null}
 
@@ -572,16 +597,16 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
 
         <div className="grid grid-cols-3 gap-0 border-b border-white/10">
           {stats.map((item, index) => (
-            <div key={item.label} className={`${index > 0 ? 'border-l border-white/10' : ''} p-4`}>
-              <p className={`${item.label === 'Nivel' ? 'text-2xl text-kupan-flame' : 'text-3xl text-white'} font-black uppercase`}>{item.value}</p>
-              <p className="text-[0.65rem] font-black uppercase text-white/60">{item.label}</p>
+            <div key={item.label} className={`${index > 0 ? 'border-l border-white/10' : ''} min-w-0 px-3 py-4 sm:p-4`}>
+              <p className={`${item.label === 'Nivel' ? 'text-base text-kupan-flame sm:text-xl' : 'text-3xl text-white'} break-words font-black uppercase leading-none`}>{item.value}</p>
+              <p className="mt-2 text-[0.65rem] font-black uppercase text-white/60">{item.label}</p>
             </div>
           ))}
         </div>
 
         <div className="p-5">
           <button type="button" className="k-button-secondary w-full" onClick={onLogout}>
-            Cerrar sesion
+            Cerrar sesión
           </button>
         </div>
       </MotionCard>
@@ -597,6 +622,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         lastUpdatedAt={lastUpdatedAt}
         message={membershipSyncMessage}
         onRefresh={() => refreshProfile({ background: true })}
+        onRenew={() => setActivePage('plans')}
       />
 
       <StudentDashboard
@@ -609,13 +635,13 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
 
       <MotionCard as="section" className="k-card p-5" delay={0.03}>
         <SectionTitle eyebrow="Datos del atleta" title="Tu ficha KUPAN" />
-        {isFetchingProfile ? <p className="mb-4 text-sm font-bold text-white/60">Cargando tus datos desde Supabase...</p> : null}
+        {isFetchingProfile ? <p className="mb-4 text-sm font-bold text-white/60">Cargando tus datos seguros...</p> : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <ProfileField label="Nombre completo" value={profileName} />
           <ProfileField label="Email" value={email} />
-          <ProfileField label="Telefono" value={phone} />
+          <ProfileField label="Teléfono" value={phone} />
           <ProfileField label="Fecha nacimiento" value={formatDate(birthDate)} />
-          <ProfileField label="Edad" value={age !== null ? `${age} anos` : 'Sin registrar'} />
+          <ProfileField label="Edad" value={age !== null ? `${age} años` : 'Sin registrar'} />
           <ProfileField label="Nivel" value={level} />
           <ProfileField label="Estado" value={status === 'active' ? 'Activo' : 'Inactivo'} />
           <ProfileField label="Rol" value={currentUser.role === 'admin' ? 'Admin' : 'Alumno'} />
@@ -632,7 +658,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
           <span className="min-w-0">
             <span className="block text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Editar perfil</span>
             <span className="mt-2 block text-2xl font-black uppercase leading-none text-white">Datos que puedes actualizar</span>
-            <span className="mt-2 block text-sm font-bold leading-6 text-white/55">Nombre, telefono, fecha de nacimiento y nivel.</span>
+            <span className="mt-2 block text-sm font-bold leading-6 text-white/55">Nombre, teléfono, fecha de nacimiento y nivel.</span>
           </span>
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/35 text-lg font-black text-kupan-flame transition ${isEditOpen ? '-rotate-90' : 'rotate-90'}`}>
             {'>'}
@@ -662,7 +688,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
             >
               <form className="mt-4 space-y-4" onSubmit={handleSaveProfile}>
                 <EditableField label="Nombre completo" value={formData.fullName} required onChange={(value) => setFormData((current) => ({ ...current, fullName: value }))} />
-                <EditableField label="Telefono" type="tel" value={formData.phone} onChange={(value) => setFormData((current) => ({ ...current, phone: value }))} />
+                <EditableField label="Teléfono" type="tel" value={formData.phone} onChange={(value) => setFormData((current) => ({ ...current, phone: value }))} />
                 <EditableField label="Fecha de nacimiento" type="date" value={formData.birthDate} required onChange={(value) => setFormData((current) => ({ ...current, birthDate: value }))} />
                 <label className="block">
                   <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">Nivel</span>
@@ -680,7 +706,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
                 </label>
 
                 <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
-                  Email, plan, rol y estado de membresia quedan protegidos. Si necesitas cambiarlos, debe hacerlo un admin.
+                  Email, plan, rol y estado de membresía quedan protegidos. Si necesitas cambiarlos, debe hacerlo un admin.
                 </div>
 
                 <button type="submit" className="k-button w-full" disabled={isSavingProfile}>
@@ -801,7 +827,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
           </div>
         ) : (
           <MotionCard className="k-panel p-4">
-            <p className="font-black uppercase text-white">Aun no tienes reservas.</p>
+            <p className="font-black uppercase text-white">Aún no tienes reservas.</p>
             <p className="mt-1 text-sm leading-6 text-white/60">Reserva tu clase y ven a darlo todo. Tu semana queda ordenada aca.</p>
           </MotionCard>
         )}

@@ -103,8 +103,13 @@ async function loadMembershipWithFallback(profileId, rpcResult) {
       expires_at,
       status,
       payment_status,
+      payment_provider,
+      payment_reference,
       classes_total,
       classes_used,
+      agreed_price,
+      agreement_valid_until,
+      agreement_note,
       plan:plans(id, name, price, is_unlimited)
     `)
     .eq('profile_id', profileId)
@@ -124,11 +129,11 @@ async function loadMembershipWithFallback(profileId, rpcResult) {
 
 export async function loadSupabaseProfileData(profileId) {
   if (!isSupabaseConfigured || !supabase) {
-    return getProfileError('Supabase aun no esta configurado. Agrega tus variables en .env.local.')
+    return getProfileError('El servicio de datos aún no está configurado.')
   }
 
   if (!profileId) {
-    return getProfileError('Inicia sesion para ver tu perfil KUPAN.')
+    return getProfileError('Inicia sesión para ver tu perfil KUPAN.')
   }
 
   const [profileResult, membershipResult, reservationsResult, recordsResult] = await Promise.all([
@@ -147,7 +152,7 @@ export async function loadSupabaseProfileData(profileId) {
   const reservationsIssue = reservationsResult.error
     ? getSafeProfileError('profile.load_reservations', reservationsResult.error, 'No fue posible cargar tus reservas. Intenta nuevamente.').message
     : ''
-  const recordsIssue = recordsResult.ok ? '' : 'No pudimos cargar tus últimos PR desde Supabase.'
+  const recordsIssue = recordsResult.ok ? '' : 'No pudimos cargar tus últimos PR.'
   const loadedMembership = await loadMembershipWithFallback(profileId, membershipResult)
   const membership = loadedMembership.membership
   let membershipWithPlan = membership ?? null
@@ -157,15 +162,31 @@ export async function loadSupabaseProfileData(profileId) {
     : ''
 
   if (membership?.id) {
-    const [remainingTokensResult, planResult] = await Promise.all([
+    const [remainingTokensResult, membershipDetailsResult] = await Promise.all([
       supabase.rpc('membership_remaining_tokens', { target_membership_id: membership.id }),
-      membership.plan_id
-        ? supabase
-          .from('plans')
-          .select('id, name, price, is_unlimited')
-          .eq('id', membership.plan_id)
-          .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
+      supabase
+        .from('memberships')
+        .select(`
+          id,
+          profile_id,
+          plan_id,
+          start_date,
+          end_date,
+          expires_at,
+          status,
+          payment_status,
+          payment_provider,
+          payment_reference,
+          classes_total,
+          classes_used,
+          agreed_price,
+          agreement_valid_until,
+          agreement_note,
+          plan:plans(id, name, price, is_unlimited)
+        `)
+        .eq('id', membership.id)
+        .eq('profile_id', profileId)
+        .maybeSingle(),
     ])
 
     if (remainingTokensResult.error) {
@@ -175,13 +196,15 @@ export async function loadSupabaseProfileData(profileId) {
       remainingTokens = remainingTokensResult.data
     }
 
-    if (planResult.error) {
-      logAppError('profile.load_plan', planResult.error)
+    if (membershipDetailsResult.error) {
+      logAppError('profile.load_membership_details', membershipDetailsResult.error)
+      membershipIssue = membershipIssue || 'Tu plan está activo, pero algunos detalles no pudieron sincronizarse. Presiona Actualizar plan.'
     }
 
     membershipWithPlan = {
       ...membership,
-      plan: planResult.data ?? undefined,
+      ...(membershipDetailsResult.data ?? {}),
+      plan: membershipDetailsResult.data?.plan ?? membership.plan ?? undefined,
     }
   }
 
@@ -221,7 +244,7 @@ export function subscribeToProfileData(profileId, onChange) {
 
 export async function updateSupabaseProfile(profileId, values) {
   if (!isSupabaseConfigured || !supabase) {
-    return getProfileError('Supabase aun no esta configurado. Agrega tus variables en .env.local.')
+    return getProfileError('El servicio de datos aún no está configurado.')
   }
 
   const fullName = (values.fullName ?? '').trim()

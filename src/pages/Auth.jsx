@@ -97,7 +97,7 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
           <p className="mt-3 text-sm leading-6 text-white/60">
             {isRecoveryOpen
               ? 'Te enviaremos un enlace seguro para crear una nueva contraseña.'
-              : 'Tu sesión queda guardada de forma segura con Supabase. Somos comunidad, esfuerzo y progreso.'}
+              : 'Tu sesión y tus datos se guardan de forma segura. Somos comunidad, esfuerzo y progreso.'}
           </p>
         </div>
 

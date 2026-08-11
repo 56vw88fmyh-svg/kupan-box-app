@@ -68,7 +68,7 @@ export function formatShortChileDate(value) {
 
 export async function loadTodaysWod() {
   if (!isSupabaseConfigured || !supabase) {
-    return getFeedError('Supabase aun no esta configurado.')
+    return getFeedError('El servicio de datos aún no está disponible.')
   }
 
   const today = toChileDateString()
@@ -195,7 +195,7 @@ async function loadBirthdays() {
 
 export async function loadCommunityFeed() {
   if (!isSupabaseConfigured || !supabase) {
-    return getFeedError('Supabase aun no esta configurado.')
+    return getFeedError('El servicio de datos aún no está disponible.')
   }
 
   const [birthdays, ranking, news, recentPrs] = await Promise.allSettled([

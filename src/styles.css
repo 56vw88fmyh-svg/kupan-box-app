@@ -4,27 +4,32 @@
 
 @layer base {
   :root {
-    --bg-primary: #0B0B0C;
-    --bg-secondary: #141416;
-    --bg-card: #1B1B1E;
-    --bg-elevated: #232327;
+    --bg-primary: #0E1011;
+    --bg-secondary: #151817;
+    --bg-card: #1B1F1D;
+    --bg-elevated: #242926;
 
-    --text-primary: #F5F5F5;
-    --text-secondary: #C7C7CC;
-    --text-muted: #92929A;
-    --text-disabled: #68686F;
+    --text-primary: #EBECE7;
+    --text-secondary: #BDC3C3;
+    --text-muted: #98A09D;
+    --text-disabled: #69706D;
 
-    --brand-red: #FF5A1F;
-    --brand-red-hover: #FF7A3D;
-    --brand-red-soft: rgba(255, 90, 31, 0.14);
+    --brand-red: #9B2A31;
+    --brand-red-hover: #B43A42;
+    --brand-red-soft: rgba(155, 42, 49, 0.16);
+    --brand-forest: #364B35;
+    --brand-leaf: #6D8A69;
+    --brand-earth: #946A5A;
+    --brand-sand: #D9CAB3;
+    --brand-steel: #BDC3C3;
 
-    --success: #3CCB7F;
-    --warning: #F5B942;
-    --error: #FF5A5F;
-    --info: #5CA8FF;
+    --success: #7F9F79;
+    --warning: #D9B56F;
+    --error: #E16767;
+    --info: #9DB9C4;
 
-    --border-default: #303036;
-    --border-strong: #45454D;
+    --border-default: #3C4341;
+    --border-strong: #68706D;
 
     --space-1: 0.25rem;
     --space-2: 0.5rem;
@@ -40,22 +45,27 @@
     --radius-3: 1rem;
     --radius-4: 1.375rem;
 
-    --color-bg-primary: 11 11 12;
-    --color-bg-secondary: 20 20 22;
-    --color-bg-card: 27 27 30;
-    --color-bg-elevated: 35 35 39;
-    --color-text-primary: 245 245 245;
-    --color-text-secondary: 199 199 204;
-    --color-text-muted: 146 146 154;
-    --color-text-disabled: 104 104 111;
-    --color-brand-red: 255 90 31;
-    --color-brand-red-hover: 255 122 61;
-    --color-success: 60 203 127;
-    --color-warning: 245 185 66;
-    --color-error: 255 90 95;
-    --color-info: 92 168 255;
-    --color-border-default: 48 48 54;
-    --color-border-strong: 69 69 77;
+    --color-bg-primary: 14 16 17;
+    --color-bg-secondary: 21 24 23;
+    --color-bg-card: 27 31 29;
+    --color-bg-elevated: 36 41 38;
+    --color-text-primary: 235 236 231;
+    --color-text-secondary: 189 195 195;
+    --color-text-muted: 152 160 157;
+    --color-text-disabled: 105 112 109;
+    --color-brand-red: 155 42 49;
+    --color-brand-red-hover: 180 58 66;
+    --color-brand-forest: 54 75 53;
+    --color-brand-leaf: 109 138 105;
+    --color-brand-earth: 148 106 90;
+    --color-brand-sand: 217 202 179;
+    --color-brand-steel: 189 195 195;
+    --color-success: 127 159 121;
+    --color-warning: 217 181 111;
+    --color-error: 225 103 103;
+    --color-info: 157 185 196;
+    --color-border-default: 60 67 65;
+    --color-border-strong: 104 112 109;
   }
 
   * {
@@ -75,8 +85,8 @@
     margin: 0;
     color: var(--text-primary);
     background:
-      linear-gradient(135deg, rgba(240, 68, 68, 0.12) 0 1px, transparent 1px 18px),
-      linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 42%, #09090A 100%);
+      linear-gradient(135deg, rgba(189, 195, 195, 0.045) 0 1px, transparent 1px 22px),
+      linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 42%, #0A0C0C 100%);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
@@ -119,7 +129,7 @@
 
   ::selection {
     color: var(--text-primary);
-    background: rgba(255, 90, 31, 0.42);
+    background: rgba(155, 42, 49, 0.58);
   }
 }
 
@@ -129,7 +139,7 @@
   }
 
   .k-card {
-    @apply min-w-0 rounded-xl border border-kupan-border bg-kupan-charcoal/90 shadow-[0_18px_54px_rgba(0,0,0,0.46)] backdrop-blur;
+    @apply min-w-0 rounded-xl border border-kupan-border bg-kupan-charcoal/90 shadow-[0_18px_54px_rgba(0,0,0,0.42)] backdrop-blur;
   }
 
   .k-panel {
@@ -141,7 +151,7 @@
   }
 
   .k-button {
-    @apply inline-flex min-h-12 items-center justify-center rounded-xl bg-kupan-ember px-4 py-3 text-sm font-black uppercase text-kupan-black shadow-glow transition duration-200 hover:-translate-y-0.5 hover:bg-kupan-flame hover:shadow-xl hover:shadow-kupan-ember/20 active:scale-[0.98];
+    @apply inline-flex min-h-12 items-center justify-center rounded-xl bg-kupan-ember px-4 py-3 text-sm font-black uppercase text-kupan-bone shadow-glow transition duration-200 hover:-translate-y-0.5 hover:bg-kupan-root-hover hover:shadow-xl hover:shadow-kupan-ember/20 active:scale-[0.98];
   }
 
   .k-button-secondary {
@@ -150,8 +160,8 @@
 
   .k-hero {
     background:
-      linear-gradient(115deg, rgba(11, 11, 12, 0.18), rgba(11, 11, 12, 0.9)),
-      repeating-linear-gradient(135deg, rgba(245, 245, 245, 0.07) 0 1px, transparent 1px 18px),
+      linear-gradient(115deg, rgba(14, 16, 17, 0.12), rgba(14, 16, 17, 0.92)),
+      repeating-linear-gradient(135deg, rgba(189, 195, 195, 0.06) 0 1px, transparent 1px 20px),
       linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-secondary) 48%, var(--bg-primary) 100%);
   }
 
@@ -185,7 +195,17 @@
   }
 
   .k-tab-item {
-    min-height: 4rem;
+    min-height: 3.65rem;
+  }
+
+  .k-display {
+    font-family: "Barlow Condensed", Inter, system-ui, sans-serif;
+    letter-spacing: 0;
+  }
+
+  .k-ceremonial {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    letter-spacing: 0;
   }
 
   .k-scroll-x {

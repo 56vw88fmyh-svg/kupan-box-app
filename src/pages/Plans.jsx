@@ -1,4 +1,5 @@
 import { SectionTitle } from '../components/SectionTitle.jsx'
+import { Link } from 'react-router-dom'
 import { transferInfo } from '../data/fallbackData.js'
 import { createWhatsAppUrl, whatsappMessages } from '../utils/whatsapp.js'
 
@@ -28,12 +29,18 @@ function PlanCard({ plan }) {
       </ul>
 
       <div className="mt-5 grid gap-3">
-        <a className={plan.highlight ? 'k-button' : 'k-button-secondary'} href={buildWhatsAppUrl(plan)} target="_blank" rel="noreferrer">
-          Solicitar por WhatsApp
-        </a>
-        <a className="k-button-secondary" href={plan.paymentUrl} target="_blank" rel="noreferrer">
-          Pagar ahora
-        </a>
+        {plan.trial ? (
+          <Link className={plan.highlight ? 'k-button' : 'k-button-secondary'} to="/prueba">Solicitar primera clase</Link>
+        ) : (
+          <a className={plan.highlight ? 'k-button' : 'k-button-secondary'} href={buildWhatsAppUrl(plan)} target="_blank" rel="noreferrer">
+            Solicitar por WhatsApp
+          </a>
+        )}
+        {plan.paymentUrl ? (
+          <a className="k-button-secondary" href={plan.paymentUrl} target="_blank" rel="noreferrer">
+            Pagar ahora
+          </a>
+        ) : null}
       </div>
     </article>
   )
@@ -47,11 +54,12 @@ export function Plans({ appContent }) {
       <section className="k-card overflow-hidden p-0">
         <div className="border-b border-white/10 bg-black/25 p-5">
           <p className="k-pill inline-flex text-kupan-flame">Planes KUPAN</p>
-          <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Elige tu plan y ven a entrenar fuerte.</h2>
+          <h2 className="k-display mt-4 text-5xl font-black uppercase leading-none text-white">Elige tu plan y ven a entrenar fuerte.</h2>
           <p className="mt-3 text-sm leading-6 text-white/60">
             Tú eliges el ritmo, nosotros ponemos el box, la comunidad y la energía para que sigas progresando.
           </p>
         </div>
+        <p className="k-ceremonial border-t border-white/10 px-5 py-4 text-2xl italic leading-tight text-kupan-sand">Fuerza · Raíces · Espíritu</p>
       </section>
 
       <SectionTitle eyebrow="Membresías KUPAN" title="Planes para tu ritmo" />

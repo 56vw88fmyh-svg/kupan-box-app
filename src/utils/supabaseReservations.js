@@ -1,5 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
+import { getChileDateKey } from './chileDateTime.js'
+import { formatCoachName } from './coachName.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
 const shortDayNames = ['', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
@@ -14,7 +16,7 @@ function getSafeReservationError(scope, error, fallback) {
 }
 
 function toDateInput(date) {
-  return date.toISOString().slice(0, 10)
+  return getChileDateKey(date)
 }
 
 function getNextDateForDay(dayOfWeek) {
@@ -53,10 +55,10 @@ export function mapReservationRow(row) {
 
 export async function loadReservationData(profileId) {
   if (!isSupabaseConfigured || !supabase) {
-    return getReservationError('Supabase aun no esta configurado.')
+    return getReservationError('El servicio de datos aún no está configurado.')
   }
 
-  const [scheduleResult, reservationsResult, membershipResult] = await Promise.all([
+  const [scheduleResult, reservationsResult, membershipResult, waitlistResult] = await Promise.all([
     supabase
       .from('class_schedule')
       .select('id, day_of_week, time, class_name, coach, max_spots, active')
@@ -71,6 +73,13 @@ export async function loadReservationData(profileId) {
       ? supabase
         .rpc('get_active_membership', { target_profile_id: profileId })
       : Promise.resolve({ data: null, error: null }),
+    profileId
+      ? supabase
+        .from('class_waitlist')
+        .select('id, profile_id, class_schedule_id, reservation_date, status, position_hint, joined_at')
+        .eq('profile_id', profileId)
+        .eq('status', 'waiting')
+      : Promise.resolve({ data: [], error: null }),
   ])
 
   if (scheduleResult.error) return getSafeReservationError('reservations.load_schedule', scheduleResult.error, 'No fue posible cargar los horarios. Revisa tu conexión y vuelve a intentarlo.')
@@ -102,7 +111,7 @@ export async function loadReservationData(profileId) {
         block: getBlock(classItem.time),
         time: classItem.time.slice(0, 5),
         name: classItem.class_name,
-        coach: classItem.coach ?? 'Coach KUPAN',
+        coach: formatCoachName(classItem.coach),
         maxSpots: classItem.max_spots ?? 12,
         spots: classItem.max_spots ?? 12,
         isFull: false,
@@ -126,7 +135,7 @@ export async function loadReservationData(profileId) {
       block: getBlock(classItem.time),
       time: classItem.time.slice(0, 5),
       name: classItem.class_name,
-      coach: classItem.coach ?? 'Coach KUPAN',
+      coach: formatCoachName(classItem.coach),
       maxSpots: classItem.max_spots ?? 12,
       spots,
       isFull: spots <= 0,
@@ -141,12 +150,13 @@ export async function loadReservationData(profileId) {
     membership,
     hasActiveMembership,
     remainingTokens,
+    waitlist: waitlistResult.error ? [] : (waitlistResult.data ?? []),
   }
 }
 
 export async function createSupabaseReservation(profileId, classItem, hasActiveMembership) {
-  if (!profileId) return getReservationError('Inicia sesion para reservar.')
-  if (!hasActiveMembership) return getReservationError('Necesitas una membresia activa y pagada para reservar. Si tu plan esta vencido, pausado o sin pago confirmado, habla con KUPAN.')
+  if (!profileId) return getReservationError('Inicia sesión para reservar.')
+  if (!hasActiveMembership) return getReservationError('Necesitas una membresía activa y pagada para reservar. Si tu plan está vencido, pausado o sin pago confirmado, habla con KUPAN.')
   const { data, error } = await supabase.rpc('reserve_class', {
     target_profile_id: profileId,
     target_class_schedule_id: classItem.classScheduleId,
@@ -168,13 +178,36 @@ export async function createSupabaseReservation(profileId, classItem, hasActiveM
   return { ok: true, reservation: { ...data, ...classItem } }
 }
 
-export async function cancelSupabaseReservation(reservationId) {
-  const { error } = await supabase.rpc('cancel_reservation', {
+export async function cancelSupabaseReservation(reservationId, reason = '') {
+  const { data, error } = await supabase.rpc('cancel_reservation', {
     target_reservation_id: reservationId,
+    reason_input: reason || null,
   })
 
   if (error) return getSafeReservationError('reservations.cancel_reservation', error, 'No pudimos cancelar la reserva. Intenta nuevamente.')
-  return { ok: true, message: 'Reserva cancelada. Si correspondia, el token fue devuelto.' }
+  const reservation = Array.isArray(data) ? data[0] : data
+  return {
+    ok: true,
+    reservation,
+    message: reservation?.token_refunded
+      ? 'Reserva cancelada. Tu token fue devuelto.'
+      : 'Reserva cancelada. Por estar dentro de los 45 minutos previos, el token quedó utilizado.',
+  }
+}
+
+export async function joinSupabaseWaitlist(classItem) {
+  const { data, error } = await supabase.rpc('join_class_waitlist', {
+    target_class_schedule_id: classItem.classScheduleId,
+    target_reservation_date: classItem.reservationDate,
+  })
+  if (error) return getSafeReservationError('reservations.join_waitlist', error, 'No pudimos agregarte a la lista de espera.')
+  return { ok: true, entry: data, message: 'Quedaste en la lista de espera. Te avisaremos si se libera un cupo.' }
+}
+
+export async function leaveSupabaseWaitlist(waitlistId) {
+  const { data, error } = await supabase.rpc('leave_class_waitlist', { target_waitlist_id: waitlistId })
+  if (error) return getSafeReservationError('reservations.leave_waitlist', error, 'No pudimos sacarte de la lista de espera.')
+  return { ok: true, entry: data, message: 'Saliste de la lista de espera.' }
 }
 
 export async function adminReserveForStudent({
@@ -185,7 +218,7 @@ export async function adminReserveForStudent({
   note = '',
 }) {
   if (!isSupabaseConfigured || !supabase) {
-    return getReservationError('Supabase aun no esta configurado.')
+    return getReservationError('El servicio de datos aún no está configurado.')
   }
 
   if (!profileId) return getReservationError('Selecciona un alumno.')

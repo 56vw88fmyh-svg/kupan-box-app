@@ -66,14 +66,16 @@ serve(async (req) => {
   const profileId = cleanText(body.profile_id)
   const planId = cleanText(body.plan_id)
   const status = cleanText(body.status)
+  const amount = Number(body.amount)
   const isSimulated = body.simulated === true
 
   if (!paymentReference || !profileId || !planId || !status) {
     return jsonResponse({ ok: false, message: 'Faltan datos del pago: alumno, plan, referencia o estado.' }, 400)
   }
 
-  if (status !== 'paid') {
-    return jsonResponse({ ok: false, message: 'El pago no esta aprobado.' }, 400)
+  const normalizedStatus = status === 'paid' ? 'approved' : status
+  if (!['pending', 'approved', 'rejected', 'refunded'].includes(normalizedStatus)) {
+    return jsonResponse({ ok: false, message: 'Estado de pago no válido.' }, 400)
   }
 
   if (isSimulated) {
@@ -104,15 +106,40 @@ serve(async (req) => {
     }
   }
 
-  const { data: existingMembership } = await adminClient
+  const { data: existingPayment } = await adminClient
+    .from('payments')
+    .select('id, membership_id, status')
+    .eq('provider', provider)
+    .eq('provider_reference', paymentReference)
+    .maybeSingle()
+
+  if (existingPayment?.membership_id) {
+    return jsonResponse({ ok: true, membership_id: existingPayment.membership_id, message: 'Pago ya procesado previamente.' })
+  }
+
+  // Compatibilidad con pagos procesados antes de crear la tabla payments.
+  const { data: legacyMembership } = await adminClient
     .from('memberships')
     .select('id')
     .eq('payment_provider', provider)
     .eq('payment_reference', paymentReference)
     .maybeSingle()
 
-  if (existingMembership) {
-    return jsonResponse({ ok: true, membership_id: existingMembership.id, message: 'Pago ya procesado previamente.' })
+  if (legacyMembership?.id) {
+    const legacyPaymentPayload = {
+      profile_id: profileId,
+      plan_id: planId,
+      provider,
+      provider_reference: paymentReference,
+      amount: Number.isFinite(amount) && amount >= 0 ? Math.round(amount) : null,
+      status: normalizedStatus,
+      membership_id: legacyMembership.id,
+      simulated: isSimulated,
+      confirmed_at: normalizedStatus === 'approved' ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    }
+    await adminClient.from('payments').upsert(legacyPaymentPayload, { onConflict: 'provider,provider_reference' })
+    return jsonResponse({ ok: true, membership_id: legacyMembership.id, message: 'Pago ya procesado previamente.' })
   }
 
   const { data: plan, error: planError } = await adminClient
@@ -123,8 +150,31 @@ serve(async (req) => {
 
   if (planError || !plan) return jsonResponse({ ok: false, message: 'Plan no encontrado.' }, 404)
 
+  const paymentPayload = {
+    profile_id: profileId,
+    plan_id: planId,
+    provider,
+    provider_reference: paymentReference,
+    amount: Number.isFinite(amount) && amount >= 0 ? Math.round(amount) : null,
+    status: normalizedStatus,
+    simulated: isSimulated,
+    confirmed_at: normalizedStatus === 'approved' ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString(),
+  }
+  const { data: payment, error: paymentError } = await adminClient
+    .from('payments')
+    .upsert(paymentPayload, { onConflict: 'provider,provider_reference' })
+    .select('id, membership_id, status')
+    .single()
+  if (paymentError) return jsonResponse({ ok: false, message: 'No pudimos registrar el estado del pago.' }, 500)
+
+  if (normalizedStatus !== 'approved') {
+    return jsonResponse({ ok: true, payment_id: payment.id, status: normalizedStatus, message: 'Estado de pago registrado.' })
+  }
+
   const startDate = getChileDate()
-  const endDateText = addDays(startDate, 30)
+  // El día de activación es el día 1: start + 29 completa 30 días corridos inclusivos.
+  const endDateText = addDays(startDate, 29)
 
   await adminClient
     .from('memberships')
@@ -149,6 +199,7 @@ serve(async (req) => {
       payment_reference: paymentReference,
       activated_at: new Date().toISOString(),
       auto_activated: true,
+      agreed_price: paymentPayload.amount,
     })
     .select('id')
     .single()
@@ -156,6 +207,9 @@ serve(async (req) => {
   if (membershipError) {
     return jsonResponse({ ok: false, message: 'No pudimos activar la membresia.' }, 500)
   }
+
+
+  await adminClient.from('payments').update({ membership_id: membership.id }).eq('id', payment.id)
 
   return jsonResponse({ ok: true, membership_id: membership.id, message: 'Membresia activada por pago confirmado.' })
 })

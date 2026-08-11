@@ -152,7 +152,7 @@ function RankingSection({ ranking }) {
   const period = monthLabel()
   return (
     <section className="space-y-4">
-      <SectionHeader eyebrow="Ranking" title={`Ranking de asistencia — ${period}`} description="Mide reservas registradas durante el mes actual. Actualización según datos disponibles en Supabase." />
+      <SectionHeader eyebrow="Ranking" title={`Ranking de asistencia — ${period}`} description="Mide reservas confirmadas y asistencias registradas durante el mes actual." />
       {ranking.length === 0 ? <EmptyState title="Ranking vacío." description="Todavía no hay reservas suficientes para mostrar posiciones este mes." /> : null}
       <div className="space-y-3">
         {ranking.slice(0, 25).map((athlete, index) => (

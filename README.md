@@ -2,6 +2,8 @@
 
 App web progresiva para el box de CrossFit KUPAN. Incluye reservas, horarios, WOD del día, planes, comunidad, perfil de alumno, PRs y panel admin conectado a Supabase.
 
+La versión `2.1.0` incorpora la identidad KUPAN 2.1, sincronización de membresías en Perfil, cancelaciones auditables a 45 minutos, lista de espera, primera clase y mejoras de cabina coach. Consulta [Implementación KUPAN 2.1](./docs/kupan-2.1-implementation.md).
+
 ## Estado Actual
 
 - Frontend: React + Vite + Tailwind CSS.
@@ -71,6 +73,8 @@ No ejecutes nuevamente scripts antiguos de `supabase/sql/` si la función o pol�
 - Funciones `is_admin()`, `has_active_membership()`, `available_spots()`, `birthdays_this_month()`.
 - Trigger `handle_new_user()` para crear `profiles`.
 - Función pública `kupan_health_check()` para monitoreo sin datos privados.
+
+La migración funcional nueva es `supabase/migrations/20260811120000_kupan_21_operations.sql`. Debe probarse primero en staging. Activa sincronización en tiempo real para membresías, tokens y reservas, y no incluye filas de alumnos ni pagos reales.
 
 ## Edge Function
 

@@ -410,7 +410,7 @@ export function PersonalRecords({ currentUser, setActivePage }) {
         <Card as="section" variant="elevated" className="p-5">
           <Badge state="neutral">Mis PR</Badge>
           <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary">Inicia sesión para registrar tus marcas.</h1>
-          <p className="mt-3 text-base leading-7 text-text-secondary">Tus PR son personales y se guardan en Supabase para que no desaparezcan al actualizar la app.</p>
+          <p className="mt-3 text-base leading-7 text-text-secondary">Tus PR son personales y se guardan de forma segura para que no desaparezcan al actualizar la app.</p>
           <Button type="button" className="mt-5" fullWidth onClick={() => setActivePage('login')}>Iniciar sesión</Button>
         </Card>
       </div>
@@ -423,7 +423,7 @@ export function PersonalRecords({ currentUser, setActivePage }) {
         <div className="border-b border-border-default bg-bg-secondary p-5">
           <Badge state="neutral">Récords personales</Badge>
           <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">Tus marcas quedan guardadas.</h1>
-          <p className="mt-3 text-base leading-7 text-text-secondary">Supabase es la fuente principal. Si la conexión falla, mantenemos visibles los datos anteriores y puedes reintentar.</p>
+          <p className="mt-3 text-base leading-7 text-text-secondary">Tus datos guardados son la fuente principal. Si la conexión falla, mantenemos visible la última información válida y puedes reintentar.</p>
         </div>
         <div className="grid grid-cols-3 border-b border-border-default">
           <div className="p-4">

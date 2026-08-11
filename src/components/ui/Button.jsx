@@ -1,7 +1,7 @@
 import { cn } from './utils.js'
 
 const variantClasses = {
-  primary: 'bg-kupan-ember text-kupan-black shadow-glow hover:bg-kupan-flame hover:shadow-xl hover:shadow-kupan-ember/20',
+  primary: 'bg-kupan-ember text-kupan-bone shadow-glow hover:bg-kupan-root-hover hover:shadow-xl hover:shadow-kupan-ember/20',
   secondary: 'border border-kupan-border bg-kupan-gray/70 text-kupan-bone hover:border-kupan-flame/70 hover:bg-kupan-gray',
   tertiary: 'bg-transparent text-kupan-bone hover:bg-white/10 hover:text-white',
   destructive: 'border border-kupan-red/45 bg-kupan-red/10 text-white hover:bg-kupan-red/20',
@@ -26,6 +26,7 @@ export function Button({
   children,
   className = '',
   disabled = false,
+  fullWidth = false,
   icon = null,
   isLoading = false,
   loadingLabel = 'Cargando',
@@ -44,6 +45,7 @@ export function Button({
         'relative inline-flex shrink-0 items-center justify-center gap-2 rounded-xl font-black uppercase tracking-[0.08em] transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-kupan-flame active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-55',
         variantClasses[variant] ?? variantClasses.primary,
         sizeClass ?? sizeClasses.md,
+        fullWidth ? 'w-full' : '',
         className,
       )}
       aria-busy={isLoading || undefined}

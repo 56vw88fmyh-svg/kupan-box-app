@@ -11,7 +11,7 @@ export function AdminSettingsForm({ draft, onTextChange, onSubmit, isSubmitting 
       <Field label="Reservas · titulo" value={draft.reservationsTitle} onChange={(value) => onTextChange('reservationsTitle', value)} />
       <TextArea label="Reservas · bajada" value={draft.reservationsBody} onChange={(value) => onTextChange('reservationsBody', value)} />
       <Field label="Comunidad · frase" value={draft.communityPhrase} onChange={(value) => onTextChange('communityPhrase', value)} />
-      <button type="submit" className="k-button w-full" disabled={isDisabled}>Guardar textos en Supabase</button>
+      <button type="submit" className="k-button w-full" disabled={isDisabled}>Guardar textos</button>
     </form>
   )
 }

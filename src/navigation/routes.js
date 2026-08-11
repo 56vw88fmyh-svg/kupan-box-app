@@ -7,7 +7,8 @@ export const primaryNavItems = [
 ]
 
 export const secondaryRoutes = [
-  { id: 'plans', path: '/planes', label: 'Planes', title: 'Mi plan', eyebrow: 'Información de membresía', parentId: 'profile', hidden: true, redirectTo: '/perfil' },
+  { id: 'plans', path: '/planes', label: 'Planes', title: 'Planes', eyebrow: 'Entrena a tu ritmo', parentId: 'profile', hidden: true },
+  { id: 'trial', path: '/prueba', label: 'Primera clase', title: 'Primera clase', eyebrow: 'Conoce KUPAN', parentId: 'home', hidden: true },
   { id: 'prs', path: '/mis-pr', label: 'Mis PR', title: 'Mis PR', eyebrow: 'Marcas que se celebran', parentId: 'wod', hidden: true },
   { id: 'wod-prs', path: '/wod/pr', label: 'PR', title: 'Mis PR', eyebrow: 'Marcas que se celebran', parentId: 'wod', hidden: true, aliasOf: 'prs' },
   { id: 'ranking', path: '/ranking', label: 'Ranking', title: 'Ranking KUPAN', eyebrow: 'Mejores marcas del box', parentId: 'community', hidden: true },
@@ -15,7 +16,7 @@ export const secondaryRoutes = [
   { id: 'login', path: '/login', label: 'Login', title: 'Acceso KUPAN', eyebrow: 'Entrena acompañado', parentId: 'profile', hidden: true },
   { id: 'password-update', path: '/actualizar-password', label: 'Actualizar contraseña', title: 'Actualizar contraseña', eyebrow: 'Acceso seguro', parentId: 'profile', hidden: true },
   { id: 'force-password-change', path: '/cambio-password-obligatorio', label: 'Cambio de contraseña', title: 'Cambio de contraseña', eyebrow: 'Acceso seguro', parentId: 'profile', hidden: true },
-  { id: 'admin', path: '/admin', label: 'Admin', title: 'Admin KUPAN', eyebrow: 'Panel Supabase', parentId: 'profile', hidden: true, roles: ['admin'] },
+  { id: 'admin', path: '/admin', label: 'Admin', title: 'Admin KUPAN', eyebrow: 'Gestión segura del box', parentId: 'profile', hidden: true, roles: ['admin'] },
   { id: 'coach', path: '/coach', label: 'Coach', title: 'Modo Coach', eyebrow: 'Asistencia del día', parentId: 'profile', hidden: true, roles: ['admin', 'coach'] },
 ]
 

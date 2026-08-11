@@ -151,6 +151,10 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     reservation_date: getChileDateString(),
   }))
   const [textDraft, setTextDraft] = useState(defaultAppText)
+  const [policyDraft, setPolicyDraft] = useState({
+    membershipDurationDays: '30', reservationWindowDays: '7', reservationClosesMinutes: '15',
+    cancellationRefundMinutes: '45', arrivalToleranceMinutes: '10', defaultClassCapacity: '12', fullDailyLimit: '1',
+  })
   const [createdCredentials, setCreatedCredentials] = useState(null)
   const [passwordStudent, setPasswordStudent] = useState(null)
   const contentTopRef = useRef(null)
@@ -497,6 +501,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     expiredMemberships: hasDataError('memberships') ? 'Sin cargar' : totals.expiredMemberships,
     upcomingExpirations: hasDataError('memberships') ? 'Sin cargar' : upcomingExpirations.length,
     newStudentsThisMonth: hasDataError('profiles') ? 'Sin cargar' : newStudentsThisMonth,
+    pendingPayments: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.pending_payments ?? 0),
+    confirmedIncome: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.confirmed_income ?? 0),
+    averageTicket: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.average_ticket ?? 0),
+    noShowRate: hasDataError('operationalMetrics') ? 'Sin cargar' : `${Number(adminData.operationalMetrics?.no_show_rate ?? 0).toFixed(1)}%`,
+    waitlistCount: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.waitlist_count ?? 0),
+    pendingTrials: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.pending_trials ?? 0),
   }
 
   const manualReservationStudents = useMemo(() => {
@@ -591,6 +601,19 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     hasHydratedTextDraftRef.current = true
   }, [buildTextDraftFromSettings])
 
+  const hydratePolicyDraft = useCallback((settings) => {
+    const read = (key, fallback) => settings.find((item) => item.key === key)?.value ?? fallback
+    setPolicyDraft({
+      membershipDurationDays: read('membership_duration_days', '30'),
+      reservationWindowDays: read('reservation_window_days', '7'),
+      reservationClosesMinutes: read('reservation_closes_minutes', '15'),
+      cancellationRefundMinutes: read('cancellation_refund_minutes', '45'),
+      arrivalToleranceMinutes: read('arrival_tolerance_minutes', '10'),
+      defaultClassCapacity: read('default_class_capacity', '12'),
+      fullDailyLimit: read('full_daily_limit', '1'),
+    })
+  }, [])
+
   function updateTextDraftField(field, value) {
     isTextDraftDirtyRef.current = true
     setTextDraft((current) => ({ ...current, [field]: value }))
@@ -605,7 +628,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     setVerifiedUser(freshUser ?? null)
 
     if (!allowed) {
-      showError('Tu permiso admin ya no esta activo. Vuelve a iniciar sesion o solicita validar tu rol en Supabase.')
+      showError('Tu permiso admin ya no está activo. Vuelve a iniciar sesión o solicita que validen tu rol.')
       return false
     }
 
@@ -617,18 +640,19 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const result = await reloadAll()
 
     if (!result.success && !result.partial) {
-      if (!options.silent) showError(result.message ?? 'No pudimos cargar datos admin desde Supabase. Revisa RLS, role admin y tablas.')
+      if (!options.silent) showError(result.message ?? 'No pudimos cargar los datos administrativos. Revisa tu conexión y vuelve a intentarlo.')
       return
     }
 
     hydrateTextDraft(result.data?.settings ?? [], { force: Boolean(options.hydrateTextDraft) })
+    hydratePolicyDraft(result.data?.settings ?? [])
 
     if (result.failedSections?.length) {
       if (!options.silent) showWarning(`${result.failedSections.length} secciones tuvieron problemas. Revisa el detalle bajo los contadores.`)
     } else {
-      if (!options.silent) showSuccess('Datos actualizados desde Supabase.')
+      if (!options.silent) showSuccess('Datos actualizados correctamente.')
     }
-  }, [clearFeedback, hydrateTextDraft, reloadAll, showError, showSuccess, showWarning])
+  }, [clearFeedback, hydratePolicyDraft, hydrateTextDraft, reloadAll, showError, showSuccess, showWarning])
 
   const openPasswordModal = useCallback((student) => {
     if (!student?.id) {
@@ -674,7 +698,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const result = await persistPlan(planDraft)
     if (!result.success) return showError('No pudimos guardar el plan.')
     setPlanDraft(createEmptyPlanDraft())
-    showSuccess('Plan guardado en Supabase.')
+    showSuccess('Plan guardado correctamente.')
     await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
@@ -740,7 +764,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
 
     setMembershipDraft(createEmptyMembershipDraft())
-    showSuccess(initialClassesUsed > 0 ? 'Plan activado con tokens ya usados registrados.' : 'Membresia creada en Supabase.')
+    showSuccess(initialClassesUsed > 0 ? 'Plan activado con tokens ya usados registrados.' : 'Membresía creada correctamente.')
     await reloadAffectedSections(result.affectedSections)
   }
 
@@ -888,7 +912,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     if (!result.success) return showError('No pudimos guardar el WOD.')
     markWodRemoteSaveSuccessful()
     setWodDraft(createEmptyWodDraft())
-    showSuccess('WOD guardado en Supabase.')
+    showSuccess('WOD guardado correctamente.')
     await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
@@ -900,12 +924,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
 
     if (!recoverStoredWodDraft()) return
-    showWarning('Borrador local recuperado. Revisa el contenido antes de guardar en Supabase.')
+    showWarning('Borrador local recuperado. Revisa el contenido antes de publicarlo.')
   }
 
   function discardWodDraft() {
     if (storedWodDraft?.draft) {
-      const confirmed = window.confirm('Vas a descartar el borrador local no publicado. Esta acción no modifica el WOD guardado en Supabase. ¿Quieres continuar?')
+      const confirmed = window.confirm('Vas a descartar el borrador local no publicado. Esta acción no modifica el WOD publicado. ¿Quieres continuar?')
       if (!confirmed) return
     }
 
@@ -928,7 +952,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const result = await persistSchedule(scheduleDraft)
     if (!result.success) return showError('No pudimos guardar el horario.')
     setScheduleDraft(createEmptyScheduleDraft())
-    showSuccess('Horario guardado en Supabase.')
+    showSuccess('Horario guardado correctamente.')
     await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
@@ -960,7 +984,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const result = await persistPost(postDraft)
     if (!result.success) return showError('No pudimos guardar la publicacion.')
     setPostDraft(createEmptyPostDraft())
-    showSuccess('Publicacion guardada en Supabase.')
+    showSuccess('Publicación guardada correctamente.')
     await reloadAffectedSections(result.affectedSections)
     onContentChange?.()
   }
@@ -995,11 +1019,27 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       return
     }
 
-    showSuccess('Textos principales guardados en Supabase.')
+    showSuccess('Textos principales guardados correctamente.')
     await reloadAffectedSections(result.affectedSections)
     const settingsResult = await reloadSection('settings')
     hydrateTextDraft(settingsResult.data ?? [], { force: true })
     onContentChange?.()
+  }
+
+  async function savePolicies(event) {
+    event.preventDefault()
+    if (!(await ensureFreshAdmin())) return
+    const invalid = Object.values(policyDraft).some((value) => !Number.isInteger(Number(value)) || Number(value) < 1)
+    if (invalid) return showError('Todas las políticas deben ser números enteros mayores que cero.')
+    const keys = {
+      membershipDurationDays: 'membership_duration_days', reservationWindowDays: 'reservation_window_days',
+      reservationClosesMinutes: 'reservation_closes_minutes', cancellationRefundMinutes: 'cancellation_refund_minutes',
+      arrivalToleranceMinutes: 'arrival_tolerance_minutes', defaultClassCapacity: 'default_class_capacity', fullDailyLimit: 'full_daily_limit',
+    }
+    const result = await persistTexts(policyDraft, keys)
+    if (!result.success) return showError(result.message || 'No pudimos guardar las políticas.')
+    showSuccess('Políticas operativas guardadas.')
+    await reloadSection('settings')
   }
 
   async function updateReservationStatus(reservationId, status) {
@@ -1011,7 +1051,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       return
     }
 
-    showSuccess(status === 'cancelled' ? 'Reserva cancelada. Si correspondia, el token fue devuelto.' : 'Asistencia confirmada. El token queda consumido.')
+    showSuccess(status === 'cancelled' ? 'Reserva cancelada por KUPAN. El token fue devuelto cuando correspondía.' : 'Asistencia confirmada. El token queda consumido.')
     await reloadAffectedSections(result.affectedSections)
   }
 
@@ -1079,7 +1119,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       return
     }
 
-    showSuccess('Alumno creado en Supabase Auth y profiles.')
+    showSuccess('Alumno creado correctamente.')
     setCreatedCredentials({
       email: result.data.email,
       password: result.data.temporary_password,
@@ -1120,7 +1160,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       <section className="k-card p-5">
         <p className="k-pill inline-flex text-kupan-flame">Admin KUPAN</p>
         <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Inicia sesion para entrar al panel.</h2>
-        <p className="mt-3 text-sm leading-6 text-white/60">El acceso admin ahora depende del rol del perfil en Supabase.</p>
+        <p className="mt-3 text-sm leading-6 text-white/60">El acceso depende del rol administrativo activo de tu perfil.</p>
         <button type="button" className="k-button mt-5 w-full" onClick={() => setActivePage('login')}>
           Iniciar sesion
         </button>
@@ -1132,7 +1172,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     return (
       <section className="k-card p-5">
         <p className="k-pill inline-flex text-kupan-flame">Verificando acceso</p>
-        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Conectando con Supabase.</h2>
+        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Conectando con los datos del box.</h2>
         <p className="mt-3 text-sm leading-6 text-white/60">Estamos revisando tu rol actualizado antes de abrir el panel admin.</p>
       </section>
     )
@@ -1144,7 +1184,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         <p className="k-pill inline-flex text-kupan-flame">Acceso denegado</p>
         <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Este panel es solo para admins KUPAN.</h2>
         <p className="mt-3 text-sm leading-6 text-white/60">
-          Tu perfil esta activo como alumno. Para entrar, tu usuario debe tener role = admin en Supabase.
+          Tu perfil está activo como alumno. Para entrar, tu usuario debe tener permiso de administrador.
         </p>
         <button type="button" className="k-button-secondary mt-5 w-full" onClick={() => setActivePage('profile')}>
           Volver a perfil
@@ -1166,7 +1206,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Datos en vivo</p>
-            <p className="mt-1 text-sm font-bold leading-6 text-white/65">Panel conectado a Supabase y protegido por RLS.</p>
+            <p className="mt-1 text-sm font-bold leading-6 text-white/65">Panel conectado a los datos del box y protegido por permisos de acceso.</p>
           </div>
           <button type="button" className="k-button min-h-12 w-full lg:w-auto" onClick={refreshData} disabled={isLoading || isRefreshing}>
             {isLoading || isRefreshing ? 'Actualizando...' : 'Actualizar datos'}
@@ -1303,6 +1343,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
             reservations: hasDataError('reservations'),
             schedule: hasDataError('schedule'),
             memberships: hasDataError('memberships'),
+            operationalMetrics: hasDataError('operationalMetrics'),
           }}
           totals={totals}
           todayClasses={todayClasses}
@@ -1460,8 +1501,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       {activeSection === 'texts' ? (
         <AdminSettingsModule
           textDraft={textDraft}
+          policyDraft={policyDraft}
           onTextChange={updateTextDraftField}
+          onPolicyChange={(field, value) => setPolicyDraft((current) => ({ ...current, [field]: value }))}
           onSave={saveTexts}
+          onSavePolicies={savePolicies}
           isSaving={isSavingSettings}
         />
       ) : null}

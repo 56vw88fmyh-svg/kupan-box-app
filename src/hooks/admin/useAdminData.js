@@ -15,6 +15,7 @@ export const adminDataLoaders = [
   { label: 'cumpleanos', key: 'birthdays', rpcName: 'birthdays_this_month' },
   { label: 'PR destacados', key: 'prs', rpcName: 'admin_get_personal_records' },
   { label: 'movimientos de tokens', key: 'tokenMovements', rpcName: 'admin_get_token_movements' },
+  { label: 'métricas operativas', key: 'operationalMetrics', rpcName: 'admin_get_operational_metrics' },
   { label: 'proximos cumpleanos', key: 'upcomingBirthdays', loaderName: 'loadUpcomingBirthdays' },
 ]
 
@@ -38,6 +39,7 @@ export function createEmptyAdminData() {
     upcomingBirthdays: [],
     prs: [],
     tokenMovements: [],
+    operationalMetrics: {},
   }
 }
 
@@ -105,7 +107,7 @@ export async function loadAdminDataSnapshot(dependencies = {}) {
   const { configured = isSupabaseConfigured, supabaseClient = supabase } = dependencies
 
   if (!configured || !supabaseClient) {
-    const message = 'Supabase aun no esta configurado. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.'
+    const message = 'El servicio de datos administrativos aún no está configurado.'
     return {
       success: false,
       partial: false,
@@ -113,9 +115,9 @@ export async function loadAdminDataSnapshot(dependencies = {}) {
       updatedSections: [],
       failedSections: adminDataLoaders.map((loader) => loader.key),
       errors: {
-        configuration: { key: 'configuration', label: 'Supabase', message },
+        configuration: { key: 'configuration', label: 'servicio de datos', message },
       },
-      sectionErrors: [{ key: 'configuration', label: 'Supabase', message }],
+      sectionErrors: [{ key: 'configuration', label: 'servicio de datos', message }],
       message,
     }
   }

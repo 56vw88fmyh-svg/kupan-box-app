@@ -65,7 +65,7 @@ export function AdminWodModule({
       ) : null}
       {draftRecovery?.storageError ? (
         <p className="rounded-xl border border-kupan-warning/30 bg-kupan-warning/10 p-3 text-xs font-bold leading-5 text-white/70">
-          No pudimos guardar el borrador local en este dispositivo. Puedes seguir editando y guardar el WOD en Supabase.
+          No pudimos guardar el borrador local en este dispositivo. Puedes seguir editando y publicar el WOD directamente.
         </p>
       ) : null}
       <AdminWodForm draft={draft} onDraftChange={onDraftChange} onSubmit={onSave} isSubmitting={isSaving} />

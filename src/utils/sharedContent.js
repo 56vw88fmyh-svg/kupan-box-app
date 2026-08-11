@@ -77,20 +77,38 @@ function mapWod(wod) {
 }
 
 function mapPlans(plans) {
-  if (!plans.length) return defaultAdminContent.plans
+  const publicPlans = plans.filter((plan) => {
+    const name = String(plan.name ?? '').toLowerCase()
+    return name.includes('8') || name.includes('12') || name.includes('full')
+  })
+  if (!publicPlans.length) return defaultAdminContent.plans
 
-  return plans.map((plan, index) => ({
+  const paymentUrls = {
+    '8': 'https://mpago.la/33iSvva',
+    '12': 'https://mpago.la/2V6hM5j',
+    full: 'https://mpago.la/2wHbG3j',
+  }
+
+  const mapped = publicPlans.map((plan) => {
+    const normalizedName = String(plan.name ?? '').toLowerCase()
+    const tokenCount = normalizedName.includes('12') ? 12 : normalizedName.includes('8') ? 8 : null
+    const paymentKey = plan.is_unlimited ? 'full' : String(tokenCount)
+    return {
     name: plan.name,
     price: formatPrice(plan.price),
-    classes: plan.is_unlimited ? 'Clases ilimitadas' : `${plan.classes_per_week ?? ''} clases por semana`,
-    paymentUrl: '#',
-    highlight: index === 2,
+    classes: plan.is_unlimited ? 'Una reserva diaria, lunes a viernes' : `${tokenCount ?? ''} clases por 30 días`,
+    paymentUrl: paymentUrls[paymentKey] ?? '',
+    highlight: tokenCount === 12,
     benefits: [
-      plan.is_unlimited ? 'Entrena sin limite mensual' : 'Acceso a clases KUPAN',
+      plan.is_unlimited ? 'Una reserva diaria de lunes a viernes' : `${tokenCount} tokens no acumulables`,
+      'Vigencia de 30 días desde la activación',
       'Reserva tu clase y ven a darlo todo',
       'Somos comunidad, esfuerzo y progreso',
     ],
-  }))
+    }
+  })
+
+  return [...mapped, ...defaultAdminContent.plans.filter((plan) => plan.name === 'Pase diario' || plan.trial)]
 }
 
 function mapAppText(settings) {
@@ -154,5 +172,5 @@ export async function saveAppSetting(key, value) {
     .from('app_settings')
     .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
 
-  return { ok: !error, message: error ? 'No pudimos guardar el texto.' : 'Texto guardado en Supabase.' }
+  return { ok: !error, message: error ? 'No pudimos guardar el texto.' : 'Texto guardado correctamente.' }
 }

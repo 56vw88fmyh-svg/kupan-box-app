@@ -261,7 +261,7 @@ function LevelSelector({ selectedLevel, onSelect }) {
 function WodSurprise({ today }) {
   return (
     <Card as="section" variant="elevated" className="p-6 text-center">
-      <Badge state="neutral">{today}</Badge>
+      <span className="inline-flex rounded-lg border border-kupan-border bg-white/[0.04] px-3 py-2 text-sm font-bold normal-case text-kupan-sand">{today}</span>
       <h1 className="mt-5 text-4xl font-black leading-tight text-text-primary">WOD sorpresa</h1>
       <p className="mx-auto mt-3 max-w-sm text-base leading-7 text-text-secondary">
         La programación se revelará al comenzar la clase.

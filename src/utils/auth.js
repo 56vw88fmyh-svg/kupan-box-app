@@ -20,7 +20,7 @@ function getPasswordRedirectUrl() {
 function getSupabaseConfigError() {
   return {
     ok: false,
-    message: 'Supabase aun no esta configurado. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en .env.local.',
+    message: 'El servicio de acceso aún no está configurado.',
   }
 }
 

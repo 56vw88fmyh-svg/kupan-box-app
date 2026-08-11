@@ -16,7 +16,7 @@ export function formatRankingDate(date) {
 
 export async function loadPrRanking({ movement = '', level = '' } = {}) {
   if (!isSupabaseConfigured || !supabase) {
-    return getRankingError('Supabase aun no esta configurado.')
+    return getRankingError('El servicio de datos aún no está configurado.')
   }
 
   const { data: sessionData } = await supabase.auth.getSession()

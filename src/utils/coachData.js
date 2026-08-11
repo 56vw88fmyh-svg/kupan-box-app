@@ -1,7 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
 
-const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
+const dayNames = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 function getCoachError(message = 'No pudimos cargar el modo coach.') {
   return { ok: false, message }
@@ -116,7 +116,7 @@ async function loadCoachReservations(date) {
 
 export async function loadCoachDashboard() {
   if (!isSupabaseConfigured || !supabase) {
-    return getCoachError('Supabase aun no esta configurado.')
+    return getCoachError('El servicio de datos aún no está configurado.')
   }
 
   const today = getChileDateString()
@@ -147,7 +147,7 @@ export async function loadCoachDashboard() {
 
 export async function loadCoachManualReservationOptions() {
   if (!isSupabaseConfigured || !supabase) {
-    return getCoachError('Supabase aun no esta configurado.')
+    return getCoachError('El servicio de datos aún no está configurado.')
   }
 
   try {
@@ -170,20 +170,61 @@ export async function loadCoachManualReservationOptions() {
 }
 
 export async function markCoachReservation(reservationId, status) {
-  const { error } = await supabase.rpc('admin_mark_reservation', {
+  const arrivalStatus = status === 'attended' ? 'on_time' : null
+  const { error } = await supabase.rpc('coach_mark_attendance', {
     target_reservation_id: reservationId,
     target_status: status,
+    target_arrival_status: arrivalStatus,
+    reason_input: status === 'reserved' ? 'Corrección de asistencia' : null,
   })
 
   if (error) return getSafeCoachError('coach.mark_reservation', error, 'No pudimos marcar asistencia. Intenta nuevamente.')
+  if (status === 'reserved') return { ok: true, message: 'Asistencia revertida y registrada en el historial.' }
   return { ok: true, message: status === 'attended' ? 'Asistencia marcada. Token consumido.' : 'No show marcado. Token consumido.' }
 }
 
-export async function cancelCoachReservation(reservationId) {
-  const { error } = await supabase.rpc('cancel_reservation', {
+export async function markCoachLateArrival(reservationId) {
+  const { error } = await supabase.rpc('coach_mark_attendance', {
     target_reservation_id: reservationId,
+    target_status: 'attended',
+    target_arrival_status: 'late',
+    reason_input: 'Llegada tardía registrada por coach',
+  })
+  if (error) return getSafeCoachError('coach.mark_late', error, 'No pudimos registrar la llegada tardía.')
+  return { ok: true, message: 'Llegada tardía y asistencia registradas.' }
+}
+
+export async function loadCoachPrivateNotes(profileId) {
+  const { data, error } = await supabase
+    .from('coach_private_notes')
+    .select('id, profile_id, reservation_id, note_type, content, created_at')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(10)
+  if (error) return getSafeCoachError('coach.load_notes', error, 'No pudimos cargar las observaciones privadas.')
+  return { ok: true, notes: data ?? [] }
+}
+
+export async function createCoachPrivateNote({ profileId, reservationId, noteType, content }) {
+  const { data: userData } = await supabase.auth.getUser()
+  const { error } = await supabase.from('coach_private_notes').insert({
+    profile_id: profileId,
+    reservation_id: reservationId || null,
+    note_type: noteType,
+    content: content.trim(),
+    created_by: userData.user?.id,
+  })
+  if (error) return getSafeCoachError('coach.create_note', error, 'No pudimos guardar la observación privada.')
+  return { ok: true, message: 'Observación privada guardada.' }
+}
+
+export async function cancelCoachReservation(reservationId) {
+  const { data, error } = await supabase.rpc('admin_cancel_reservation', {
+    target_reservation_id: reservationId,
+    cancellation_reason: 'Cancelación operativa desde Modo Coach',
   })
 
   if (error) return getSafeCoachError('coach.cancel_reservation', error, 'No pudimos cancelar la reserva. Intenta nuevamente.')
-  return { ok: true, message: 'Reserva cancelada. Si correspondia, el token fue devuelto.' }
+  const reservation = Array.isArray(data) ? data[0] : data
+  return { ok: true, message: reservation?.token_refunded ? 'Reserva cancelada por KUPAN. Token devuelto.' : 'Reserva cancelada por KUPAN.' }
 }

@@ -31,6 +31,22 @@ export function AdminOverviewModule({
         <AdminStatCard label="Nuevos del mes" value={dashboardValues.newStudentsThisMonth} detail="Alumnos creados" status={dataStatus.profiles ? 'attention' : 'normal'} onClick={() => onNavigate({ id: 'students' })} />
       </section>
 
+      <section aria-labelledby="commercial-metrics-title" className="k-card p-4">
+        <div className="mb-4">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-sand">Operación comercial</p>
+          <h3 id="commercial-metrics-title" className="k-display mt-1 text-2xl font-black uppercase text-white">Señales del mes</h3>
+          <p className="mt-2 text-sm leading-6 text-white/55">Ingresos considera pagos aprobados del mes. No-show usa asistencias cerradas. Lista de espera y pruebas muestran pendientes actuales.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <AdminStatCard label="Pagos pendientes" value={dashboardValues.pendingPayments} detail="Por confirmar" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
+          <AdminStatCard label="Ingresos confirmados" value={typeof dashboardValues.confirmedIncome === 'number' ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(dashboardValues.confirmedIncome) : dashboardValues.confirmedIncome} detail="Mes actual" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
+          <AdminStatCard label="Ticket promedio" value={typeof dashboardValues.averageTicket === 'number' ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(dashboardValues.averageTicket) : dashboardValues.averageTicket} detail="Pagos aprobados" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
+          <AdminStatCard label="No-show" value={dashboardValues.noShowRate} detail="Mes actual" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
+          <AdminStatCard label="Lista de espera" value={dashboardValues.waitlistCount} detail="Esperando cupo" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} onClick={() => onNavigate({ id: 'reservations' })} />
+          <AdminStatCard label="Pruebas pendientes" value={dashboardValues.pendingTrials} detail="Por contactar" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
+        </div>
+      </section>
+
       <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="k-card p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -46,7 +62,7 @@ export function AdminOverviewModule({
             ))}
             {todayClasses === null ? (
               <p className="rounded-xl border border-kupan-warning/35 bg-kupan-warning/10 p-4 text-sm font-bold leading-6 text-white/72">
-                No pudimos cargar clases o reservas desde Supabase. Presiona Actualizar datos para reintentar.
+                No pudimos cargar clases o reservas. Presiona Actualizar datos para reintentar.
               </p>
             ) : null}
             {todayClasses?.length === 0 ? (

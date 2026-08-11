@@ -84,7 +84,7 @@ export function AdminManualReservationForm({
         onChange={(value) => onDraftChange((current) => ({ ...current, allow_without_membership: value }))}
       />
       <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-xs font-bold leading-5 text-white/55">
-        Sobrecupo queda desactivado por ahora. Si la clase esta completa, Supabase bloqueara la reserva.
+        El sobrecupo está desactivado. Si la clase está completa, la reserva será bloqueada.
       </div>
       <button type="submit" className="k-button sm:col-span-2" disabled={isDisabled}>
         {isSubmitting ? 'Agregando...' : 'Agregar a clase'}

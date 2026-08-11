@@ -48,7 +48,7 @@ function NavIcon({ icon, isActive }) {
   if (icon === 'home') return <img className="h-5 w-5 object-contain" src={isotipoKupan} alt="" width="20" height="20" decoding="async" />
 
   return (
-    <svg className={cn('h-5 w-5', isActive ? 'stroke-kupan-black' : 'stroke-current')} viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className={cn('h-5 w-5', isActive ? 'stroke-kupan-bone' : 'stroke-current')} viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {iconPaths[icon] ?? iconPaths.profile}
     </svg>
   )
@@ -76,7 +76,7 @@ export function BottomNav({ currentUser }) {
                 return cn(
                   'k-tab-item relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 text-[0.62rem] font-black transition duration-200',
                   active
-                    ? 'border-kupan-ember/55 bg-kupan-ember text-kupan-black shadow-[0_10px_24px_rgba(240,68,68,0.26)]'
+                    ? 'border-kupan-root-hover/70 bg-kupan-ember text-kupan-bone shadow-[0_8px_20px_rgba(155,42,49,0.28)]'
                     : 'border-transparent text-white/60 hover:border-kupan-border hover:bg-white/10 hover:text-white',
                 )
               }}
@@ -85,7 +85,7 @@ export function BottomNav({ currentUser }) {
                 const active = isActive || isActiveByGroup
                 return (
                   <span className="flex min-w-0 flex-col items-center justify-center gap-1 transition duration-150 active:scale-95 sm:hover:-translate-y-0.5">
-                    {active ? <span className="absolute left-1/2 top-1 h-1 w-6 -translate-x-1/2 rounded-full bg-kupan-black/80" aria-hidden="true" /> : null}
+                    {active ? <span className="absolute left-1/2 top-1 h-1 w-6 -translate-x-1/2 rounded-full bg-kupan-sand" aria-hidden="true" /> : null}
                     <span className={cn('mt-1 flex h-7 w-7 items-center justify-center rounded-lg text-xs', active ? 'bg-white/20' : 'bg-white/10')}>
                       <NavIcon icon={page.icon} isActive={active} />
                     </span>

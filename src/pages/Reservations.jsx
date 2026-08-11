@@ -4,20 +4,16 @@ import {
   cancelSupabaseReservation,
   createSupabaseReservation,
   formatReservationDate,
+  joinSupabaseWaitlist,
+  leaveSupabaseWaitlist,
   loadReservationData,
 } from '../utils/supabaseReservations.js'
+import { getChileDateKey, getChileDateTime } from '../utils/chileDateTime.js'
+import { formatCoachName } from '../utils/coachName.js'
+import { getCancellationPolicy } from '../utils/reservationPolicy.js'
 
 const CHILE_TIME_ZONE = 'America/Santiago'
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
-
-function getChileDateKey(date = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: CHILE_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date)
-}
 
 function getReservationDayId(date) {
   const weekday = new Intl.DateTimeFormat('en-US', { timeZone: CHILE_TIME_ZONE, weekday: 'short' }).format(date)
@@ -55,11 +51,7 @@ function buildWeekDays(baseDate = new Date()) {
 }
 
 function parseLocalClassDateTime(reservationDate, time) {
-  if (!reservationDate || !time) return null
-  const [year, month, day] = reservationDate.split('-').map(Number)
-  const [hours, minutes] = time.split(':').map(Number)
-  if (![year, month, day, hours, minutes].every(Number.isFinite)) return null
-  return new Date(year, month - 1, day, hours, minutes)
+  return getChileDateTime(reservationDate, time)
 }
 
 function formatMembershipDate(date) {
@@ -171,7 +163,7 @@ function PlanStatusCard({ currentUser, hasActiveMembership, membership, remainin
 
 function WeekSelector({ weekDays, selectedDateKey, onSelect }) {
   return (
-    <div className="-mx-4 overflow-x-auto k-scroll-x px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Seleccionar dia de reserva">
+    <div className="-mx-4 overflow-x-auto k-scroll-x px-4 pb-1 sm:mx-0 sm:px-0" aria-label="Seleccionar día de reserva">
       <div className="flex min-w-max gap-2">
         {weekDays.map((day) => {
           const isSelected = day.dateKey === selectedDateKey
@@ -200,7 +192,7 @@ function WeekSelector({ weekDays, selectedDateKey, onSelect }) {
   )
 }
 
-function ClassCard({ item, reservation, currentUser, hasActiveMembership, remainingTokens, onReserve, onCancel, processingKey }) {
+function ClassCard({ item, reservation, waitlistEntry, currentUser, hasActiveMembership, remainingTokens, onReserve, onCancel, onJoinWaitlist, onLeaveWaitlist, processingKey }) {
   const status = getClassViewState(item)
   const spots = getSpots(item)
   const duration = getDurationLabel(item)
@@ -216,7 +208,7 @@ function ClassCard({ item, reservation, currentUser, hasActiveMembership, remain
         <div className="min-w-0">
           <p className="text-3xl font-black leading-none text-text-primary">{item.time}</p>
           <h3 className="mt-2 text-lg font-black text-text-primary">{item.name}</h3>
-          <p className="mt-1 text-sm text-text-secondary">Coach {item.coach || 'KUPAN'}</p>
+          <p className="mt-1 text-sm text-text-secondary">Coach {formatCoachName(item.coach)}</p>
           <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-text-muted">
             <span>{formatReservationDate(item.reservationDate)}</span>
             {duration ? <span>· {duration}</span> : null}
@@ -249,7 +241,7 @@ function ClassCard({ item, reservation, currentUser, hasActiveMembership, remain
             size="lg"
             fullWidth
             isLoading={isProcessing}
-            disabled={isProcessing || !canReserve}
+            disabled={isProcessing || (Boolean(currentUser) && !canReserve)}
             onClick={() => onReserve(item)}
           >
             {!currentUser ? 'Iniciar sesión' : !hasActiveMembership ? 'Plan requerido' : !hasTokens ? 'Sin tokens' : 'Reservar'}
@@ -260,7 +252,19 @@ function ClassCard({ item, reservation, currentUser, hasActiveMembership, remain
             Cancelar reserva
           </Button>
         ) : null}
-        {status.key === 'full' ? <p className="text-sm font-semibold text-text-muted">No hay lista de espera activa para esta clase.</p> : null}
+        {status.key === 'full' && waitlistEntry ? (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-text-secondary">Estás en lista de espera{waitlistEntry.position_hint ? ` · posición aproximada ${waitlistEntry.position_hint}` : ''}.</p>
+            <Button type="button" variant="secondary" size="lg" fullWidth disabled={isProcessing} onClick={() => onLeaveWaitlist(waitlistEntry)}>
+              Salir de lista de espera
+            </Button>
+          </div>
+        ) : null}
+        {status.key === 'full' && !waitlistEntry ? (
+          <Button type="button" variant="secondary" size="lg" fullWidth disabled={isProcessing || (Boolean(currentUser) && (!hasActiveMembership || !hasTokens))} onClick={() => onJoinWaitlist(item)}>
+            {!currentUser ? 'Iniciar sesión' : 'Entrar a lista de espera'}
+          </Button>
+        ) : null}
         {status.action === 'none' && status.key !== 'full' ? <p className="text-sm font-semibold text-text-muted">Esta clase no admite acciones de reserva.</p> : null}
       </div>
     </Card>
@@ -271,7 +275,7 @@ function ReservationList({ reservations, onCancel, processingKey }) {
   if (reservations.length === 0) {
     return (
       <EmptyState
-        title="Aun no tienes reservas."
+        title="Aún no tienes reservas."
         description="Elige una clase disponible y tu cupo quedará guardado aquí."
       />
     )
@@ -305,6 +309,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   const weekDays = useMemo(() => buildWeekDays(), [])
   const [availableClasses, setAvailableClasses] = useState([])
   const [userActiveReservations, setUserActiveReservations] = useState([])
+  const [activeWaitlist, setActiveWaitlist] = useState([])
   const [membership, setMembership] = useState(null)
   const [hasActiveMembership, setHasActiveMembership] = useState(false)
   const [remainingTokens, setRemainingTokens] = useState(null)
@@ -320,6 +325,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     .sort((a, b) => String(a.time).localeCompare(String(b.time)))
   const totalSpots = filteredClasses.reduce((sum, item) => sum + getSpots(item).available, 0)
   const reservationByClassKey = useMemo(() => new Map(userActiveReservations.map((reservation) => [getClassKey(reservation), reservation])), [userActiveReservations])
+  const waitlistByClassKey = useMemo(() => new Map(activeWaitlist.map((entry) => [`${entry.class_schedule_id}-${entry.reservation_date}`, entry])), [activeWaitlist])
 
   const refreshReservations = useCallback(async () => {
     setIsLoading(true)
@@ -337,6 +343,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
       classScheduleId: reservation.class_schedule_id,
       reservationDate: reservation.reservation_date,
       status: reservation.status,
+      token_charged: reservation.token_charged,
       dayId: String(reservation.class_schedule?.day_of_week),
       day: reservation.class_schedule?.day_of_week ? dayNames[reservation.class_schedule.day_of_week] : '',
       block: reservation.class_schedule?.time && Number(reservation.class_schedule.time.slice(0, 2)) < 12 ? 'AM' : 'PM',
@@ -348,6 +355,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     setMembership(result.membership)
     setHasActiveMembership(result.hasActiveMembership)
     setRemainingTokens(result.remainingTokens)
+    setActiveWaitlist(result.waitlist ?? [])
     setReservationMessage('')
   }, [currentUser?.id])
 
@@ -408,6 +416,38 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     setCancelTarget(classItem)
   }
 
+  async function handleJoinWaitlist(classItem) {
+    if (!currentUser) {
+      setActivePage('login')
+      return
+    }
+    const classKey = getClassKey(classItem)
+    if (processingClassKey === classKey) return
+    setProcessingClassKey(classKey)
+    const result = await joinSupabaseWaitlist(classItem)
+    if (!result.ok) {
+      showToast({ type: 'error', title: 'No pudimos agregarte', description: result.message })
+    } else {
+      showToast({ type: 'success', title: 'Lista de espera', description: result.message })
+    }
+    await refreshReservations()
+    setProcessingClassKey('')
+  }
+
+  async function handleLeaveWaitlist(entry) {
+    const classKey = `${entry.class_schedule_id}-${entry.reservation_date}`
+    if (processingClassKey === classKey) return
+    setProcessingClassKey(classKey)
+    const result = await leaveSupabaseWaitlist(entry.id)
+    showToast({
+      type: result.ok ? 'success' : 'error',
+      title: result.ok ? 'Lista actualizada' : 'No pudimos actualizar',
+      description: result.message,
+    })
+    await refreshReservations()
+    setProcessingClassKey('')
+  }
+
   async function confirmCancel() {
     if (!cancelTarget?.id) return
     const classKey = getClassKey(cancelTarget)
@@ -428,13 +468,19 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     setProcessingClassKey('')
   }
 
+  const cancelPolicy = cancelTarget ? getCancellationPolicy({
+    reservationDate: cancelTarget.reservationDate,
+    time: cancelTarget.time,
+    tokenCharged: cancelTarget.token_charged !== false,
+  }) : null
+
   return (
     <div className="space-y-6 pb-24 md:pb-8">
       <section className="space-y-3">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-red">Reservas</p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-black leading-tight text-text-primary sm:text-4xl">Reserva tu proxima clase</h1>
+            <h1 className="k-display text-4xl font-black leading-none text-text-primary sm:text-5xl">Reserva tu próxima clase</h1>
             <p className="mt-2 max-w-2xl text-base leading-7 text-text-secondary">
               Elige el día, revisa cupos reales y toma tu clase en un solo paso.
             </p>
@@ -482,11 +528,14 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
               key={getClassKey(item)}
               item={item}
               reservation={reservationByClassKey.get(getClassKey(item))}
+              waitlistEntry={waitlistByClassKey.get(getClassKey(item))}
               currentUser={currentUser}
               hasActiveMembership={hasActiveMembership}
               remainingTokens={remainingTokens}
               onReserve={handleReserve}
               onCancel={requestCancel}
+              onJoinWaitlist={handleJoinWaitlist}
+              onLeaveWaitlist={handleLeaveWaitlist}
               processingKey={processingClassKey}
             />
           ))}
@@ -508,6 +557,12 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
         description={cancelTarget ? `¿Cancelar tu reserva de ${cancelTarget.name} a las ${cancelTarget.time}?` : ''}
         isDestructive
       >
+        {cancelPolicy?.valid ? (
+          <div className={`mb-4 rounded-xl border p-4 text-sm font-semibold leading-6 ${cancelPolicy.refundsToken ? 'border-kupan-success/35 bg-kupan-success/10 text-text-secondary' : 'border-kupan-warning/40 bg-kupan-warning/10 text-text-secondary'}`}>
+            <p className="font-black text-text-primary">Plazo con devolución: hasta las {cancelPolicy.cutoffLabel}</p>
+            <p className="mt-1">{cancelPolicy.message}</p>
+          </div>
+        ) : null}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" fullWidth onClick={() => setCancelTarget(null)}>
             Mantener reserva

@@ -33,7 +33,7 @@ export function PasswordUpdate({ currentUser, forced = false, onUserUpdate }) {
     async function loadSession() {
       if (!isSupabaseConfigured || !supabase) {
         if (isMounted) {
-          setMessage('Supabase no está configurado.')
+          setMessage('El servicio de acceso aún no está configurado.')
           setMessageType('error')
           setIsCheckingSession(false)
         }

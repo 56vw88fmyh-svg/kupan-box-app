@@ -11,10 +11,15 @@ export function useAdminReservations({ supabaseClient = supabase, reserveForStud
     const operationKey = `reservationStatus:${reservationId}:${status}`
     return runOperation(operationKey, async () => {
       const result = status === 'cancelled'
-        ? await supabaseClient.rpc('cancel_reservation', { target_reservation_id: reservationId })
-        : await supabaseClient.rpc('admin_mark_reservation', {
+        ? await supabaseClient.rpc('admin_cancel_reservation', {
+          target_reservation_id: reservationId,
+          cancellation_reason: 'Cancelación administrativa desde panel KUPAN',
+        })
+        : await supabaseClient.rpc('coach_mark_attendance', {
           target_reservation_id: reservationId,
           target_status: status,
+          target_arrival_status: status === 'attended' ? 'on_time' : null,
+          reason_input: 'Actualización desde panel administrativo',
         })
       const { data, error } = result
 

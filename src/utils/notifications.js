@@ -19,7 +19,7 @@ function getSafeNotificationError(scope, error, fallback) {
 }
 
 export async function loadNotifications(profileId) {
-  if (!isSupabaseConfigured || !supabase) return getNotificationError('Supabase aun no esta configurado.')
+  if (!isSupabaseConfigured || !supabase) return getNotificationError('El servicio de datos aún no está configurado.')
   if (!profileId) return { ok: true, notifications: [], unreadCount: 0 }
 
   const { data, error } = await supabase
@@ -40,7 +40,7 @@ export async function loadNotifications(profileId) {
 }
 
 export async function markNotificationRead(notificationId) {
-  if (!isSupabaseConfigured || !supabase) return getNotificationError('Supabase aun no esta configurado.')
+  if (!isSupabaseConfigured || !supabase) return getNotificationError('El servicio de datos aún no está configurado.')
 
   const { error } = await supabase
     .from('notifications')
@@ -52,7 +52,7 @@ export async function markNotificationRead(notificationId) {
 }
 
 export async function markAllNotificationsRead(profileId) {
-  if (!isSupabaseConfigured || !supabase) return getNotificationError('Supabase aun no esta configurado.')
+  if (!isSupabaseConfigured || !supabase) return getNotificationError('El servicio de datos aún no está configurado.')
   if (!profileId) return { ok: true }
 
   const { error } = await supabase

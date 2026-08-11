@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, StaleDataState } from '../components/ui/index.js'
 import { formatChileDisplayDate, formatShortChileDate, loadCommunityFeed, loadTodaysWod } from '../utils/communityFeed.js'
 import { formatReservationDate, loadReservationData } from '../utils/supabaseReservations.js'
+import { formatCoachName } from '../utils/coachName.js'
 
 const fallbackDashboard = {
   isLoading: false,
@@ -87,8 +88,8 @@ function getBadgeState(status) {
   return 'neutral'
 }
 
-function buildWodSummary(wod, fallbackWod) {
-  if (!wod && !fallbackWod) return null
+function buildWodSummary(wod) {
+  if (!wod) return null
   if (wod) {
     const lines = [
       ...wod.warmup.slice(0, 1),
@@ -104,12 +105,6 @@ function buildWodSummary(wod, fallbackWod) {
     }
   }
 
-  return {
-    title: fallbackWod.title || 'WOD KUPAN',
-    type: fallbackWod.type || 'WOD de hoy',
-    level: 'Todos los niveles',
-    lines: (fallbackWod.workout ?? []).slice(0, 4),
-  }
 }
 
 function HomeHeader({ currentUser, dateLabel, onProfile }) {
@@ -119,8 +114,8 @@ function HomeHeader({ currentUser, dateLabel, onProfile }) {
     <header className="flex items-center justify-between gap-4">
       <div className="min-w-0">
         <p className="text-sm font-bold leading-5 text-white/65">Hola,</p>
-        <h1 className="break-words text-3xl font-black uppercase leading-none text-white">{name}</h1>
-        <p className="mt-2 text-sm font-bold capitalize leading-5 text-white/60">{dateLabel}</p>
+        <h1 className="k-display break-words text-4xl font-black uppercase leading-none text-white">{name}</h1>
+        <p className="mt-2 text-sm font-bold leading-5 text-white/60">{dateLabel}</p>
       </div>
       <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-kupan-border bg-kupan-gray/80 text-sm font-black uppercase text-white shadow-2xl" aria-label="Ir a perfil" onClick={onProfile}>
         {getInitials(name)}
@@ -133,7 +128,7 @@ function NextClassCard({ classItem, currentUser, onAction }) {
   const status = getClassStatus(classItem, currentUser)
   const dateLabel = classItem?.reservationDate ? formatReservationDate(classItem.reservationDate) : 'Próxima clase'
   const spotsLabel = classItem?.spots === null || classItem?.spots === undefined ? 'Cupo reservado' : `${classItem.spots} cupos quedan`
-  const coach = classItem?.coach || 'Coach KUPAN'
+  const coach = formatCoachName(classItem?.coach)
 
   if (!classItem) {
     return (
@@ -151,7 +146,7 @@ function NextClassCard({ classItem, currentUser, onAction }) {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Próxima clase</p>
-            <h2 className="mt-3 break-words text-3xl font-black uppercase leading-none text-white">{classItem.name || 'Clase KUPAN'}</h2>
+            <h2 className="k-display mt-3 whitespace-nowrap text-[2rem] font-black uppercase leading-none text-white sm:text-4xl">{classItem.name || 'Clase KUPAN'}</h2>
           </div>
           <Badge state={getBadgeState(status)}>{status.label}</Badge>
         </div>
@@ -221,7 +216,7 @@ function QuickActions({ setActivePage }) {
   const actions = [
     { label: 'Reservar', page: 'reservations' },
     { label: 'Ver WOD', page: 'wod' },
-    { label: 'Horarios', page: 'reservations' },
+    { label: 'Mi plan', page: 'plans' },
     { label: 'Registrar resultado', page: 'prs' },
   ]
 
@@ -267,7 +262,7 @@ function NewsPreview({ news, onOpenCommunity }) {
   )
 }
 
-export function Home({ setActivePage, appContent, currentUser }) {
+export function Home({ setActivePage, currentUser }) {
   const [dashboard, setDashboard] = useState({ ...fallbackDashboard, isLoading: true })
   const dateLabel = useMemo(() => formatChileDisplayDate(), [])
 
@@ -294,7 +289,7 @@ export function Home({ setActivePage, appContent, currentUser }) {
       setDashboard({
         isLoading: false,
         message: errors[0] ?? '',
-        classes: reservationData?.classes ?? appContent.schedule ?? [],
+        classes: reservationData?.classes ?? [],
         reservations: reservationData?.reservations ?? [],
         wod: wodData,
         news: communityData?.news ?? [],
@@ -306,10 +301,10 @@ export function Home({ setActivePage, appContent, currentUser }) {
     return () => {
       isMounted = false
     }
-  }, [appContent.schedule, currentUser?.id])
+  }, [currentUser?.id])
 
   const nextClass = getNextClass(dashboard.classes, dashboard.reservations)
-  const wodSummary = buildWodSummary(dashboard.wod, appContent.wod)
+  const wodSummary = buildWodSummary(dashboard.wod)
 
   function handleClassAction() {
     if (!currentUser) {
