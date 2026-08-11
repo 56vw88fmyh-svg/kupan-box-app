@@ -198,7 +198,6 @@ export async function loadSupabaseProfileData(profileId) {
 
     if (membershipDetailsResult.error) {
       logAppError('profile.load_membership_details', membershipDetailsResult.error)
-      membershipIssue = membershipIssue || 'Tu plan está activo, pero algunos detalles no pudieron sincronizarse. Presiona Actualizar plan.'
     }
 
     membershipWithPlan = {
