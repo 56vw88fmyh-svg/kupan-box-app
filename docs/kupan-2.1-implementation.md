@@ -16,7 +16,7 @@
 
 ## Migración
 
-Aplicar primero en staging:
+La migración fue aplicada y verificada en producción el 11 de agosto de 2026:
 
 ```bash
 supabase link --project-ref TU_PROJECT_REF_STAGING
@@ -26,7 +26,7 @@ supabase db push --linked
 
 Archivo: `supabase/migrations/20260811120000_kupan_21_operations.sql`.
 
-La migración no copia usuarios ni datos. Agrega columnas, tablas, RLS, RPC, auditoría y publicación Realtime. Antes de producción se debe respaldar y ejecutar la matriz de pruebas.
+La migración no copia usuarios ni datos. Agrega columnas, tablas, RLS, RPC, auditoría y publicación Realtime. Las futuras modificaciones deben entrar como nuevas migraciones compensatorias; no se deben borrar columnas con datos para revertir.
 
 ## Prueba Admin → Alumno
 
@@ -38,12 +38,12 @@ La migración no copia usuarios ni datos. Agrega columnas, tablas, RLS, RPC, aud
 6. Cancelar con 45 minutos o más: el token vuelve una sola vez.
 7. Marcar attended/no-show: el token permanece consumido.
 
-## Bloqueos externos
+## Estado externo
 
-- No se desplegó esta migración a producción.
-- No se procesaron pagos reales.
+- Migración desplegada en producción.
+- `payment-webhook` desplegado y activo; no se procesaron pagos reales durante el release.
 - Mercado Pago requiere secreto productivo y validación oficial de firma antes de habilitar cobros reales.
-- E2E autenticado requiere usuarios y variables seguras de staging.
+- Los E2E que mutan datos siguen reservados para un entorno aislado con usuarios de prueba.
 
 ## Rollback
 

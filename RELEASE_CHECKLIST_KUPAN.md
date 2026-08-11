@@ -1,10 +1,12 @@
 # RELEASE CHECKLIST KUPAN
 
 Responsable de release: KUPAN App  
-Fecha de preparacion: 2026-06-19  
-Version candidata: `v1.0.10`  
-Service Worker: `v14`  
-Estado: preparado para preview. No publicar produccion hasta completar la prueba critica de PR en preview.
+Fecha de release: 2026-08-11
+Version publicada: `v2.1.0`
+Service Worker: `v21`
+Estado: **publicado y validado en produccion**.
+
+> Actualizacion KUPAN 2.1: migracion aplicada, Edge Function de pagos desplegada, build y pruebas aprobadas, rutas SPA/PWA verificadas y Perfil sincronizado con Supabase. Las secciones historicas siguientes se conservan como procedimiento reutilizable para futuros releases.
 
 ## 1. Estado antes del despliegue
 
