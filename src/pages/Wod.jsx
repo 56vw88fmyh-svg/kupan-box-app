@@ -260,10 +260,10 @@ function LevelSelector({ selectedLevel, onSelect }) {
 
 function WodSurprise({ today }) {
   return (
-    <Card as="section" variant="elevated" className="p-6 text-center">
+    <Card as="section" variant="elevated" className="mx-auto w-full max-w-3xl px-6 py-10 text-center sm:px-10 sm:py-14">
       <span className="inline-flex rounded-lg border border-kupan-border bg-white/[0.04] px-3 py-2 text-sm font-bold normal-case text-kupan-sand">{today}</span>
-      <h1 className="mt-5 text-4xl font-black leading-tight text-text-primary">WOD sorpresa</h1>
-      <p className="mx-auto mt-3 max-w-sm text-base leading-7 text-text-secondary">
+      <h1 className="mt-6 text-4xl font-black leading-tight text-text-primary sm:text-5xl">WOD sorpresa</h1>
+      <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-text-secondary sm:text-lg">
         La programación se revelará al comenzar la clase.
       </p>
     </Card>
@@ -382,7 +382,7 @@ export function Wod({ appContent, currentUser, setActivePage }) {
 
       {!state.isLoading && wod && !isSurprise ? (
         <>
-          <Card as="section" variant="elevated" className="overflow-hidden p-0">
+          <Card as="section" variant="elevated" className="mx-auto w-full max-w-4xl overflow-hidden p-0">
             <div className="border-b border-border-default bg-bg-secondary p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <Badge state="neutral">WOD de hoy</Badge>
@@ -430,7 +430,7 @@ export function Wod({ appContent, currentUser, setActivePage }) {
             </div>
           </Card>
 
-          <div className="space-y-3">
+          <div className="mx-auto w-full max-w-4xl space-y-3">
             {sections.map((section) => (
               <TrainingSection key={section.id} {...section} />
             ))}

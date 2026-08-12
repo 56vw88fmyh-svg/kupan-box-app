@@ -31,3 +31,14 @@ for (const route of routes) {
     await assertCleanConsole()
   })
 }
+
+test('registro presenta una bienvenida simple y deja la escala técnica al coach', async ({ page }, testInfo) => {
+  const assertCleanConsole = attachConsoleGuard(page, testInfo)
+  await safeGoto(page, '/login')
+  await page.getByRole('button', { name: 'Registrarme' }).click()
+
+  await expect(page.getByText('Estoy comenzando', { exact: true })).toBeVisible()
+  await expect(page.getByText(/tu coach evaluará contigo la escala técnica adecuada/i)).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Nivel' })).toHaveCount(0)
+  await assertCleanConsole()
+})

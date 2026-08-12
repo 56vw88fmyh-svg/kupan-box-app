@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Input } from '../components/ui/index.js'
-import { athleteLevels, requestPasswordRecovery } from '../utils/auth.js'
+import { requestPasswordRecovery } from '../utils/auth.js'
 
 /* global console */
 
@@ -23,7 +23,6 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [birthDate, setBirthDate] = useState('')
-  const [level, setLevel] = useState('Iniciado')
   const [phone, setPhone] = useState('')
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('error')
@@ -42,7 +41,7 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
       const result = isRecoveryOpen
         ? await requestPasswordRecovery(email)
         : isRegister
-          ? await onRegister({ name, email, password, birthDate, level, phone })
+          ? await onRegister({ name, email, password, birthDate, level: 'Iniciado', phone })
           : await onLogin({ email, password })
 
       if (result?.message) {
@@ -106,21 +105,13 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
             <>
               <AuthField label="Nombre completo" value={name} onChange={setName} autoComplete="name" required />
               <AuthField label="Fecha de nacimiento" type="date" value={birthDate} onChange={setBirthDate} required />
-              <label className="block">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-white/60">Nivel</span>
-                <select
-                  className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
-                  value={level}
-                  required
-                  onChange={(event) => setLevel(event.target.value)}
-                >
-                  {athleteLevels.map((levelOption) => (
-                    <option key={levelOption} className="bg-kupan-black text-white" value={levelOption}>
-                      {levelOption}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="rounded-xl border border-kupan-leaf/35 bg-kupan-leaf/10 p-4" aria-label="Nivel inicial">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-kupan-sand">Nivel inicial</p>
+                <p className="mt-2 text-lg font-black text-white">Estoy comenzando</p>
+                <p className="mt-1 text-sm leading-6 text-white/65">
+                  Tu coach evaluará contigo la escala técnica adecuada durante tus primeras clases.
+                </p>
+              </div>
               <AuthField label="Teléfono opcional" type="tel" value={phone} onChange={setPhone} autoComplete="tel" />
             </>
           ) : null}
