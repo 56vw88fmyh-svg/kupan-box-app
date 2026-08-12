@@ -57,7 +57,7 @@ export function AppShell({ title, eyebrow, children, currentUser }) {
         {children}
         <div className="mt-8 flex flex-col items-center justify-center gap-2 text-center">
           <p className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-white/30">
-            KUPAN App v2.1.0
+            KUPAN App v2.1.1
           </p>
           <button type="button" className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-kupan-sand" onClick={forceAppUpdate}>
             Actualizar app

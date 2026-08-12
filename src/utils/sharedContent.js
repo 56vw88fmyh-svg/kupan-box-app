@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { defaultAdminContent, defaultAppText } from './adminContent.js'
+import { getPaymentUrlForPlan } from '../data/paymentLinks.js'
 
 const dayMap = {
   1: { id: 'monday', short: 'Lun', label: 'Lunes' },
@@ -77,38 +78,48 @@ function mapWod(wod) {
 }
 
 function mapPlans(plans) {
+  function getPublicPlanKey(plan) {
+    const name = String(plan?.name ?? '').toLowerCase()
+    if (name.includes('pase') && name.includes('diario')) return 'daily'
+    if (name.includes('full') || plan?.is_unlimited) return 'full'
+    if (name.includes('12')) return '12'
+    if (name.includes('8')) return '8'
+    return ''
+  }
+
   const publicPlans = plans.filter((plan) => {
-    const name = String(plan.name ?? '').toLowerCase()
-    return name.includes('8') || name.includes('12') || name.includes('full')
+    return Boolean(getPublicPlanKey(plan))
   })
   if (!publicPlans.length) return defaultAdminContent.plans
 
-  const paymentUrls = {
-    '8': 'https://mpago.la/33iSvva',
-    '12': 'https://mpago.la/2V6hM5j',
-    full: 'https://mpago.la/2wHbG3j',
-  }
-
   const mapped = publicPlans.map((plan) => {
     const normalizedName = String(plan.name ?? '').toLowerCase()
-    const tokenCount = normalizedName.includes('12') ? 12 : normalizedName.includes('8') ? 8 : null
-    const paymentKey = plan.is_unlimited ? 'full' : String(tokenCount)
+    const isDailyPass = normalizedName.includes('pase') && normalizedName.includes('diario')
+    const isFull = normalizedName.includes('full') || plan.is_unlimited
+    const tokenCount = normalizedName.includes('12') ? 12 : normalizedName.includes('8') ? 8 : isDailyPass ? 1 : null
     return {
-    name: plan.name,
-    price: formatPrice(plan.price),
-    classes: plan.is_unlimited ? 'Una reserva diaria, lunes a viernes' : `${tokenCount ?? ''} clases por 30 días`,
-    paymentUrl: paymentUrls[paymentKey] ?? '',
-    highlight: tokenCount === 12,
-    benefits: [
-      plan.is_unlimited ? 'Una reserva diaria de lunes a viernes' : `${tokenCount} tokens no acumulables`,
-      'Vigencia de 30 días desde la activación',
-      'Reserva tu clase y ven a darlo todo',
-      'Somos comunidad, esfuerzo y progreso',
-    ],
+      name: plan.name,
+      price: formatPrice(plan.price),
+      classes: isDailyPass ? '1 clase' : isFull ? 'Plan Full por 30 días' : `${tokenCount ?? ''} clases por 30 días`,
+      paymentUrl: getPaymentUrlForPlan(plan.name),
+      highlight: tokenCount === 12,
+      benefits: isDailyPass
+        ? ['Una clase CrossFit', 'Sujeto a cupos disponibles', 'Ideal para visitas o entrenamiento puntual']
+        : isFull
+          ? ['Una reserva diaria de lunes a viernes', 'Vigencia de 30 días desde la activación', 'No descuenta tokens', 'Entrena fuerte, entrena acompañado']
+        : [
+          `${tokenCount} tokens no acumulables`,
+          'Vigencia de 30 días desde la activación',
+          'Reserva tu clase y ven a darlo todo',
+          'Somos comunidad, esfuerzo y progreso',
+        ],
     }
   })
 
-  return [...mapped, ...defaultAdminContent.plans.filter((plan) => plan.name === 'Pase diario' || plan.trial)]
+  const mappedKeys = new Set(publicPlans.map(getPublicPlanKey))
+  const missingPublicPlans = defaultAdminContent.plans.filter((plan) => !plan.trial && !mappedKeys.has(getPublicPlanKey(plan)))
+  const trialPlan = defaultAdminContent.plans.filter((plan) => plan.trial)
+  return [...mapped, ...missingPublicPlans, ...trialPlan]
 }
 
 function mapAppText(settings) {

@@ -37,9 +37,14 @@ function PlanCard({ plan }) {
           </a>
         )}
         {plan.paymentUrl ? (
-          <a className="k-button-secondary" href={plan.paymentUrl} target="_blank" rel="noreferrer">
-            Pagar ahora
+          <a className="k-button-secondary" href={plan.paymentUrl} target="_blank" rel="noopener noreferrer" aria-label={`Pagar ${plan.name} en Mercado Pago`}>
+            Pagar {plan.name}
           </a>
+        ) : null}
+        {plan.paymentUrl ? (
+          <p className="text-xs font-semibold leading-5 text-white/55">
+            Después de pagar, envía el comprobante por WhatsApp para activar tu plan.
+          </p>
         ) : null}
       </div>
     </article>

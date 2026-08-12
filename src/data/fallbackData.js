@@ -1,3 +1,5 @@
+import { paymentLinks } from './paymentLinks.js'
+
 export const todayStats = [
   { label: 'Cupos para hoy', value: '12' },
   { label: 'WOD para darlo todo', value: 'AMRAP' },
@@ -109,32 +111,32 @@ export const plans = [
   {
     name: '8 clases',
     price: '$40.000',
-    classes: '8 clases al mes',
-    paymentUrl: 'https://mpago.la/33iSvva',
+    classes: '8 clases por 30 días',
+    paymentUrl: paymentLinks.eightClasses,
     highlight: false,
     benefits: ['Dos entrenamientos por semana', 'Técnica, constancia y comunidad', 'Acceso al WOD diario', 'Perfecto para crear hábito'],
   },
   {
     name: '12 clases',
     price: '$45.000',
-    classes: '12 clases al mes',
-    paymentUrl: 'https://mpago.la/2V6hM5j',
+    classes: '12 clases por 30 días',
+    paymentUrl: paymentLinks.twelveClasses,
     highlight: true,
     benefits: ['Tres entrenamientos por semana', 'Buen equilibrio entre ritmo y recuperación', 'Somos comunidad, esfuerzo y progreso', 'Recomendado para avanzar constante'],
   },
   {
     name: 'Full CrossFit',
     price: '$55.000',
-    classes: 'Clases ilimitadas',
-    paymentUrl: 'https://mpago.la/2wHbG3j',
+    classes: 'Plan Full por 30 días',
+    paymentUrl: paymentLinks.full,
     highlight: false,
-    benefits: ['Una reserva diaria de lunes a viernes', 'Vigencia de 30 días corridos', 'Para quienes hacen del box su rutina', 'Entrena fuerte, entrena acompañado'],
+    benefits: ['Una reserva diaria de lunes a viernes', 'Vigencia de 30 días corridos', 'No descuenta tokens', 'Entrena fuerte, entrena acompañado'],
   },
   {
     name: 'Pase diario',
     price: '$7.000',
     classes: '1 clase',
-    paymentUrl: '',
+    paymentUrl: paymentLinks.dailyPass,
     highlight: false,
     benefits: ['Una clase CrossFit', 'Sujeto a cupos disponibles', 'Ideal para visitas o entrenamiento puntual'],
   },
