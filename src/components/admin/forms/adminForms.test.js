@@ -29,7 +29,7 @@ const forbiddenPatterns = [
 const requiredSnippets = {
   'AdminWodForm.jsx': ['value={draft.date}', 'label="Warm up"', 'label="Skill / Strength"', 'label="WOD"', 'onSubmit={onSubmit}', 'disabled={isDisabled}'],
   'AdminScheduleForm.jsx': ['value={draft.day_of_week}', 'value={draft.time}', 'checked={draft.active}', 'onSubmit={onSubmit}', 'disabled={isDisabled}'],
-  'AdminCommunityPostForm.jsx': ['value={draft.type}', 'value={draft.title}', 'checked={draft.active}', 'onSubmit={onSubmit}', 'disabled={isDisabled}'],
+  'AdminCommunityPostForm.jsx': ['value={draft.type}', 'value={draft.title}', "'Publicar y notificar'", 'checked={draft.active}', 'onSubmit={onSubmit}', 'disabled={isDisabled}'],
   'AdminSettingsForm.jsx': ['value={draft.homeEyebrow}', "onTextChange('homeEyebrow', value)", 'value={draft.communityPhrase}', 'onSubmit={onSubmit}'],
   'AdminManualReservationForm.jsx': ['value={draft.class_schedule_id}', 'value={draft.profile_id}', 'checked={draft.allow_without_membership}', 'ref={formRef}', 'onSubmit={onSubmit}'],
   'AdminPlanForm.jsx': ['value={draft.name}', 'value={draft.price}', 'checked={draft.is_unlimited}', 'checked={draft.active}', 'onSubmit={onSubmit}'],

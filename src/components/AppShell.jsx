@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import logoKupan from '../assets/brand/logo-kupan.png'
+import { gymConfig } from '../config/gymConfig.js'
 import { NotificationBell } from './NotificationBell.jsx'
 
 async function forceAppUpdate() {
@@ -10,7 +10,8 @@ async function forceAppUpdate() {
 
   if ('caches' in window) {
     const cacheKeys = await window.caches.keys()
-    await Promise.all(cacheKeys.filter((key) => key.startsWith('kupan-')).map((key) => window.caches.delete(key)))
+    const namespaces = ['wl-', gymConfig.infrastructure.cacheNamespace, ...(gymConfig.infrastructure.legacyCacheNamespaces ?? [])]
+    await Promise.all(cacheKeys.filter((key) => namespaces.some((namespace) => key.startsWith(namespace.endsWith('-') ? namespace : `${namespace}-`))).map((key) => window.caches.delete(key)))
   }
 
   window.location.reload()
@@ -41,9 +42,9 @@ export function AppShell({ title, eyebrow, children, currentUser }) {
             <h1 className="k-display mt-1 break-words text-3xl font-black uppercase leading-none text-white">{title}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <NotificationBell currentUser={currentUser} />
-            <div className="flex h-14 w-24 items-center justify-center rounded-lg border border-kupan-steel/25 bg-black/45 p-1 shadow-[0_10px_24px_rgba(0,0,0,0.35)] sm:h-[4.5rem] sm:w-32">
-              <img className="h-full w-full object-contain" src={logoKupan} alt="KUPAN · Fuerza, raíces y espíritu" width="128" height="78" decoding="async" />
+            {gymConfig.features.notifications ? <NotificationBell currentUser={currentUser} /> : null}
+            <div className="flex h-14 w-24 items-center justify-center overflow-hidden rounded-lg border border-kupan-steel/25 bg-black/45 p-1 shadow-[0_10px_24px_rgba(0,0,0,0.35)] sm:h-[4.5rem] sm:w-32">
+              <img className={gymConfig.id === 'fittest' ? 'h-12 w-12 max-w-none shrink-0 scale-[1.14] rounded-full object-cover' : 'h-full w-full object-contain'} style={gymConfig.id === 'fittest' ? { clipPath: 'circle(44% at 50% 50%)' } : undefined} src={gymConfig.assets.logo} alt={`${gymConfig.identity.name} · ${gymConfig.identity.slogan}`} width="128" height="78" decoding="async" />
             </div>
           </div>
         </div>
@@ -57,7 +58,7 @@ export function AppShell({ title, eyebrow, children, currentUser }) {
         {children}
         <div className="mt-8 flex flex-col items-center justify-center gap-2 text-center">
           <p className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-white/30">
-            KUPAN App v2.1.2
+            {gymConfig.identity.name} App v2.1.2
           </p>
           <button type="button" className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-kupan-sand" onClick={forceAppUpdate}>
             Actualizar app

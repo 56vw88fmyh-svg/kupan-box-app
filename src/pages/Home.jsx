@@ -3,6 +3,7 @@ import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, StaleDataSta
 import { formatChileDisplayDate, formatShortChileDate, loadCommunityFeed, loadTodaysWod } from '../utils/communityFeed.js'
 import { formatReservationDate, loadReservationData } from '../utils/supabaseReservations.js'
 import { formatCoachName } from '../utils/coachName.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const fallbackDashboard = {
   isLoading: false,
@@ -13,7 +14,7 @@ const fallbackDashboard = {
   news: [],
 }
 
-function getInitials(name = 'KUPAN') {
+function getInitials(name = gymConfig.identity.name) {
   return String(name)
     .split(' ')
     .map((part) => part.trim().charAt(0))
@@ -24,7 +25,7 @@ function getInitials(name = 'KUPAN') {
 }
 
 function getSafeName(currentUser) {
-  return currentUser?.name || currentUser?.full_name || currentUser?.email?.split('@')[0] || 'Atleta KUPAN'
+  return currentUser?.name || currentUser?.full_name || currentUser?.email?.split('@')[0] || `Atleta ${gymConfig.identity.name}`
 }
 
 function getDateTimeValue(classItem) {
@@ -51,8 +52,8 @@ function normalizeReservedClass(reservation) {
     reservationDate: reservation.reservation_date,
     day: reservation.class_schedule.day_of_week ? ['','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'][reservation.class_schedule.day_of_week] : '',
     time: reservation.class_schedule.time?.slice(0, 5) ?? '',
-    name: reservation.class_schedule.class_name ?? 'Clase KUPAN',
-    coach: reservation.class_schedule.coach ?? 'Coach KUPAN',
+    name: reservation.class_schedule.class_name ?? `Clase ${gymConfig.identity.name}`,
+    coach: reservation.class_schedule.coach ?? `Coach ${gymConfig.identity.name}`,
     maxSpots: reservation.class_schedule.max_spots ?? 12,
     spots: null,
     isReserved: reservation.status === 'reserved',
@@ -98,7 +99,7 @@ function buildWodSummary(wod) {
     ].filter(Boolean).slice(0, 4)
 
     return {
-      title: wod.title || 'WOD KUPAN',
+      title: wod.title || `WOD ${gymConfig.identity.name}`,
       type: wod.timeCap ? `Time cap ${wod.timeCap}` : 'WOD de hoy',
       level: 'Todos los niveles',
       lines,
@@ -146,7 +147,7 @@ function NextClassCard({ classItem, currentUser, onAction }) {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Próxima clase</p>
-            <h2 className="k-display mt-3 whitespace-nowrap text-[2rem] font-black uppercase leading-none text-white sm:text-4xl">{classItem.name || 'Clase KUPAN'}</h2>
+            <h2 className="k-display mt-3 whitespace-nowrap text-[2rem] font-black uppercase leading-none text-white sm:text-4xl">{classItem.name || `Clase ${gymConfig.identity.name}`}</h2>
           </div>
           <Badge state={getBadgeState(status)}>{status.label}</Badge>
         </div>
@@ -214,11 +215,11 @@ function WodPreview({ summary, onOpen }) {
 
 function QuickActions({ setActivePage }) {
   const actions = [
-    { label: 'Reservar', page: 'reservations' },
-    { label: 'Ver WOD', page: 'wod' },
+    { label: 'Reservar', page: 'reservations', feature: 'reservations' },
+    { label: 'Ver WOD', page: 'wod', feature: 'wod' },
     { label: 'Mi plan', page: 'plans' },
-    { label: 'Registrar resultado', page: 'prs' },
-  ]
+    { label: 'Registrar resultado', page: 'prs', feature: 'wod' },
+  ].filter((action) => !action.feature || gymConfig.features[action.feature])
 
   return (
     <section>
@@ -246,8 +247,8 @@ function NewsPreview({ news, onOpenCommunity }) {
         <div className="space-y-3">
           {news.slice(0, 2).map((item) => (
             <Card key={item.id} className="p-4" variant="standard">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-kupan-flame">{item.type ?? 'KUPAN'} · {formatShortChileDate(item.event_date ?? item.created_at?.slice(0, 10))}</p>
-              <h3 className="mt-2 font-black uppercase text-white">{item.title || 'Novedad KUPAN'}</h3>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-kupan-flame">{item.type ?? gymConfig.identity.name} · {formatShortChileDate(item.event_date ?? item.created_at?.slice(0, 10))}</p>
+              <h3 className="mt-2 font-black uppercase text-white">{item.title || `Novedad ${gymConfig.identity.name}`}</h3>
               {item.content ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/65">{item.content}</p> : null}
             </Card>
           ))}
@@ -318,7 +319,7 @@ export function Home({ setActivePage, currentUser }) {
     <div className="space-y-6">
       <HomeHeader currentUser={currentUser} dateLabel={dateLabel} onProfile={() => setActivePage('profile')} />
 
-      {dashboard.isLoading ? <LoadingState label="Preparando tu día KUPAN" /> : null}
+      {dashboard.isLoading ? <LoadingState label={`Preparando tu día ${gymConfig.identity.name}`} /> : null}
 
       {!dashboard.isLoading && dashboard.message ? (
         <ErrorState
@@ -333,11 +334,11 @@ export function Home({ setActivePage, currentUser }) {
 
       {!dashboard.isLoading ? <NextClassCard classItem={nextClass} currentUser={currentUser} onAction={handleClassAction} /> : null}
 
-      {!dashboard.isLoading ? <WodPreview summary={wodSummary} onOpen={() => setActivePage('wod')} /> : null}
+      {!dashboard.isLoading && gymConfig.features.wod ? <WodPreview summary={wodSummary} onOpen={() => setActivePage('wod')} /> : null}
 
       <QuickActions setActivePage={setActivePage} />
 
-      {!dashboard.isLoading ? <NewsPreview news={dashboard.news} onOpenCommunity={() => setActivePage('community')} /> : null}
+      {!dashboard.isLoading && gymConfig.features.community ? <NewsPreview news={dashboard.news} onOpenCommunity={() => setActivePage('community')} /> : null}
     </div>
   )
 }

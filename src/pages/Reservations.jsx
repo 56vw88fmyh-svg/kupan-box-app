@@ -11,6 +11,7 @@ import {
 import { getChileDateKey, getChileDateTime } from '../utils/chileDateTime.js'
 import { formatCoachName } from '../utils/coachName.js'
 import { getCancellationPolicy } from '../utils/reservationPolicy.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const CHILE_TIME_ZONE = 'America/Santiago'
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
@@ -113,7 +114,7 @@ function getClassKey(item) {
 
 function PlanStatusCard({ currentUser, hasActiveMembership, membership, remainingTokens, isLoading }) {
   const isUnlimitedPlan = Boolean(membership?.is_unlimited)
-  const planName = membership?.plan?.name ?? membership?.plan_name ?? 'Plan KUPAN'
+  const planName = membership?.plan?.name ?? membership?.plan_name ?? `Plan ${gymConfig.identity.name}`
   const expiresAt = membership?.end_date ?? membership?.expires_at
   const hasTokens = isUnlimitedPlan || remainingTokens === null || Number(remainingTokens) > 0
 
@@ -291,7 +292,7 @@ function ReservationList({ reservations, onCancel, processingKey }) {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-text-muted">{item.day} · {formatReservationDate(item.reservationDate)}</p>
                 <h3 className="mt-1 font-black text-text-primary">{item.name}</h3>
-                <p className="mt-1 text-sm text-text-secondary">{item.time} · Coach {item.coach || 'KUPAN'}</p>
+                <p className="mt-1 text-sm text-text-secondary">{item.time} · Coach {item.coach || gymConfig.identity.name}</p>
               </div>
               <Button type="button" variant="tertiary" size="sm" disabled={processingKey === classKey} onClick={() => onCancel(item)}>
                 Cancelar
@@ -348,8 +349,8 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
       day: reservation.class_schedule?.day_of_week ? dayNames[reservation.class_schedule.day_of_week] : '',
       block: reservation.class_schedule?.time && Number(reservation.class_schedule.time.slice(0, 2)) < 12 ? 'AM' : 'PM',
       time: reservation.class_schedule?.time?.slice(0, 5) ?? '',
-      name: reservation.class_schedule?.class_name ?? 'Clase KUPAN',
-      coach: reservation.class_schedule?.coach ?? 'Coach KUPAN',
+      name: reservation.class_schedule?.class_name ?? `Clase ${gymConfig.identity.name}`,
+      coach: reservation.class_schedule?.coach ?? `Coach ${gymConfig.identity.name}`,
       isReserved: reservation.status === 'reserved',
     })))
     setMembership(result.membership)
@@ -509,7 +510,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
       <section className="space-y-4">
         <WeekSelector weekDays={weekDays} selectedDateKey={selectedDateKey} onSelect={setSelectedDateKey} />
 
-        {isLoading ? <LoadingState title="Cargando horarios" description="Estamos revisando cupos reales desde KUPAN." /> : null}
+        {isLoading ? <LoadingState title="Cargando horarios" description={`Estamos revisando cupos reales desde ${gymConfig.identity.name}.`} /> : null}
 
         {reservationMessage ? (
           <ErrorState title="Atencion" description={reservationMessage} actionLabel="Actualizar cupos" onAction={refreshReservations} />

@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "FITTEST",
+  "short_name": "FITTEST",
+  "description": "App progresiva para reservas, planes y comunidad de FITTEST.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "lang": "es-CL",
+  "categories": ["fitness", "sports", "lifestyle"],
+  "icons": [
+    { "src": "/brand/fittest/logo-fittest-red.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/fittest/logo-fittest-red.png", "sizes": "1254x1254", "type": "image/png", "purpose": "maskable" }
+  ]
+}

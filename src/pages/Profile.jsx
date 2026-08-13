@@ -13,6 +13,7 @@ import {
   subscribeToProfileData,
   updateSupabaseProfile,
 } from '../utils/profileData.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
 const weekDayInitials = ['L', 'M', 'M', 'J', 'V', 'S']
@@ -106,7 +107,7 @@ function MembershipSummary({
     <MotionCard as="section" className="k-card overflow-hidden p-0" delay={0.02}>
       <div className="flex flex-col gap-4 border-b border-white/10 bg-black/25 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Membresía KUPAN</p>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Membresía {gymConfig.identity.name}</p>
           <h2 className="k-display mt-2 text-4xl font-black uppercase leading-none text-white">
             {isLoading ? 'Revisando tu plan...' : planName ?? 'Activa tu plan'}
           </h2>
@@ -188,7 +189,7 @@ function MembershipSummary({
           <div className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4">
             <p className="font-black uppercase text-white">Aún no tienes una membresía activa.</p>
             <p className="mt-2 text-sm leading-6 text-white/65">Cuando el administrador active tu plan, aparecerá aquí automáticamente con sus tokens y vencimiento.</p>
-            <button type="button" className="k-button mt-4 w-full" onClick={onRenew}>Ver planes KUPAN</button>
+            <button type="button" className="k-button mt-4 w-full" onClick={onRenew}>Ver planes {gymConfig.identity.name}</button>
           </div>
         </div>
       )}
@@ -232,14 +233,14 @@ function StudentDashboard({
   const classItem = getReservationClass(nextReservation)
   const dayLabel = classItem?.day_of_week ? dayNames[classItem.day_of_week] : nextReservation?.day
   const classTime = classItem?.time?.slice?.(0, 5) ?? classItem?.time ?? ''
-  const className = classItem?.class_name ?? 'Clase KUPAN'
-  const coach = classItem?.coach ?? 'Coach KUPAN'
+  const className = classItem?.class_name ?? `Clase ${gymConfig.identity.name}`
+  const coach = classItem?.coach ?? `Coach ${gymConfig.identity.name}`
 
   return (
     <MotionCard as="section" className="k-card overflow-hidden p-0" delay={0.025}>
       <div className="border-b border-white/10 bg-black/25 p-5">
         <p className="k-pill inline-flex text-kupan-flame">Panel alumno</p>
-        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Tu semana KUPAN clara y al tiro.</h2>
+        <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Tu semana {gymConfig.identity.name} clara y al tiro.</h2>
         <p className="mt-3 text-sm leading-6 text-white/60">
           Revisa tu próxima clase, tokens y plan antes de reservar.
         </p>
@@ -412,7 +413,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
   const visibleReservations = supabaseReservations
   const accessRestricted = new window.URLSearchParams(location.search).get('access') === 'restricted'
 
-  const profileName = supabaseProfile?.full_name ?? currentUser?.name ?? 'Atleta KUPAN'
+  const profileName = supabaseProfile?.full_name ?? currentUser?.name ?? `Atleta ${gymConfig.identity.name}`
   const email = supabaseProfile?.email ?? currentUser?.email ?? 'Inicia sesión para guardar tu progreso'
   const phone = supabaseProfile?.phone ?? currentUser?.phone ?? ''
   const birthDate = supabaseProfile?.birth_date ?? currentUser?.birthDate ?? ''
@@ -553,7 +554,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
     return (
       <div className="space-y-6">
         <MotionCard as="section" className="k-card p-5">
-          <p className="k-pill inline-flex text-kupan-flame">Perfil KUPAN</p>
+          <p className="k-pill inline-flex text-kupan-flame">Perfil {gymConfig.identity.name}</p>
           <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Entra a tu cuenta y entrena acompañado.</h2>
           <p className="mt-3 text-sm leading-6 text-white/60">
             Inicia sesión para ver tu plan, reservas, datos personales y progreso dentro del box.
@@ -583,7 +584,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
               {profileName.charAt(0)}
             </div>
             <div className="min-w-0">
-              <p className="k-pill inline-flex text-kupan-flame">Atleta KUPAN</p>
+              <p className="k-pill inline-flex text-kupan-flame">Atleta {gymConfig.identity.name}</p>
               <h2 className="mt-3 break-words text-4xl font-black uppercase leading-none text-white">{profileName}</h2>
               <p className="mt-2 text-sm text-white/60">{email}</p>
             </div>
@@ -634,7 +635,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
       />
 
       <MotionCard as="section" className="k-card p-5" delay={0.03}>
-        <SectionTitle eyebrow="Datos del atleta" title="Tu ficha KUPAN" />
+        <SectionTitle eyebrow="Datos del atleta" title={`Tu ficha ${gymConfig.identity.name}`} />
         {isFetchingProfile ? <p className="mb-4 text-sm font-bold text-white/60">Cargando tus datos seguros...</p> : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <ProfileField label="Nombre completo" value={profileName} />
@@ -798,7 +799,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
       </MotionCard>
 
       <section>
-        <SectionTitle eyebrow="Reservas activas" title="Tu agenda KUPAN" />
+        <SectionTitle eyebrow="Reservas activas" title={`Tu agenda ${gymConfig.identity.name}`} />
         {visibleReservations.length > 0 ? (
           <div className="space-y-3">
             {visibleReservations.map((item) => {
@@ -833,7 +834,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         )}
       </section>
 
-      <section>
+      {gymConfig.features.wod ? <section>
         <SectionTitle eyebrow="Ultimos PR" title="Marcas que se celebran" />
         <button type="button" className="k-button mb-4 w-full" onClick={() => setActivePage('prs')}>
           Gestionar mis PR
@@ -856,22 +857,22 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         ) : (
           <MotionCard className="k-panel p-4">
             <p className="font-black uppercase text-white">Aún no tienes PR registrados.</p>
-            <p className="mt-1 text-sm leading-6 text-white/60">Entra a Mis PR y registra tu primera marca KUPAN.</p>
+            <p className="mt-1 text-sm leading-6 text-white/60">Entra a Mis PR y registra tu primera marca {gymConfig.identity.name}.</p>
           </MotionCard>
         )}
-      </section>
+      </section> : null}
 
       {['admin', 'coach'].includes(currentUser.role) ? (
         <MotionCard as="section" className="k-card p-5" delay={0.08}>
           <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Gestion del box</p>
-          <h2 className="mt-2 text-2xl font-black uppercase text-white">Herramientas KUPAN</h2>
+          <h2 className="mt-2 text-2xl font-black uppercase text-white">Herramientas {gymConfig.identity.name}</h2>
           <p className="mt-2 text-sm leading-6 text-white/60">
             Entra al modo coach para ver la clase del día, reservas y asistencia.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('coach')}>
+            {gymConfig.features.coachManagement ? <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('coach')}>
               Entrar a modo coach
-            </button>
+            </button> : null}
             {currentUser.role === 'admin' ? (
               <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('admin')}>
                 Entrar a admin

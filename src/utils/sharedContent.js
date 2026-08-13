@@ -1,6 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { defaultAdminContent, defaultAppText } from './adminContent.js'
 import { getPaymentUrlForPlan } from '../data/paymentLinks.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const dayMap = {
   1: { id: 'monday', short: 'Lun', label: 'Lunes' },
@@ -18,7 +19,7 @@ function splitLines(value, fallback = []) {
 }
 
 function formatPrice(price) {
-  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(price || 0))
+  return new Intl.NumberFormat(gymConfig.localization.locale, { style: 'currency', currency: gymConfig.localization.currency, maximumFractionDigits: 0 }).format(Number(price || 0))
 }
 
 function buildWeeklySchedule(classes) {
@@ -32,7 +33,7 @@ function buildWeeklySchedule(classes) {
         id: item.id,
         time: item.time.slice(0, 5),
         name: item.class_name,
-        coach: item.coach ?? 'Coach KUPAN',
+        coach: item.coach ?? `Coach ${gymConfig.identity.name}`,
         spots: item.max_spots ?? 12,
         maxSpots: item.max_spots ?? 12,
       })
@@ -161,7 +162,7 @@ export async function loadSharedContent() {
   const communityPosts = communityItems
     .filter((post) => post.type !== 'evento')
     .map((post) => ({
-      tag: post.type ?? 'KUPAN',
+      tag: post.type ?? gymConfig.identity.name,
       title: post.title,
       text: post.content,
     }))

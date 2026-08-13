@@ -1,6 +1,7 @@
 import { Component } from 'react'
 import { Button, Card } from './ui/index.js'
 import { logAppError } from '../utils/appState.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 export class ErrorBoundary extends Component {
   constructor(props) {
@@ -42,7 +43,7 @@ export class ErrorBoundary extends Component {
           <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Error inesperado</p>
           <h1 className="mt-3 text-3xl font-black uppercase leading-tight text-white">La app necesita tomar aire.</h1>
           <p className="mt-3 text-sm leading-6 text-white/70">
-            Algo se cortó mientras cargábamos KUPAN. Puedes reintentar, volver al inicio o recargar la aplicación.
+            Algo se cortó mientras cargábamos {gymConfig.identity.name}. Puedes reintentar, volver al inicio o recargar la aplicación.
           </p>
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <Button type="button" variant="secondary" onClick={this.reset}>Reintentar</Button>

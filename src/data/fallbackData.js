@@ -1,4 +1,5 @@
 import { paymentLinks } from './paymentLinks.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 export const todayStats = [
   { label: 'Cupos para hoy', value: '12' },
@@ -107,7 +108,7 @@ export const wod = {
   scaling: [],
 }
 
-export const plans = [
+const kupanPlans = [
   {
     name: '8 clases',
     price: '$40.000',
@@ -151,13 +152,35 @@ export const plans = [
   },
 ]
 
-export const transferInfo = {
+function formatConfiguredPrice(price) {
+  return new Intl.NumberFormat(gymConfig.localization.locale, {
+    style: 'currency',
+    currency: gymConfig.localization.currency,
+    maximumFractionDigits: 0,
+  }).format(price)
+}
+
+export const plans = gymConfig.id === 'kupan' ? kupanPlans : gymConfig.operations.plans.map((plan, index) => ({
+  name: plan.name,
+  price: formatConfiguredPrice(plan.price),
+  classes: plan.frequency,
+  paymentUrl: '',
+  highlight: index === 1,
+  benefits: [
+    plan.frequency,
+    `Reserva hasta ${gymConfig.operations.reservationClosesMinutes} minutos antes de la clase`,
+    `Cancelación con ${gymConfig.operations.cancellationWindowMinutes} minutos de anticipación`,
+    gymConfig.identity.slogan,
+  ],
+}))
+
+export const transferInfo = gymConfig.id === 'kupan' ? {
   name: 'Víctor Arismendi',
   rut: '16.906.330-3',
   bank: 'Cuenta Vista Mercado Pago',
   account: '1079164642',
   email: 'pagoskupanbox@gmail.com',
-}
+} : null
 
 export const communityPosts = []
 

@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const chileDateFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Santiago',
@@ -44,7 +45,7 @@ function mapWodRow(row) {
   return {
     id: row.id,
     date: row.date,
-    title: row.title || 'WOD KUPAN',
+    title: row.title || `WOD ${gymConfig.identity.name}`,
     warmup: splitLines(row.warmup),
     strength: splitLines(row.strength),
     workout: splitLines(row.workout),
@@ -130,7 +131,7 @@ async function loadRanking() {
   return profileIds
     .map((profileId) => ({
       profile_id: profileId,
-      full_name: names.get(profileId) ?? 'Atleta KUPAN',
+      full_name: names.get(profileId) ?? `Atleta ${gymConfig.identity.name}`,
       reservations_count: counts.get(profileId) ?? 0,
     }))
     .sort((a, b) => b.reservations_count - a.reservations_count)
@@ -177,7 +178,7 @@ async function loadRecentPrs() {
   const names = new Map((profilesResult.data ?? []).map((profile) => [profile.id, profile.full_name]))
   return (data ?? []).map((record) => ({
     ...record,
-    full_name: names.get(record.profile_id) ?? 'Atleta KUPAN',
+    full_name: names.get(record.profile_id) ?? `Atleta ${gymConfig.identity.name}`,
   }))
 }
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Card, Input } from '../components/ui/index.js'
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { getPasswordErrorMessage, passwordRequirements, validateSecurePassword } from '../utils/passwordSecurity.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 function RequirementList() {
   return (
@@ -112,7 +113,7 @@ export function PasswordUpdate({ currentUser, forced = false, onUserUpdate }) {
       <Card variant="elevated" className="p-5">
         <p className="k-pill inline-flex text-kupan-flame">{forced ? 'Cambio obligatorio' : 'Recuperación segura'}</p>
         <h1 className="mt-4 text-3xl font-black uppercase leading-tight text-white">
-          {forced ? 'Crea una nueva contraseña para seguir.' : 'Crea tu nueva contraseña KUPAN.'}
+          {forced ? 'Crea una nueva contraseña para seguir.' : `Crea tu nueva contraseña ${gymConfig.identity.name}.`}
         </h1>
         <p className="mt-3 text-sm leading-6 text-white/65">
           {forced

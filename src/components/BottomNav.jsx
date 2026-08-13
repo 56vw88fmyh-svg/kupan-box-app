@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import isotipoKupan from '../assets/brand/isotipo-kupan.png'
+import { gymConfig } from '../config/gymConfig.js'
 import { getActiveNavId, getPrimaryNavItemsForUser } from '../navigation/routes.js'
 import { cn } from './ui/index.js'
 
@@ -45,7 +45,11 @@ const iconPaths = {
 }
 
 function NavIcon({ icon, isActive }) {
-  if (icon === 'home') return <img className="h-5 w-5 object-contain" src={isotipoKupan} alt="" width="20" height="20" decoding="async" />
+  if (icon === 'home') return (
+    <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-black">
+      <img className={`h-full w-full object-contain ${gymConfig.id === 'fittest' ? 'scale-[1.18]' : ''}`} style={gymConfig.id === 'fittest' ? { clipPath: 'circle(44% at 50% 50%)' } : undefined} src={gymConfig.assets.icon} alt="" width="20" height="20" decoding="async" />
+    </span>
+  )
 
   return (
     <svg className={cn('h-5 w-5', isActive ? 'stroke-kupan-bone' : 'stroke-current')} viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -61,7 +65,7 @@ export function BottomNav({ currentUser }) {
 
   return (
     <nav className="k-bottom-nav fixed inset-x-0 bottom-0 z-30 border-t border-kupan-border bg-kupan-black/96 px-2 pt-2 backdrop-blur-2xl" aria-label="Navegación principal">
-      <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1">
+      <div className="mx-auto grid max-w-5xl gap-1" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
         {navItems.map((page) => {
           const isActiveByGroup = activeNavId === page.id
 

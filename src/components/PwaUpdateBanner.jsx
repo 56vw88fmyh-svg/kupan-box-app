@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Card } from './ui/index.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 export function PwaUpdateBanner() {
   const [waitingWorker, setWaitingWorker] = useState(null)
@@ -111,7 +112,7 @@ export function PwaUpdateBanner() {
           </p>
           <p className="mt-1 text-xs font-bold leading-5 text-white/60">
             {showBanner
-              ? 'Actualiza cuando estés listo para usar la última versión de KUPAN.'
+              ? `Actualiza cuando estés listo para usar la última versión de ${gymConfig.identity.name}.`
               : 'Algunas acciones se sincronizarán cuando vuelva internet.'}
           </p>
         </div>

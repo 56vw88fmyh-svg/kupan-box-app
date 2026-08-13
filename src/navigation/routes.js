@@ -1,23 +1,25 @@
+import { gymConfig } from '../config/gymConfig.js'
+
 export const primaryNavItems = [
-  { id: 'home', path: '/', label: 'Inicio', title: 'KUPAN', eyebrow: 'Comunidad, esfuerzo y progreso', icon: 'home' },
-  { id: 'reservations', path: '/reservas', label: 'Reservas', title: 'Reservas', eyebrow: 'Calendario, horarios y tus clases', icon: 'calendar' },
-  { id: 'wod', path: '/wod', label: 'WOD', title: 'WOD', eyebrow: 'WOD, resultados y PR', icon: 'wod' },
-  { id: 'community', path: '/comunidad', label: 'Comunidad', title: 'Comunidad', eyebrow: 'Actividad, ranking y noticias', icon: 'community' },
+  { id: 'home', path: '/', label: 'Inicio', title: gymConfig.identity.name, eyebrow: gymConfig.identity.tagline ?? gymConfig.identity.slogan, icon: 'home' },
+  { id: 'reservations', path: '/reservas', label: 'Reservas', title: 'Reservas', eyebrow: 'Calendario, horarios y tus clases', icon: 'calendar', feature: 'reservations' },
+  { id: 'wod', path: '/wod', label: 'WOD', title: 'WOD', eyebrow: 'WOD, resultados y PR', icon: 'wod', feature: 'wod' },
+  { id: 'community', path: '/comunidad', label: 'Comunidad', title: 'Comunidad', eyebrow: 'Actividad, ranking y noticias', icon: 'community', feature: 'community' },
   { id: 'profile', path: '/perfil', label: 'Perfil', title: 'Perfil', eyebrow: 'Plan, datos y configuración', icon: 'profile' },
 ]
 
 export const secondaryRoutes = [
   { id: 'plans', path: '/planes', label: 'Planes', title: 'Planes', eyebrow: 'Entrena a tu ritmo', parentId: 'profile', hidden: true },
-  { id: 'trial', path: '/prueba', label: 'Primera clase', title: 'Primera clase', eyebrow: 'Conoce KUPAN', parentId: 'home', hidden: true },
+  { id: 'trial', path: '/prueba', label: 'Primera clase', title: 'Primera clase', eyebrow: `Conoce ${gymConfig.identity.name}`, parentId: 'home', hidden: true },
   { id: 'prs', path: '/mis-pr', label: 'Mis PR', title: 'Mis PR', eyebrow: 'Marcas que se celebran', parentId: 'wod', hidden: true },
   { id: 'wod-prs', path: '/wod/pr', label: 'PR', title: 'Mis PR', eyebrow: 'Marcas que se celebran', parentId: 'wod', hidden: true, aliasOf: 'prs' },
-  { id: 'ranking', path: '/ranking', label: 'Ranking', title: 'Ranking KUPAN', eyebrow: 'Mejores marcas del box', parentId: 'community', hidden: true },
-  { id: 'community-ranking', path: '/comunidad/ranking', label: 'Ranking', title: 'Ranking KUPAN', eyebrow: 'Mejores marcas del box', parentId: 'community', hidden: true, aliasOf: 'ranking' },
-  { id: 'login', path: '/login', label: 'Login', title: 'Acceso KUPAN', eyebrow: 'Entrena acompañado', parentId: 'profile', hidden: true },
+  { id: 'ranking', path: '/ranking', label: 'Ranking', title: `Ranking ${gymConfig.identity.name}`, eyebrow: 'Mejores marcas del box', parentId: 'community', hidden: true, feature: 'wod' },
+  { id: 'community-ranking', path: '/comunidad/ranking', label: 'Ranking', title: `Ranking ${gymConfig.identity.name}`, eyebrow: 'Mejores marcas del box', parentId: 'community', hidden: true, aliasOf: 'ranking', feature: 'wod' },
+  { id: 'login', path: '/login', label: 'Login', title: `Acceso ${gymConfig.identity.name}`, eyebrow: 'Entrena acompañado', parentId: 'profile', hidden: true },
   { id: 'password-update', path: '/actualizar-password', label: 'Actualizar contraseña', title: 'Actualizar contraseña', eyebrow: 'Acceso seguro', parentId: 'profile', hidden: true },
   { id: 'force-password-change', path: '/cambio-password-obligatorio', label: 'Cambio de contraseña', title: 'Cambio de contraseña', eyebrow: 'Acceso seguro', parentId: 'profile', hidden: true },
-  { id: 'admin', path: '/admin', label: 'Admin', title: 'Admin KUPAN', eyebrow: 'Gestión segura del box', parentId: 'profile', hidden: true, roles: ['admin'] },
-  { id: 'coach', path: '/coach', label: 'Coach', title: 'Modo Coach', eyebrow: 'Asistencia del día', parentId: 'profile', hidden: true, roles: ['admin', 'coach'] },
+  { id: 'admin', path: '/admin', label: 'Admin', title: `Admin ${gymConfig.identity.name}`, eyebrow: 'Gestión segura del box', parentId: 'profile', hidden: true, roles: ['admin'] },
+  { id: 'coach', path: '/coach', label: 'Coach', title: 'Modo Coach', eyebrow: 'Asistencia del día', parentId: 'profile', hidden: true, roles: ['admin', 'coach'], feature: 'coachManagement' },
 ]
 
 export const routeAliases = [
@@ -48,7 +50,7 @@ export function getRouteMeta(pathname) {
 }
 
 export function getPrimaryNavItemsForUser() {
-  return primaryNavItems
+  return primaryNavItems.filter((item) => !item.feature || gymConfig.features[item.feature])
 }
 
 export function getActiveNavId(pathname) {
@@ -62,6 +64,7 @@ export function getPathForPageId(pageId) {
 }
 
 export function userCanAccessRoute(route, currentUser) {
+  if (route?.feature && !gymConfig.features[route.feature]) return false
   if (!route?.roles?.length) return true
   const hasAllowedRole = route.roles.includes(currentUser?.role)
   const isActiveProfile = currentUser?.status === 'active'

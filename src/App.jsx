@@ -5,6 +5,7 @@ import { AppShell } from './components/AppShell.jsx'
 import { LoadingScreen } from './components/LoadingScreen.jsx'
 import { MotionPage } from './components/Motion.jsx'
 import { PwaUpdateBanner } from './components/PwaUpdateBanner.jsx'
+import { gymConfig } from './config/gymConfig.js'
 import { ProtectedRoute } from './navigation/ProtectedRoute.jsx'
 import { getPathForPageId, getRouteMeta, routeAliases } from './navigation/routes.js'
 import { isSupabaseConfigured, supabase } from './lib/supabase.js'
@@ -155,7 +156,7 @@ export default function App() {
     <AppShell title={page.title} eyebrow={page.eyebrow} currentUser={currentUser}>
       {isLoading ? <LoadingScreen /> : null}
       <MotionPage key={location.pathname}>
-        <Suspense fallback={<div className="k-card p-5 text-sm font-bold uppercase text-white/60">Cargando KUPAN...</div>}>
+        <Suspense fallback={<div className="k-card p-5 text-sm font-bold uppercase text-white/60">Cargando {gymConfig.identity.name}...</div>}>
           {mustChangePassword ? (
             <Navigate to="/cambio-password-obligatorio" replace />
           ) : (
@@ -165,24 +166,26 @@ export default function App() {
                 <Route
                   path="/reservas"
                   element={(
-                    <Reservations
-                      setActivePage={goToPage}
-                      currentUser={currentUser}
-                      appContent={appContent}
-                      pendingReservation={pendingReservation}
-                      onClearPendingReservation={() => setPendingReservation(null)}
-                    />
+                    gymConfig.features.reservations ? (
+                      <Reservations
+                        setActivePage={goToPage}
+                        currentUser={currentUser}
+                        appContent={appContent}
+                        pendingReservation={pendingReservation}
+                        onClearPendingReservation={() => setPendingReservation(null)}
+                      />
+                    ) : <Navigate to="/" replace />
                   )}
                 />
-                <Route path="/wod" element={<Wod appContent={appContent} currentUser={currentUser} setActivePage={goToPage} />} />
+                <Route path="/wod" element={gymConfig.features.wod ? <Wod appContent={appContent} currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />
                 <Route path="/planes" element={<Plans appContent={appContent} />} />
                 <Route path="/prueba" element={<TrialClass setActivePage={goToPage} />} />
-                <Route path="/comunidad" element={<Community appContent={appContent} />} />
+                <Route path="/comunidad" element={gymConfig.features.community ? <Community appContent={appContent} /> : <Navigate to="/" replace />} />
                 <Route path="/perfil" element={<Profile currentUser={currentUser} onLogout={logout} setActivePage={goToPage} onUserUpdate={setCurrentUser} />} />
-                <Route path="/mis-pr" element={<PersonalRecords currentUser={currentUser} setActivePage={goToPage} />} />
-                <Route path="/wod/pr" element={<PersonalRecords currentUser={currentUser} setActivePage={goToPage} />} />
-                <Route path="/ranking" element={<Ranking />} />
-                <Route path="/comunidad/ranking" element={<Ranking />} />
+                <Route path="/mis-pr" element={gymConfig.features.wod ? <PersonalRecords currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />
+                <Route path="/wod/pr" element={gymConfig.features.wod ? <PersonalRecords currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />
+                <Route path="/ranking" element={gymConfig.features.community && gymConfig.features.wod ? <Ranking /> : <Navigate to="/" replace />} />
+                <Route path="/comunidad/ranking" element={gymConfig.features.community && gymConfig.features.wod ? <Ranking /> : <Navigate to="/" replace />} />
                 <Route path="/login" element={<Auth onLogin={login} onRegister={register} />} />
                 <Route path="/actualizar-password" element={<PasswordUpdate currentUser={currentUser} onUserUpdate={setCurrentUser} />} />
                 <Route
@@ -204,9 +207,11 @@ export default function App() {
                 <Route
                   path="/coach"
                   element={(
-                    <ProtectedRoute authChecked={authChecked} currentUser={currentUser} routePath="/coach">
-                      <Coach currentUser={currentUser} setActivePage={goToPage} />
-                    </ProtectedRoute>
+                    gymConfig.features.coachManagement ? (
+                      <ProtectedRoute authChecked={authChecked} currentUser={currentUser} routePath="/coach">
+                        <Coach currentUser={currentUser} setActivePage={goToPage} />
+                      </ProtectedRoute>
+                    ) : <Navigate to="/" replace />
                   )}
                 />
                 <Route path="*" element={<Navigate to="/" replace />} />

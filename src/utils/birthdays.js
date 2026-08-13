@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const monthFormatter = new Intl.DateTimeFormat('es-CL', { month: 'long' })
 
@@ -98,7 +99,7 @@ export async function loadUpcomingBirthdays(daysAhead = 30) {
 
 export function buildBirthdayGreeting(birthday) {
   return [
-    `Hola ${birthday.full_name}, de parte de KUPAN queremos desearte un muy feliz cumpleaños.`,
+    `Hola ${birthday.full_name}, de parte de ${gymConfig.identity.name} queremos desearte un muy feliz cumpleaños.`,
     'Que sea un gran día, con energía, comunidad y mucho progreso.',
     'Nos vemos en el box para celebrarlo entrenando fuerte y acompañado.',
   ].join('\n')

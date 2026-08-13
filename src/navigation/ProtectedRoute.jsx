@@ -1,12 +1,13 @@
 import { Navigate } from 'react-router-dom'
 import { LoadingState } from '../components/ui/index.js'
 import { getRouteMeta, userCanAccessRoute } from './routes.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 export function ProtectedRoute({ authChecked, currentUser, routePath, children }) {
   const route = getRouteMeta(routePath)
 
   if (!authChecked) {
-    return <LoadingState title="Verificando acceso" description="Un momento mientras validamos tu permiso en KUPAN." lines={3} />
+    return <LoadingState title="Verificando acceso" description={`Un momento mientras validamos tu permiso en ${gymConfig.identity.name}.`} lines={3} />
   }
 
   if (!userCanAccessRoute(route, currentUser)) {

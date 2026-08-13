@@ -1,11 +1,9 @@
-export const paymentLinks = Object.freeze({
-  eightClasses: 'https://mpago.la/33iSvva',
-  twelveClasses: 'https://mpago.la/2V6hM5j',
-  full: 'https://mpago.la/2wHbG3j',
-  dailyPass: 'https://mpago.la/1Js5uwe',
-})
+import { gymConfig } from '../config/gymConfig.js'
+
+export const paymentLinks = Object.freeze(gymConfig.features.onlinePayments ? gymConfig.integrations.paymentLinks : {})
 
 export function getPaymentUrlForPlan(planName = '') {
+  if (!gymConfig.features.onlinePayments) return ''
   const normalizedName = String(planName).trim().toLowerCase()
 
   if (normalizedName.includes('pase') && normalizedName.includes('diario')) return paymentLinks.dailyPass

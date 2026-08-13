@@ -1,7 +1,8 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
+import { gymConfig } from '../config/gymConfig.js'
 
-function getRankingError(message = 'No pudimos cargar el ranking KUPAN.') {
+function getRankingError(message = `No pudimos cargar el ranking ${gymConfig.identity.name}.`) {
   return { ok: false, message }
 }
 

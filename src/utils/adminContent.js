@@ -7,14 +7,17 @@ import {
   weeklySchedule,
   wod,
 } from '../data/fallbackData.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 export const defaultAppText = {
-  homeEyebrow: 'Entrena fuerte, entrena acompañado',
+  homeEyebrow: gymConfig.id === 'kupan' ? 'Entrena fuerte, entrena acompañado' : gymConfig.identity.slogan,
   homeTitle: 'Reserva tu clase y ven a darlo todo.',
-  homeBody: 'Somos comunidad, esfuerzo y progreso: revisa horarios, WOD y cupos para llegar listo al box.',
+  homeBody: gymConfig.features.wod
+    ? 'Somos comunidad, esfuerzo y progreso: revisa horarios, WOD y cupos para llegar listo al box.'
+    : 'Revisa horarios, clases y cupos para llegar listo al centro de entrenamiento.',
   reservationsTitle: 'Reserva tu clase y ven a darlo todo.',
   reservationsBody: 'Elige horario, confirma tu cupo y deja tu entrenamiento listo. Somos comunidad, esfuerzo y progreso.',
-  communityPhrase: 'El WOD termina cuando termina el último compañero',
+  communityPhrase: gymConfig.features.wod ? 'El WOD termina cuando termina el último compañero' : gymConfig.identity.slogan,
 }
 
 export const defaultAdminContent = {

@@ -13,7 +13,7 @@ export const adminSectionMeta = {
   prs: { label: 'PR destacados', module: 'Entrenamientos', icon: 'PR' },
 }
 
-export const adminNavigationModules = [
+const allAdminNavigationModules = [
   { id: 'inicio', label: 'Inicio', shortLabel: 'Inicio', icon: 'IN', items: [{ id: 'overview', label: 'Inicio', hint: 'Estado de hoy' }] },
   {
     id: 'clases',
@@ -84,6 +84,20 @@ export const adminNavigationModules = [
   },
 ]
 
+function isAdminItemEnabled(item) {
+  if (['wod', 'prs'].includes(item.id)) return gymConfig.features.wod
+  if (['students', 'create-student', 'memberships'].includes(item.id)) return gymConfig.features.studentManagement
+  if (item.id === 'community') return gymConfig.features.community
+  if (item.id === 'birthdays') return gymConfig.features.studentManagement && gymConfig.features.notifications
+  if (item.id === 'reservations') return gymConfig.features.reservations || gymConfig.features.attendance
+  if (item.id === 'schedule') return gymConfig.features.reservations
+  return true
+}
+
+export const adminNavigationModules = allAdminNavigationModules
+  .map((module) => ({ ...module, items: module.items.filter(isAdminItemEnabled) }))
+  .filter((module) => module.items.length > 0)
+
 export function getAdminModuleId(sectionId) {
   return adminNavigationModules.find((module) => module.items.some((item) => item.id === sectionId))?.id ?? 'inicio'
 }
@@ -91,3 +105,4 @@ export function getAdminModuleId(sectionId) {
 export function getAdminNavigationItemIds() {
   return adminNavigationModules.flatMap((module) => module.items.map((item) => `${module.id}:${item.id}:${item.target ?? ''}`))
 }
+import { gymConfig } from './gymConfig.js'

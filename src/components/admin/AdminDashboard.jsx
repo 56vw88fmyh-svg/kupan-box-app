@@ -4,18 +4,18 @@ function cn(...classes) {
 
 export function AdminPageHeader({ dateLabel, greeting, status, onAction }) {
   const actions = [
-    { id: 'wod', label: 'Crear WOD', icon: 'WD', target: { id: 'wod' } },
-    { id: 'class', label: 'Crear clase', icon: 'CL', target: { id: 'schedule' } },
-    { id: 'payment', label: 'Registrar pago', icon: 'PG', target: { id: 'memberships', target: 'membership-activate' } },
-    { id: 'student', label: 'Buscar alumno', icon: 'AL', target: { id: 'students' } },
-  ]
+    { id: 'wod', label: 'Crear WOD', icon: 'WD', target: { id: 'wod' }, enabled: gymConfig.features.wod },
+    { id: 'class', label: 'Crear clase', icon: 'CL', target: { id: 'schedule' }, enabled: gymConfig.features.reservations },
+    { id: 'payment', label: 'Registrar pago', icon: 'PG', target: { id: 'memberships', target: 'membership-activate' }, enabled: gymConfig.features.studentManagement },
+    { id: 'student', label: 'Buscar alumno', icon: 'AL', target: { id: 'students' }, enabled: gymConfig.features.studentManagement },
+  ].filter((action) => action.enabled)
 
   return (
     <section className="k-card p-4 sm:p-5">
       <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-kupan-flame">Panel KUPAN</p>
-          <h2 className="mt-2 text-3xl font-black uppercase leading-none text-white sm:text-4xl">Panel Kupan</h2>
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-kupan-flame">Panel {gymConfig.identity.name}</p>
+          <h2 className="mt-2 text-3xl font-black uppercase leading-none text-white sm:text-4xl">Panel {gymConfig.identity.name}</h2>
           <p className="mt-3 text-base font-bold leading-7 text-white/72">{greeting}</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <p className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-black uppercase text-white">
@@ -254,3 +254,4 @@ export function AdminMobileModuleNav({ modules, activeModuleId, onNavigate }) {
     </div>
   )
 }
+import { gymConfig } from '../../config/gymConfig.js'

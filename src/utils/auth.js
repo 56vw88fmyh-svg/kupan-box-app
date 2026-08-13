@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 export const athleteLevels = ['Iniciado', 'Rookie', 'Scaled', 'RX']
 
@@ -6,7 +7,7 @@ function normalizeEmail(email) {
   return String(email ?? '').trim().toLowerCase()
 }
 
-const productionAppUrl = 'https://kupan-box-app.vercel.app'
+const productionAppUrl = `https://${gymConfig.domains.production}`
 
 function getPasswordRedirectUrl() {
   const publicUrl = import.meta.env?.VITE_PUBLIC_APP_URL || import.meta.env?.VITE_APP_URL
@@ -49,7 +50,7 @@ export function getAuthErrorMessage(error) {
   }
 
   if (message.includes('birth_date')) {
-    return 'La fecha de nacimiento es obligatoria para crear tu perfil KUPAN.'
+    return `La fecha de nacimiento es obligatoria para crear tu perfil ${gymConfig.identity.name}.`
   }
 
   if (
@@ -58,7 +59,7 @@ export function getAuthErrorMessage(error) {
     || message.includes('failed to fetch')
     || message.includes('load failed')
   ) {
-    return 'No pudimos conectar con KUPAN. Revisa internet y vuelve a intentarlo.'
+    return `No pudimos conectar con ${gymConfig.identity.name}. Revisa internet y vuelve a intentarlo.`
   }
 
   if (
@@ -118,7 +119,7 @@ export function mapSupabaseUser(user, profile = null) {
   if (!user) return null
 
   const metadata = user.user_metadata ?? {}
-  const fullName = profile?.full_name ?? metadata.full_name ?? metadata.name ?? user.email?.split('@')[0] ?? 'Atleta KUPAN'
+  const fullName = profile?.full_name ?? metadata.full_name ?? metadata.name ?? user.email?.split('@')[0] ?? `Atleta ${gymConfig.identity.name}`
 
   return {
     id: user.id,
@@ -149,7 +150,7 @@ export async function loginWithSupabase({ email, password }) {
   const normalizedEmail = normalizeEmail(email)
 
   if (!normalizedEmail || !password) {
-    return { ok: false, message: 'Completa correo y contraseña para entrar a KUPAN.' }
+    return { ok: false, message: `Completa correo y contraseña para entrar a ${gymConfig.identity.name}.` }
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({

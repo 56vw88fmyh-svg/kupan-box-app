@@ -2,14 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, StaleDataState } from '../components/ui/index.js'
 import { formatBirthdayDayMonth } from '../utils/birthdays.js'
 import { formatShortChileDate, loadCommunityFeed } from '../utils/communityFeed.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const tabs = [
   { id: 'activity', label: 'Actividad' },
   { id: 'events', label: 'Eventos' },
   { id: 'news', label: 'Noticias' },
   { id: 'ranking', label: 'Ranking' },
-  { id: 'birthdays', label: 'Cumpleaños' },
-]
+  { id: 'birthdays', label: 'Cumpleaños', feature: 'notifications' },
+].filter((tab) => !tab.feature || gymConfig.features[tab.feature])
 
 function stripText(value, fallback = '') {
   return String(value ?? fallback)
@@ -29,10 +30,10 @@ function monthLabel(date = new Date()) {
 }
 
 function buildActivity({ news, recentPrs, ranking }) {
-  const prItems = recentPrs.slice(0, 4).map((record) => ({
+  const prItems = (gymConfig.features.wod ? recentPrs : []).slice(0, 4).map((record) => ({
     id: `pr-${record.id}`,
     type: 'Nuevo PR',
-    title: stripText(record.full_name, 'Atleta KUPAN'),
+    title: stripText(record.full_name, `Atleta ${gymConfig.identity.name}`),
     detail: `${stripText(record.movement, 'Movimiento')} · ${record.value} ${record.unit ?? ''}`,
     date: record.record_date ?? record.created_at,
   }))
@@ -40,7 +41,7 @@ function buildActivity({ news, recentPrs, ranking }) {
   const newsItems = news.slice(0, 3).map((post) => ({
     id: `post-${post.id}`,
     type: post.type === 'evento' ? 'Evento publicado' : 'Noticia publicada',
-    title: stripText(post.title, 'Comunicado KUPAN'),
+    title: stripText(post.title, `Comunicado ${gymConfig.identity.name}`),
     detail: stripText(post.content, 'Nueva información disponible.').slice(0, 120),
     date: post.created_at ?? post.event_date,
   }))
@@ -48,7 +49,7 @@ function buildActivity({ news, recentPrs, ranking }) {
   const attendanceItems = ranking.slice(0, 2).map((athlete, index) => ({
     id: `attendance-${athlete.profile_id}`,
     type: 'Asistencia destacada',
-    title: stripText(athlete.full_name, 'Atleta KUPAN'),
+    title: stripText(athlete.full_name, `Atleta ${gymConfig.identity.name}`),
     detail: `Posición ${index + 1} · ${athlete.reservations_count} reservas registradas`,
     date: new Date().toISOString(),
   }))
@@ -71,7 +72,7 @@ function SectionHeader({ eyebrow, title, description }) {
 function ActivitySection({ items }) {
   return (
     <section className="space-y-4">
-      <SectionHeader eyebrow="Actividad" title="Lo último en el box" description="PR, publicaciones y asistencia destacada en contexto." />
+      <SectionHeader eyebrow="Actividad" title="Lo último en el box" description={gymConfig.features.wod ? 'PR, publicaciones y asistencia destacada en contexto.' : 'Publicaciones y asistencia destacada en contexto.'} />
       {items.length === 0 ? <EmptyState title="Sin actividad reciente." description="Cuando haya PR, resultados o publicaciones nuevas, aparecerán aquí." /> : null}
       <div className="space-y-3">
         {items.slice(0, 20).map((item) => (
@@ -101,7 +102,7 @@ function EventsSection({ events }) {
           <Card key={event.id} as="article" variant="interactive" className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-black text-text-primary">{stripText(event.title, 'Evento KUPAN')}</h3>
+                <h3 className="text-lg font-black text-text-primary">{stripText(event.title, `Evento ${gymConfig.identity.name}`)}</h3>
                 <p className="mt-2 text-sm leading-6 text-text-secondary">{stripText(event.content, 'Detalles por confirmar.').slice(0, 180)}</p>
               </div>
               <Badge state="available">{event.status ?? 'Publicado'}</Badge>
@@ -113,7 +114,7 @@ function EventsSection({ events }) {
               </div>
               <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
                 <p className="text-text-muted">Lugar</p>
-                <p className="mt-1 font-black text-text-primary">{stripText(event.location, 'Kupan Box')}</p>
+                <p className="mt-1 font-black text-text-primary">{stripText(event.location, gymConfig.identity.name)}</p>
               </div>
             </div>
             <Button type="button" variant="secondary" className="mt-4" fullWidth disabled>Informarse en el box</Button>
@@ -138,7 +139,7 @@ function NewsSection({ news }) {
                 <Badge state="neutral">{stripText(post.type, 'Noticia')}</Badge>
                 <p className="text-sm font-semibold text-text-muted">{formatDate(post.created_at ?? post.event_date)}</p>
               </div>
-              <h3 className="mt-3 text-xl font-black text-text-primary">{stripText(post.title, 'Noticia KUPAN')}</h3>
+              <h3 className="mt-3 text-xl font-black text-text-primary">{stripText(post.title, `Noticia ${gymConfig.identity.name}`)}</h3>
               <p className="mt-2 text-sm leading-6 text-text-secondary">{stripText(post.content, 'Resumen por confirmar.').slice(0, 220)}</p>
             </div>
           </Card>
@@ -163,7 +164,7 @@ function RankingSection({ ranking }) {
                   #{index + 1}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="break-words font-black text-text-primary">{stripText(athlete.full_name, 'Atleta KUPAN')}</h3>
+                  <h3 className="break-words font-black text-text-primary">{stripText(athlete.full_name, `Atleta ${gymConfig.identity.name}`)}</h3>
                   <p className="mt-1 text-sm text-text-muted">Posición {index + 1} · actualizado {formatDate(new Date().toISOString())}</p>
                 </div>
               </div>
@@ -192,7 +193,7 @@ function BirthdaysSection({ birthdays }) {
                 {stripText(person.full_name, 'A').charAt(0)}
               </div>
               <div className="min-w-0">
-                <h3 className="break-words font-black text-text-primary">{stripText(person.full_name, 'Atleta KUPAN')}</h3>
+                <h3 className="break-words font-black text-text-primary">{stripText(person.full_name, `Atleta ${gymConfig.identity.name}`)}</h3>
                 <p className="text-sm text-text-muted">{formatBirthdayDayMonth(person.birth_day, person.birth_month)}</p>
               </div>
             </div>
@@ -252,12 +253,14 @@ export function Community({ appContent }) {
     <div className="space-y-6 pb-24 md:pb-8">
       <Card as="section" variant="elevated" className="overflow-hidden p-0">
         <div className="border-b border-border-default bg-bg-secondary p-5">
-          <Badge state="neutral">Comunidad KUPAN</Badge>
+          <Badge state="neutral">Comunidad {gymConfig.identity.name}</Badge>
           <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">Comunidad en una sola pizarra.</h1>
-          <p className="mt-3 text-base leading-7 text-text-secondary">Actividad, eventos, noticias, ranking y cumpleaños sin competir con reservas ni WOD.</p>
+          <p className="mt-3 text-base leading-7 text-text-secondary">
+            {gymConfig.features.wod ? 'Actividad, eventos, noticias, ranking y cumpleaños sin competir con reservas ni WOD.' : 'Actividad, eventos, noticias y ranking del centro de entrenamiento.'}
+          </p>
         </div>
         <div className="bg-kupan-ember/15 p-5">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Frase KUPAN</p>
+          <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Frase {gymConfig.identity.name}</p>
           <blockquote className="mt-3 text-2xl font-black leading-tight text-white">“{stripText(phrase)}”</blockquote>
         </div>
       </Card>

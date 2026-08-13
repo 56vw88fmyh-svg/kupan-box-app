@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { gymConfig } from '../config/gymConfig.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
 import { getChileDateKey } from './chileDateTime.js'
 import { formatCoachName } from './coachName.js'
@@ -156,7 +157,7 @@ export async function loadReservationData(profileId) {
 
 export async function createSupabaseReservation(profileId, classItem, hasActiveMembership) {
   if (!profileId) return getReservationError('Inicia sesión para reservar.')
-  if (!hasActiveMembership) return getReservationError('Necesitas una membresía activa y pagada para reservar. Si tu plan está vencido, pausado o sin pago confirmado, habla con KUPAN.')
+  if (!hasActiveMembership) return getReservationError(`Necesitas una membresía activa y pagada para reservar. Si tu plan está vencido, pausado o sin pago confirmado, habla con ${gymConfig.identity.name}.`)
   const { data, error } = await supabase.rpc('reserve_class', {
     target_profile_id: profileId,
     target_class_schedule_id: classItem.classScheduleId,

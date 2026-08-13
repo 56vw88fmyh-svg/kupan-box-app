@@ -10,7 +10,7 @@ export function AdminCommunityPostForm({ draft, onDraftChange, onSubmit, isSubmi
       </SelectField>
       <Field label="Fecha evento" type="date" value={draft.event_date} onChange={(value) => onDraftChange((current) => ({ ...current, event_date: value }))} />
       <Field label="Titulo" value={draft.title} required onChange={(value) => onDraftChange((current) => ({ ...current, title: value }))} />
-      <ToggleField label="Activo" checked={draft.active} onChange={(value) => onDraftChange((current) => ({ ...current, active: value }))} />
+      <ToggleField label={draft.type === 'noticia' ? 'Publicar y notificar' : 'Activo'} checked={draft.active} onChange={(value) => onDraftChange((current) => ({ ...current, active: value }))} />
       <div className="sm:col-span-2">
         <TextArea label="Contenido" value={draft.content} onChange={(value) => onDraftChange((current) => ({ ...current, content: value }))} />
       </div>

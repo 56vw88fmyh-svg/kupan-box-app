@@ -25,7 +25,7 @@ Orden tentativo derivado de dependencias:
 8. `birthdays-functions.sql`
 9. `personal-records-exercises-migration.sql`
 10. `pr-ranking.sql`
-11. `notifications.sql`
+11. `notifications.sql` (incluye recordatorios de renovacion y avisos de noticias)
 
 ## SQL manuales excluidos
 

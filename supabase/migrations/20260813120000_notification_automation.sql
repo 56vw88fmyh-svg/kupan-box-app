@@ -1,5 +1,6 @@
--- Sistema interno de notificaciones para cada despliegue white-label.
--- Incluye campana, avisos de noticias y recordatorios de renovacion sin duplicados.
+-- Automatizaciones de notificaciones internas para KUPAN y despliegues white-label.
+
+begin;
 
 create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
@@ -28,16 +29,16 @@ alter table public.notifications
     'news'
   ));
 
+create unique index if not exists notifications_dedupe_key_idx
+  on public.notifications(dedupe_key)
+  where dedupe_key is not null;
+
 create index if not exists notifications_profile_created_idx
   on public.notifications(profile_id, created_at desc);
 
 create index if not exists notifications_profile_unread_idx
   on public.notifications(profile_id, read)
   where read = false;
-
-create unique index if not exists notifications_dedupe_key_idx
-  on public.notifications(dedupe_key)
-  where dedupe_key is not null;
 
 alter table public.notifications enable row level security;
 
@@ -71,38 +72,6 @@ to authenticated
 using (public.is_admin());
 
 grant select, update, insert, delete on public.notifications to authenticated;
-
-create or replace function public.create_notification(
-  target_profile_id uuid,
-  notification_title text,
-  notification_message text,
-  notification_type text
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public, pg_temp
-as $$
-declare
-  notification_id uuid;
-begin
-  if not public.is_admin() then
-    raise exception 'Solo admin puede crear notificaciones internas.';
-  end if;
-
-  if notification_type not in ('plan_expiring', 'low_tokens', 'reservation_confirmed', 'class_reminder', 'birthday', 'news') then
-    raise exception 'Tipo de notificacion no valido.';
-  end if;
-
-  insert into public.notifications (profile_id, title, message, type)
-  values (target_profile_id, notification_title, notification_message, notification_type)
-  returning id into notification_id;
-
-  return notification_id;
-end;
-$$;
-
-grant execute on function public.create_notification(uuid, text, text, text) to authenticated;
 
 create or replace function public.refresh_my_membership_notifications(
   reminder_days integer default 3
@@ -196,10 +165,4 @@ create trigger notify_active_users_about_news_trigger
 after insert or update of active, type on public.community_posts
 for each row execute function public.notify_active_users_about_news();
 
--- Tipos preparados:
--- plan_expiring: plan por vencer
--- low_tokens: tokens bajos
--- reservation_confirmed: reserva confirmada
--- class_reminder: recordatorio de clase
--- birthday: cumpleaños
--- news: noticia publicada por el centro
+commit;

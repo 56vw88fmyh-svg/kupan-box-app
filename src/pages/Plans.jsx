@@ -2,6 +2,7 @@ import { SectionTitle } from '../components/SectionTitle.jsx'
 import { Link } from 'react-router-dom'
 import { transferInfo } from '../data/fallbackData.js'
 import { createWhatsAppUrl, whatsappMessages } from '../utils/whatsapp.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 function buildWhatsAppUrl(plan) {
   return createWhatsAppUrl(whatsappMessages.plan(plan.name))
@@ -58,23 +59,23 @@ export function Plans({ appContent }) {
     <div className="space-y-6">
       <section className="k-card overflow-hidden p-0">
         <div className="border-b border-white/10 bg-black/25 p-5">
-          <p className="k-pill inline-flex text-kupan-flame">Planes KUPAN</p>
+          <p className="k-pill inline-flex text-kupan-flame">Planes {gymConfig.identity.name}</p>
           <h2 className="k-display mt-4 text-5xl font-black uppercase leading-none text-white">Elige tu plan y ven a entrenar fuerte.</h2>
           <p className="mt-3 text-sm leading-6 text-white/60">
             Tú eliges el ritmo, nosotros ponemos el box, la comunidad y la energía para que sigas progresando.
           </p>
         </div>
-        <p className="k-ceremonial border-t border-white/10 px-5 py-4 text-2xl italic leading-tight text-kupan-sand">Fuerza · Raíces · Espíritu</p>
+        <p className="k-ceremonial border-t border-white/10 px-5 py-4 text-2xl italic leading-tight text-kupan-sand">{gymConfig.identity.slogan}</p>
       </section>
 
-      <SectionTitle eyebrow="Membresías KUPAN" title="Planes para tu ritmo" />
+      <SectionTitle eyebrow={`Membresías ${gymConfig.identity.name}`} title="Planes para tu ritmo" />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {plans.map((plan) => (
           <PlanCard key={plan.name} plan={plan} />
         ))}
       </div>
 
-      <section>
+      {transferInfo ? <section>
         <SectionTitle eyebrow="Transferencia" title="Activa tu plan directo" />
         <div className="k-card p-5">
           <p className="text-sm leading-6 text-white/60">
@@ -103,7 +104,7 @@ export function Plans({ appContent }) {
             </div>
           </dl>
         </div>
-      </section>
+      </section> : null}
     </div>
   )
 }

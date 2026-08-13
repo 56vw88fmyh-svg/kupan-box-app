@@ -1,9 +1,10 @@
-const CACHE_VERSION = 'v22'
-const STATIC_CACHE = `kupan-static-${CACHE_VERSION}`
-const HTML_CACHE = `kupan-html-${CACHE_VERSION}`
+const CACHE_VERSION = 'v28'
+const HOST_CACHE_PREFIX = `wl-${self.location.hostname.replace(/[^a-z0-9-]/gi, '-')}`
+const STATIC_CACHE = `${HOST_CACHE_PREFIX}-static-${CACHE_VERSION}`
+const HTML_CACHE = `${HOST_CACHE_PREFIX}-html-${CACHE_VERSION}`
 const APP_SHELL = [
-  '/manifest.webmanifest',
-  '/icons/icon-192.png',
+  '/manifests/kupan.webmanifest',
+  '/manifests/fittest.webmanifest',
 ]
 
 const PRIVATE_PATTERNS = [
@@ -43,6 +44,7 @@ function isStaticAsset(request) {
     || url.pathname.startsWith('/assets/')
     || url.pathname.startsWith('/icons/')
     || url.pathname.startsWith('/brand/')
+    || url.pathname.startsWith('/manifests/')
     || url.pathname === '/manifest.webmanifest'
 }
 
@@ -81,7 +83,7 @@ self.addEventListener('activate', (event) => {
       .keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => key.startsWith('kupan-') && ![STATIC_CACHE, HTML_CACHE].includes(key))
+          .filter((key) => (key.startsWith(`${HOST_CACHE_PREFIX}-`) || key.startsWith('kupan-')) && ![STATIC_CACHE, HTML_CACHE].includes(key))
           .map((key) => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),

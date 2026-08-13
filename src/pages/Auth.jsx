@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button, Input } from '../components/ui/index.js'
 import { requestPasswordRecovery } from '../utils/auth.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 /* global console */
 
@@ -50,7 +51,7 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
         setCanRetry(Boolean(result.retryable))
       }
     } catch {
-      console.error('KUPAN no pudo completar una solicitud de acceso.')
+      console.error(`${gymConfig.identity.name} no pudo completar una solicitud de acceso.`)
       setMessage('No pudimos completar el acceso. Revisa tu conexión y vuelve a intentarlo.')
       setCanRetry(true)
     } finally {
@@ -89,7 +90,7 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
     <div className="space-y-6">
       <section className="k-card overflow-hidden p-0">
         <div className="border-b border-white/10 bg-black/25 p-5">
-          <p className="k-pill inline-flex text-kupan-flame">{isRecoveryOpen ? 'Recupera tu acceso' : isRegister ? 'Súmate a KUPAN' : 'Acceso KUPAN'}</p>
+          <p className="k-pill inline-flex text-kupan-flame">{isRecoveryOpen ? 'Recupera tu acceso' : isRegister ? `Súmate a ${gymConfig.identity.name}` : `Acceso ${gymConfig.identity.name}`}</p>
           <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">
             {isRecoveryOpen ? 'Vuelve a entrenar con tu cuenta.' : isRegister ? 'Crea tu cuenta y ven a entrenar.' : 'Entra a tu cuenta y reserva tu clase.'}
           </h2>

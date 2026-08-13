@@ -4,6 +4,7 @@ import { SectionTitle } from '../components/SectionTitle.jsx'
 import { EmptyState, ErrorState, LoadingState, StaleDataState } from '../components/ui/index.js'
 import { prMovements } from '../data/movements.js'
 import { formatRankingDate, loadPrRanking } from '../utils/ranking.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const levels = ['Todos', 'Iniciado', 'Rookie', 'Scaled', 'RX']
 
@@ -80,7 +81,7 @@ export function Ranking() {
     <div className="space-y-6">
       <section className="k-card overflow-hidden p-0">
         <div className="border-b border-white/10 bg-black/25 p-5">
-          <p className="k-pill inline-flex text-kupan-flame">Ranking KUPAN</p>
+          <p className="k-pill inline-flex text-kupan-flame">Ranking {gymConfig.identity.name}</p>
           <h2 className="mt-4 text-4xl font-black uppercase leading-none text-white">Mejores marcas por movimiento.</h2>
           <p className="mt-3 text-sm leading-6 text-white/60">
             Ranking interno con privacidad básica: nombre, nivel, movimiento, marca y fecha.

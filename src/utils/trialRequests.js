@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { gymConfig } from '../config/gymConfig.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
 
 export async function loadTrialSchedules() {
@@ -33,5 +34,5 @@ export async function submitTrialRequest(values) {
     logAppError('trial.submit', error)
     return { ok: false, message: getHumanErrorMessage(error, error.message || 'No pudimos enviar tu solicitud.') }
   }
-  return { ok: true, id: data, message: 'Recibimos tu solicitud. El equipo KUPAN te contactará para confirmar tu primera clase.' }
+  return { ok: true, id: data, message: `Recibimos tu solicitud. El equipo ${gymConfig.identity.name} te contactará para confirmar tu primera clase.` }
 }

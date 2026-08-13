@@ -1,4 +1,4 @@
-import logoKupan from '../assets/brand/logo-kupan.png'
+import { gymConfig } from '../config/gymConfig.js'
 
 export function LoadingScreen() {
   return (
@@ -6,8 +6,8 @@ export function LoadingScreen() {
       <div className="flex w-full max-w-xs animate-page-enter flex-col items-center gap-5">
         <img
           className="max-h-36 w-full animate-kupan-pulse object-contain"
-          src={logoKupan}
-          alt="KUPAN"
+          src={gymConfig.assets.logo}
+          alt={gymConfig.identity.name}
           width="640"
           height="360"
         />
@@ -15,10 +15,9 @@ export function LoadingScreen() {
           <div className="h-full animate-loading-bar rounded-full bg-kupan-ember shadow-glow" />
         </div>
         <p className="animate-soft-blink text-xs font-black uppercase tracking-[0.24em] text-kupan-flame">
-          Preparando tu WOD
+          Preparando tu entrenamiento
         </p>
       </div>
     </div>
   )
 }
-

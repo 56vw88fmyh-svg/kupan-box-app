@@ -1,7 +1,8 @@
 import { formatChileTime, getChileDateTime } from './chileDateTime.js'
+import { gymConfig } from '../config/gymConfig.js'
 
-export const CANCELLATION_REFUND_MINUTES = 45
-export const RESERVATION_CLOSES_MINUTES = 15
+export const CANCELLATION_REFUND_MINUTES = gymConfig.operations.cancellationWindowMinutes
+export const RESERVATION_CLOSES_MINUTES = gymConfig.operations.reservationClosesMinutes
 
 export function getCancellationPolicy({
   reservationDate,
@@ -17,10 +18,10 @@ export function getCancellationPolicy({
   }
 
   const cutoffAt = new Date(startsAt.getTime() - refundMinutes * 60_000)
-  const isKupanCancellation = actor === 'kupan'
+  const isGymCancellation = actor === 'gym' || actor === 'kupan'
   const isTimely = now.getTime() <= cutoffAt.getTime()
-  const kind = isKupanCancellation ? 'kupan' : isTimely ? 'timely' : 'late'
-  const refundsToken = Boolean(tokenCharged && (isKupanCancellation || isTimely))
+  const kind = isGymCancellation ? 'kupan' : isTimely ? 'timely' : 'late'
+  const refundsToken = Boolean(tokenCharged && (isGymCancellation || isTimely))
 
   return {
     valid: true,
@@ -29,12 +30,12 @@ export function getCancellationPolicy({
     cutoffLabel: formatChileTime(cutoffAt),
     kind,
     refundsToken,
-    consumesFullDailyReservation: !isKupanCancellation && !isTimely,
-    message: isKupanCancellation
-      ? 'KUPAN canceló esta clase. Tu token será devuelto.'
+    consumesFullDailyReservation: !isGymCancellation && !isTimely,
+    message: isGymCancellation
+      ? `${gymConfig.identity.name} canceló esta clase. Tu token será devuelto.`
       : isTimely
         ? 'Cancelarás con anticipación y recuperarás tu token.'
-        : 'Estás fuera del plazo de 45 minutos. La reserva se cancelará sin devolver el token.',
+        : `Estás fuera del plazo de ${refundMinutes} minutos. La reserva se cancelará sin devolver el token.`,
   }
 }
 

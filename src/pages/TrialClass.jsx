@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Card, ErrorState, Input, LoadingState } from '../components/ui/index.js'
 import { loadTrialSchedules, submitTrialRequest } from '../utils/trialRequests.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const days = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const initialForm = {
@@ -53,7 +54,7 @@ export function TrialClass({ setActivePage }) {
   if (success) {
     return (
       <Card as="section" variant="elevated" className="p-6 text-center">
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-sand">Primera clase KUPAN</p>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-sand">Primera clase {gymConfig.identity.name}</p>
         <h1 className="k-display mt-3 text-5xl font-black uppercase leading-none text-white">Solicitud recibida</h1>
         <p className="mx-auto mt-4 max-w-md text-base leading-7 text-text-secondary">{message}</p>
         <Button className="mt-6" onClick={() => setActivePage('home')}>Volver al inicio</Button>
@@ -65,7 +66,7 @@ export function TrialClass({ setActivePage }) {
     <div className="mx-auto max-w-2xl space-y-5 pb-24">
       <header>
         <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-sand">Tu primera experiencia</p>
-        <h1 className="k-display mt-2 text-5xl font-black uppercase leading-none text-white">Conoce KUPAN</h1>
+        <h1 className="k-display mt-2 text-5xl font-black uppercase leading-none text-white">Conoce {gymConfig.identity.name}</h1>
         <p className="mt-3 text-base leading-7 text-text-secondary">La primera clase es gratuita una vez por persona. No necesitas saber tu nivel: te acompañamos desde el comienzo.</p>
       </header>
 
@@ -99,7 +100,7 @@ export function TrialClass({ setActivePage }) {
         </label>
         <label className="flex min-h-12 items-start gap-3 rounded-xl border border-kupan-border bg-black/25 p-3 text-sm leading-6 text-text-secondary">
           <input className="mt-1 h-5 w-5 shrink-0 accent-kupan-ember" type="checkbox" checked={form.privacyAccepted} onChange={(event) => update('privacyAccepted', event.target.checked)} />
-          <span>Acepto que KUPAN use estos datos para coordinar mi clase y realizar seguimiento de esta solicitud.</span>
+          <span>Acepto que {gymConfig.identity.name} use estos datos para coordinar mi clase y realizar seguimiento de esta solicitud.</span>
         </label>
         <Button type="submit" size="lg" fullWidth isLoading={isSaving}>Solicitar primera clase</Button>
       </Card>

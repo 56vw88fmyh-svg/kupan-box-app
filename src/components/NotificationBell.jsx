@@ -4,6 +4,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '../utils/notifications.js'
+import { gymConfig } from '../config/gymConfig.js'
 
 const typeLabels = {
   plan_expiring: 'Plan por vencer',
@@ -11,6 +12,7 @@ const typeLabels = {
   reservation_confirmed: 'Reserva confirmada',
   class_reminder: 'Recordatorio',
   birthday: 'Cumpleaños',
+  news: 'Noticias del centro',
 }
 
 function formatNotificationDate(value) {
@@ -37,7 +39,9 @@ export function NotificationBell({ currentUser }) {
     }
 
     setIsLoading(true)
-    const result = await loadNotifications(currentUser.id)
+    const result = await loadNotifications(currentUser.id, {
+      renewalReminderDays: gymConfig.operations.membershipRenewalReminderDays,
+    })
     setIsLoading(false)
 
     if (!result.ok) {
@@ -51,6 +55,16 @@ export function NotificationBell({ currentUser }) {
 
   useEffect(() => {
     refreshNotifications()
+    const refreshInterval = window.setInterval(refreshNotifications, 60_000)
+    const refreshWhenVisible = () => {
+      if (!document.hidden) refreshNotifications()
+    }
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+
+    return () => {
+      window.clearInterval(refreshInterval)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id])
 
@@ -88,11 +102,14 @@ export function NotificationBell({ currentUser }) {
       <button
         type="button"
         className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/45 text-lg font-black text-white transition hover:border-kupan-ember/60 hover:bg-kupan-ember/10"
-        aria-label="Notificaciones KUPAN"
+        aria-label={`Notificaciones ${gymConfig.identity.name}`}
         aria-expanded={isOpen}
         onClick={handleOpen}
       >
-        !
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+        </svg>
         {unreadCount > 0 ? (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-kupan-ember px-1 text-[0.62rem] font-black text-white shadow-glow">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -106,7 +123,7 @@ export function NotificationBell({ currentUser }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Notificaciones</p>
-                <h2 className="mt-1 text-lg font-black uppercase text-white">KUPAN al día</h2>
+                <h2 className="mt-1 text-lg font-black uppercase text-white">{gymConfig.identity.name} al día</h2>
               </div>
               <button type="button" className="text-xs font-black uppercase text-white/55 hover:text-white" onClick={handleMarkAllRead}>
                 Leer todo

@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { gymConfig } from '../config/gymConfig.js'
 import { mapReservationRow } from './supabaseReservations.js'
 import { getPersonalRecordHistory } from '../services/personalRecordsService.ts'
 import { getHumanErrorMessage, logAppError } from './appState.js'
@@ -34,7 +35,7 @@ export function getMembershipTokenSummary(membership, remainingTokensOverride = 
   }
 }
 
-function getProfileError(message = 'No pudimos cargar tu perfil KUPAN. Intenta nuevamente.') {
+function getProfileError(message = `No pudimos cargar tu perfil ${gymConfig.identity.name}. Intenta nuevamente.`) {
   return { ok: false, message }
 }
 
@@ -133,7 +134,7 @@ export async function loadSupabaseProfileData(profileId) {
   }
 
   if (!profileId) {
-    return getProfileError('Inicia sesión para ver tu perfil KUPAN.')
+    return getProfileError(`Inicia sesión para ver tu perfil ${gymConfig.identity.name}.`)
   }
 
   const [profileResult, membershipResult, reservationsResult, recordsResult] = await Promise.all([
