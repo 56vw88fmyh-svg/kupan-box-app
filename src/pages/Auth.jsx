@@ -5,7 +5,7 @@ import { gymConfig } from '../config/gymConfig.js'
 
 /* global console */
 
-function AuthField({ label, type = 'text', value, onChange, autoComplete, required = false }) {
+function AuthField({ label, type = 'text', value, onChange, autoComplete, required = false, ...props }) {
   return (
     <Input
       autoComplete={autoComplete}
@@ -14,6 +14,7 @@ function AuthField({ label, type = 'text', value, onChange, autoComplete, requir
       type={type}
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      {...props}
     />
   )
 }
@@ -105,7 +106,17 @@ export function Auth({ mode = 'login', onLogin, onRegister }) {
           {isRegister && !isRecoveryOpen ? (
             <>
               <AuthField label="Nombre completo" value={name} onChange={setName} autoComplete="name" required />
-              <AuthField label="Fecha de nacimiento" type="date" value={birthDate} onChange={setBirthDate} required />
+              <AuthField
+                autoComplete="bday"
+                helpText="Puedes escribir la fecha o elegirla desde el calendario."
+                label="Fecha de nacimiento"
+                max={new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date())}
+                min="1900-01-01"
+                type="date"
+                value={birthDate}
+                onChange={setBirthDate}
+                required
+              />
               <div className="rounded-xl border border-kupan-leaf/35 bg-kupan-leaf/10 p-4" aria-label="Nivel inicial">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-kupan-sand">Nivel inicial</p>
                 <p className="mt-2 text-lg font-black text-white">Estoy comenzando</p>

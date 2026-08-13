@@ -71,6 +71,8 @@ export default function App() {
   }
 
   useEffect(() => {
+    // Recover from a dialog or an interrupted PWA render that left page scrolling locked.
+    document.body.style.removeProperty('overflow')
     const timer = window.setTimeout(() => setIsLoading(false), 650)
     return () => window.clearTimeout(timer)
   }, [])

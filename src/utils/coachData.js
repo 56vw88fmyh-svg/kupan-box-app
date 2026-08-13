@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { gymConfig } from '../config/gymConfig.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -72,7 +73,7 @@ function decorateClass(classItem, reservations) {
     day: dayNames[classItem.day_of_week],
     time: classItem.time?.slice(0, 5) ?? '',
     className: classItem.class_name,
-    coach: classItem.coach ?? 'Coach KUPAN',
+    coach: classItem.coach ?? `Coach ${gymConfig.identity.name}`,
     maxSpots,
     usedSpots,
     availableSpots: Math.max(maxSpots - usedSpots, 0),
@@ -226,5 +227,10 @@ export async function cancelCoachReservation(reservationId) {
 
   if (error) return getSafeCoachError('coach.cancel_reservation', error, 'No pudimos cancelar la reserva. Intenta nuevamente.')
   const reservation = Array.isArray(data) ? data[0] : data
-  return { ok: true, message: reservation?.token_refunded ? 'Reserva cancelada por KUPAN. Token devuelto.' : 'Reserva cancelada por KUPAN.' }
+  return {
+    ok: true,
+    message: reservation?.token_refunded
+      ? `Reserva cancelada por ${gymConfig.identity.name}. Token devuelto.`
+      : `Reserva cancelada por ${gymConfig.identity.name}.`,
+  }
 }

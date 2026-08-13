@@ -117,6 +117,18 @@
     appearance: none;
   }
 
+  input[type="date"] {
+    min-width: 0;
+    color-scheme: dark;
+    -webkit-appearance: auto;
+    appearance: auto;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 1;
+  }
+
   button,
   a {
     -webkit-tap-highlight-color: transparent;

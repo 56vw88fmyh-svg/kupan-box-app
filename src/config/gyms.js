@@ -136,7 +136,7 @@ export const gymConfigs = Object.freeze({
       wod: false,
       community: true,
       studentManagement: false,
-      coachManagement: false,
+      coachManagement: true,
       onlinePayments: false,
       attendance: true,
       notifications: true,

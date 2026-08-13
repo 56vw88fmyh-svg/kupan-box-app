@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v28'
+const CACHE_VERSION = 'v29'
 const HOST_CACHE_PREFIX = `wl-${self.location.hostname.replace(/[^a-z0-9-]/gi, '-')}`
 const STATIC_CACHE = `${HOST_CACHE_PREFIX}-static-${CACHE_VERSION}`
 const HTML_CACHE = `${HOST_CACHE_PREFIX}-html-${CACHE_VERSION}`

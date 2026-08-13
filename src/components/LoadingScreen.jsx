@@ -2,7 +2,10 @@ import { gymConfig } from '../config/gymConfig.js'
 
 export function LoadingScreen() {
   return (
-    <div className="fixed inset-0 z-50 flex animate-fade-out items-center justify-center bg-kupan-black px-8">
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-50 flex animate-fade-out items-center justify-center bg-kupan-black px-8"
+    >
       <div className="flex w-full max-w-xs animate-page-enter flex-col items-center gap-5">
         <img
           className="max-h-36 w-full animate-kupan-pulse object-contain"
