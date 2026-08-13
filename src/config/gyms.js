@@ -142,9 +142,9 @@ export const gymConfigs = Object.freeze({
       notifications: true,
     },
     domains: {
-      production: 'fittest.cl',
-      staging: 'fittest-staging.vercel.app',
-      aliases: ['www.fittest.cl'],
+      production: 'fittest-box-app.vercel.app',
+      staging: 'localhost',
+      aliases: ['fittest.cl', 'www.fittest.cl', '127.0.0.1'],
     },
     assets: {
       logo: '/brand/fittest/logo-fittest-red.png',
