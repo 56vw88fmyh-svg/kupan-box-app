@@ -43,6 +43,18 @@ for (const hookFile of hookFiles) {
   }
 }
 
+const membershipsHookSource = readFileSync(join(hooksRoot, 'useAdminMemberships.js'), 'utf8')
+assert.match(
+  membershipsHookSource,
+  /simulateApprovedPayment[\s\S]*rpc\('admin_activate_membership'/,
+  'La simulación de pago debe activar la membresía con el RPC administrativo disponible en FITTEST',
+)
+assert.equal(
+  /simulateApprovedPayment[\s\S]*functions\.invoke\('payment-webhook'/.test(membershipsHookSource),
+  false,
+  'La simulación no debe depender de una Edge Function externa para activar el plan',
+)
+
 const reservationsSource = readFileSync(join(hooksRoot, '..', '..', 'pages', 'Reservations.jsx'), 'utf8')
 assert.match(
   reservationsSource,

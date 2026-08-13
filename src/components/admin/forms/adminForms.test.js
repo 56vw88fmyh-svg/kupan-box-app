@@ -33,7 +33,7 @@ const requiredSnippets = {
   'AdminSettingsForm.jsx': ['value={draft.homeEyebrow}', "onTextChange('homeEyebrow', value)", 'value={draft.communityPhrase}', 'onSubmit={onSubmit}'],
   'AdminManualReservationForm.jsx': ['value={draft.class_schedule_id}', 'value={draft.profile_id}', 'checked={draft.allow_without_membership}', 'ref={formRef}', 'onSubmit={onSubmit}'],
   'AdminPlanForm.jsx': ['value={draft.name}', 'value={draft.price}', 'checked={draft.is_unlimited}', 'checked={draft.active}', 'onSubmit={onSubmit}'],
-  'AdminMembershipActivationForm.jsx': ['ref={formRef}', 'value={draft.profile_id}', 'value={draft.plan_id}', 'getPlanTokenTotal(selectedPlan)', 'onSubmit={onSubmit}'],
+  'AdminMembershipActivationForm.jsx': ['ref={formRef}', 'value={draft.profile_id}', 'value={draft.plan_id}', 'getPlanTokenTotal(selectedPlan)', 'onSubmit={onSubmit}', "'Activando plan...'", "'Simulando pago...'"],
   'AdminMembershipEditForm.jsx': ['ref={formRef}', 'value={draft.plan_id}', 'value={draft.status}', 'getPlanTokenTotal(nextPlan)', 'onSubmit={onSubmit}'],
   'AdminCreateStudentForm.jsx': ['value={draft.full_name}', 'value={draft.email}', 'value={draft.birth_date}', 'value={draft.plan_id}', 'onSubmit={onSubmit}'],
 }

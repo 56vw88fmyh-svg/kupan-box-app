@@ -14,10 +14,11 @@ export function AdminMembershipActivationForm({
   onSimulatePayment,
   addDays,
   getPlanTokenTotal,
-  isSubmitting = false,
+  isSavingActivation = false,
+  isSimulatingPayment = false,
   disabled = false,
 }) {
-  const isDisabled = disabled || isSubmitting
+  const isDisabled = disabled || isSavingActivation || isSimulatingPayment
 
   return (
     <form ref={formRef} className="k-panel grid scroll-mt-28 gap-3 p-4 sm:grid-cols-2" onSubmit={onSubmit}>
@@ -52,9 +53,11 @@ export function AdminMembershipActivationForm({
           Si el alumno venia entrenando antes de usar la app, registra aqui sus clases usadas. Quedara un movimiento en el historial.
         </p>
       </div>
-      <button type="submit" className="k-button sm:col-span-2" disabled={isDisabled}>Activar con tokens ya usados</button>
+      <button type="submit" className="k-button sm:col-span-2" disabled={isDisabled}>
+        {isSavingActivation ? 'Activando plan...' : 'Activar con tokens ya usados'}
+      </button>
       <button type="button" className="k-button-secondary sm:col-span-2" onClick={onSimulatePayment} disabled={isDisabled}>
-        Simular pago aprobado
+        {isSimulatingPayment ? 'Simulando pago...' : 'Simular pago aprobado'}
       </button>
     </form>
   )

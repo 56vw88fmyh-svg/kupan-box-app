@@ -116,7 +116,8 @@ export function AdminMembershipsModule({
         onSimulatePayment={actions.simulatePayment}
         addDays={addDays}
         getPlanTokenTotal={getPlanTokenTotal}
-        isSubmitting={isSavingActivation || isSimulatingPayment}
+        isSavingActivation={isSavingActivation}
+        isSimulatingPayment={isSimulatingPayment}
       />
 
       {editDraft.id ? (

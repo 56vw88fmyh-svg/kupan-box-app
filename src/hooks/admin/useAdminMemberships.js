@@ -4,7 +4,6 @@ import {
   buildMembershipActivationPayload,
   buildMembershipStatusPayload,
   buildMembershipUpdatePayload,
-  buildPaymentSimulationBody,
 } from '../../utils/adminMutationBuilders.js'
 import { createMutationResult, useAdminMutationState } from './useAdminMutationState.js'
 
@@ -122,16 +121,30 @@ export function useAdminMemberships({ supabaseClient = supabase, logError = logA
     })
   }
 
-  async function simulateApprovedPayment(membershipDraft) {
+  async function simulateApprovedPayment(membershipDraft, selectedPlan) {
     return runOperation('simulateApprovedPayment', async () => {
-      const { data, error } = await supabaseClient.functions.invoke('payment-webhook', {
-        body: buildPaymentSimulationBody(membershipDraft),
+      const payload = buildMembershipActivationPayload({
+        ...membershipDraft,
+        classes_used: 0,
+        payment_provider: 'manual_test',
+        payment_reference: `test-${membershipDraft.profile_id}-${membershipDraft.plan_id}-${Date.now()}`,
+        notes: 'Pago aprobado simulado por administración',
+      }, selectedPlan)
+
+      const { data, error } = await supabaseClient.rpc('admin_activate_membership', {
+        target_profile_id: payload.profile_id,
+        target_plan_id: payload.plan_id,
+        membership_start_date: payload.start_date,
+        classes_total_override: payload.classes_total,
+        initial_classes_used: 0,
+        payment_provider_input: payload.payment_provider,
+        payment_reference_input: payload.payment_reference,
+        notes_input: payload.notes,
       })
 
-      if (error || !data?.ok) {
-        const normalizedError = error ?? new Error(data?.message || 'No pudimos simular el pago. Revisa la Edge Function payment-webhook.')
-        logError('admin.memberships.simulate_payment', normalizedError, { profileId: membershipDraft.profile_id, planId: membershipDraft.plan_id })
-        return createMutationResult({ success: false, error: normalizedError, data, message: data?.message || '' })
+      if (error) {
+        logError('admin.memberships.simulate_payment', error, { profileId: payload.profile_id, planId: payload.plan_id })
+        return createMutationResult({ success: false, error })
       }
 
       return createMutationResult({ success: true, data, affectedSections: ['memberships', 'profiles', 'tokenMovements'] })

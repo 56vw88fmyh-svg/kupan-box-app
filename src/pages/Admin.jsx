@@ -1084,10 +1084,16 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       return
     }
 
-    const result = await persistApprovedPaymentSimulation(membershipDraft)
+    const selectedPlan = adminData.plans.find((plan) => plan.id === membershipDraft.plan_id)
+    if (!selectedPlan) {
+      showError('Selecciona un plan válido para simular el pago.')
+      return
+    }
+
+    const result = await persistApprovedPaymentSimulation(membershipDraft, selectedPlan)
 
     if (!result.success) {
-      showError(result.message || 'No pudimos simular el pago. Revisa la Edge Function payment-webhook.')
+      showError(`No pudimos simular el pago: ${result.error?.message ?? 'Error desconocido'}`)
       return
     }
 
