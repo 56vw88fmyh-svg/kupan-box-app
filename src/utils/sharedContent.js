@@ -79,6 +79,28 @@ function mapWod(wod) {
 }
 
 function mapPlans(plans) {
+  if (gymConfig.id !== 'kupan') {
+    return plans.map((plan, index) => {
+      const configuredPlan = gymConfig.operations.plans.find((item) => item.name.toLowerCase() === String(plan.name).toLowerCase())
+      const frequency = configuredPlan?.frequency
+        ?? (plan.is_unlimited ? 'Plan Full por 30 días' : `${Number(plan.classes_per_week || 0) * 4} clases al mes`)
+
+      return {
+        name: plan.name,
+        price: formatPrice(plan.price),
+        classes: frequency,
+        paymentUrl: '',
+        highlight: index === 1,
+        benefits: [
+          frequency,
+          `Reserva hasta ${gymConfig.operations.reservationClosesMinutes} minutos antes de la clase`,
+          `Cancelación con ${gymConfig.operations.cancellationWindowMinutes} minutos de anticipación`,
+          gymConfig.identity.slogan,
+        ],
+      }
+    })
+  }
+
   function getPublicPlanKey(plan) {
     const name = String(plan?.name ?? '').toLowerCase()
     if (name.includes('pase') && name.includes('diario')) return 'daily'

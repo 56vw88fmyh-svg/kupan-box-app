@@ -2,17 +2,17 @@ import { paymentLinks } from './paymentLinks.js'
 import { gymConfig } from '../config/gymConfig.js'
 
 export const todayStats = [
-  { label: 'Cupos para hoy', value: '12' },
-  { label: 'WOD para darlo todo', value: 'AMRAP' },
+  { label: 'Cupos por clase', value: String(gymConfig.operations.defaultClassCapacity ?? '-') },
+  { label: gymConfig.features.wod ? 'WOD para darlo todo' : 'Tipos de clase', value: gymConfig.features.wod ? 'AMRAP' : String(gymConfig.operations.classTypes.length) },
   { label: 'Días apareciendo', value: '7' },
 ]
 
-export const schedule = [
+const kupanSchedule = [
   { time: '19:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12, level: 'Lunes a viernes' },
   { time: '20:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12, level: 'Lunes a viernes' },
 ]
 
-export const weeklySchedule = [
+const kupanWeeklySchedule = [
   {
     id: 'monday',
     short: 'Lun',
@@ -89,6 +89,12 @@ export const weeklySchedule = [
     },
   },
 ]
+
+// FITTEST entregó sus horarios generales, pero no una grilla de clases. Mantener
+// estos arreglos vacíos evita publicar horas ficticias hasta que el administrador
+// cargue la agenda real desde el panel.
+export const schedule = gymConfig.id === 'kupan' ? kupanSchedule : []
+export const weeklySchedule = gymConfig.id === 'kupan' ? kupanWeeklySchedule : []
 
 export const reservations = [
 ]
