@@ -4,6 +4,7 @@ import { formatChileDisplayDate, formatShortChileDate, loadCommunityFeed, loadTo
 import { formatReservationDate, loadReservationData } from '../utils/supabaseReservations.js'
 import { formatCoachName } from '../utils/coachName.js'
 import { gymConfig } from '../config/gymConfig.js'
+import { formatScheduleTime, isUnlimitedSchedule } from '../utils/classSchedule.js'
 
 const fallbackDashboard = {
   isLoading: false,
@@ -52,10 +53,14 @@ function normalizeReservedClass(reservation) {
     reservationDate: reservation.reservation_date,
     day: reservation.class_schedule.day_of_week ? ['','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'][reservation.class_schedule.day_of_week] : '',
     time: reservation.class_schedule.time?.slice(0, 5) ?? '',
+    endTime: reservation.class_schedule.end_time?.slice(0, 5) ?? '',
+    timeLabel: formatScheduleTime(reservation.class_schedule),
     name: reservation.class_schedule.class_name ?? `Clase ${gymConfig.identity.name}`,
     coach: reservation.class_schedule.coach ?? `Coach ${gymConfig.identity.name}`,
     maxSpots: reservation.class_schedule.max_spots ?? 12,
     spots: null,
+    isOpenAccess: Boolean(reservation.class_schedule.is_open_access),
+    unlimitedCapacity: Boolean(reservation.class_schedule.unlimited_capacity),
     isReserved: reservation.status === 'reserved',
     status: reservation.status,
   }
@@ -128,7 +133,9 @@ function HomeHeader({ currentUser, dateLabel, onProfile }) {
 function NextClassCard({ classItem, currentUser, onAction }) {
   const status = getClassStatus(classItem, currentUser)
   const dateLabel = classItem?.reservationDate ? formatReservationDate(classItem.reservationDate) : 'Próxima clase'
-  const spotsLabel = classItem?.spots === null || classItem?.spots === undefined ? 'Cupo reservado' : `${classItem.spots} cupos quedan`
+  const spotsLabel = isUnlimitedSchedule(classItem)
+    ? 'Acceso abierto · sin límite'
+    : classItem?.spots === null || classItem?.spots === undefined ? 'Cupo reservado' : `${classItem.spots} cupos quedan`
   const coach = formatCoachName(classItem?.coach)
 
   if (!classItem) {
@@ -159,7 +166,7 @@ function NextClassCard({ classItem, currentUser, onAction }) {
         </div>
         <div className="border-l border-kupan-border p-4">
           <p className="text-xs font-black uppercase text-white/55">Hora</p>
-          <p className="mt-1 text-lg font-black uppercase text-white">{classItem.time || 'Por definir'}</p>
+          <p className="mt-1 text-lg font-black uppercase text-white">{classItem.timeLabel || formatScheduleTime(classItem) || 'Por definir'}</p>
         </div>
         <div className="border-t border-kupan-border p-4">
           <p className="text-xs font-black uppercase text-white/55">Coach</p>

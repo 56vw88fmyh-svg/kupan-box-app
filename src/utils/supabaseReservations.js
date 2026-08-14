@@ -3,6 +3,7 @@ import { gymConfig } from '../config/gymConfig.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
 import { getChileDateKey } from './chileDateTime.js'
 import { formatCoachName } from './coachName.js'
+import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from './classSchedule.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
 const shortDayNames = ['', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
@@ -62,7 +63,7 @@ export async function loadReservationData(profileId) {
   const [scheduleResult, reservationsResult, membershipResult, waitlistResult] = await Promise.all([
     supabase
       .from('class_schedule')
-      .select('id, day_of_week, time, class_name, coach, max_spots, active')
+      .select('id, day_of_week, time, end_time, class_name, coach, max_spots, is_open_access, unlimited_capacity, active')
       .eq('active', true)
       .order('day_of_week', { ascending: true })
       .order('time', { ascending: true }),
@@ -87,7 +88,12 @@ export async function loadReservationData(profileId) {
   if (reservationsResult.error) return getSafeReservationError('reservations.load_user_reservations', reservationsResult.error, 'No fue posible cargar tus reservas. Revisa tu conexión y vuelve a intentarlo.')
   if (membershipResult.error) return getSafeReservationError('reservations.load_membership', membershipResult.error, 'No fue posible revisar tu plan. Intenta nuevamente.')
 
-  const userReservations = (reservationsResult.data ?? []).map(mapReservationRow)
+  const scheduleById = new Map((scheduleResult.data ?? []).map((classItem) => [classItem.id, classItem]))
+  const userReservations = (reservationsResult.data ?? []).map(mapReservationRow).map((reservation) => {
+    const schedule = scheduleById.get(reservation.class_schedule_id)
+    if (!schedule) return reservation
+    return { ...reservation, class_schedule: { ...reservation.class_schedule, ...schedule } }
+  })
   const membership = Array.isArray(membershipResult.data) ? membershipResult.data[0] : membershipResult.data
   const hasActiveMembership = Boolean(membership?.status === 'active' && membership?.payment_status === 'paid')
   const { data: remainingTokens, error: remainingTokensError } = membership?.id
@@ -97,6 +103,10 @@ export async function loadReservationData(profileId) {
 
   const classes = await Promise.all((scheduleResult.data ?? []).map(async (classItem) => {
     const reservationDate = getNextDateForDay(classItem.day_of_week)
+    const isOpenAccess = isOpenAccessSchedule(classItem)
+    const unlimitedCapacity = isUnlimitedSchedule(classItem)
+    const endTime = getScheduleEndTime(classItem)
+    const timeLabel = formatScheduleTime(classItem)
     const { data: availableSpots, error: availableSpotsError } = await supabase.rpc('available_spots', {
       class_id: classItem.id,
       target_date: reservationDate,
@@ -111,15 +121,19 @@ export async function loadReservationData(profileId) {
         short: shortDayNames[classItem.day_of_week],
         block: getBlock(classItem.time),
         time: classItem.time.slice(0, 5),
+        endTime,
+        timeLabel,
         name: classItem.class_name,
         coach: formatCoachName(classItem.coach),
-        maxSpots: classItem.max_spots ?? 12,
-        spots: classItem.max_spots ?? 12,
+        maxSpots: unlimitedCapacity ? null : classItem.max_spots ?? 12,
+        spots: unlimitedCapacity ? null : classItem.max_spots ?? 12,
+        isOpenAccess,
+        unlimitedCapacity,
         isFull: false,
         isReserved: false,
       }
     }
-    const spots = Number(availableSpots ?? classItem.max_spots ?? 12)
+    const spots = unlimitedCapacity ? null : Number(availableSpots ?? classItem.max_spots ?? 12)
     const isReserved = userReservations.some((reservation) => (
       reservation.class_schedule_id === classItem.id &&
       reservation.reservation_date === reservationDate &&
@@ -135,11 +149,15 @@ export async function loadReservationData(profileId) {
       short: shortDayNames[classItem.day_of_week],
       block: getBlock(classItem.time),
       time: classItem.time.slice(0, 5),
+      endTime,
+      timeLabel,
       name: classItem.class_name,
       coach: formatCoachName(classItem.coach),
-      maxSpots: classItem.max_spots ?? 12,
+      maxSpots: unlimitedCapacity ? null : classItem.max_spots ?? 12,
       spots,
-      isFull: spots <= 0,
+      isOpenAccess,
+      unlimitedCapacity,
+      isFull: unlimitedCapacity ? false : spots <= 0,
       isReserved,
     }
   }))

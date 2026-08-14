@@ -31,6 +31,7 @@ import {
 } from '../constants/adminConstants.js'
 import { formatDate, formatMoney, getChileDateString, getDateTimeValue, toTime } from '../utils/adminFormatters.js'
 import { addDays, calculateDaysBetween, getChileDayOfWeek, getMembershipTokens, getPlanTokenTotal } from '../utils/adminMetrics.js'
+import { formatScheduleTime, isUnlimitedSchedule } from '../utils/classSchedule.js'
 import {
   AdminMobileModuleNav,
   AdminPageHeader,
@@ -298,17 +299,19 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         const reserved = classReservations.length
         const attended = classReservations.filter((reservation) => reservation.status === 'attended').length
         const maxSpots = Number(classItem.max_spots ?? 12)
-        const occupancy = maxSpots > 0 ? reserved / maxSpots : 0
+        const unlimitedCapacity = isUnlimitedSchedule(classItem)
+        const occupancy = !unlimitedCapacity && maxSpots > 0 ? reserved / maxSpots : 0
 
         return {
           id: classItem.id,
-          time: toTime(classItem.time),
+          time: formatScheduleTime(classItem) || toTime(classItem.time),
           name: classItem.class_name ?? 'Clase KUPAN',
           coach: classItem.coach || 'Sin coach asignado',
           reserved,
           attended,
-          maxSpots,
-          status: reserved >= maxSpots ? 'Completa' : occupancy >= 0.8 ? 'Alta ocupación' : 'Disponible',
+          maxSpots: unlimitedCapacity ? null : maxSpots,
+          unlimitedCapacity,
+          status: unlimitedCapacity ? 'Acceso abierto' : reserved >= maxSpots ? 'Completa' : occupancy >= 0.8 ? 'Alta ocupación' : 'Disponible',
           wodStatus: todayWod ? 'Publicado' : 'Pendiente',
         }
       })
@@ -412,8 +415,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   const weeklyOccupancy = useMemo(() => {
     const activeClasses = adminData.schedule.filter((classItem) => classItem.active)
-    const capacity = activeClasses.reduce((sum, classItem) => sum + Number(classItem.max_spots ?? 12), 0)
+    const limitedClasses = activeClasses.filter((classItem) => !isUnlimitedSchedule(classItem))
+    const limitedClassIds = new Set(limitedClasses.map((classItem) => classItem.id))
+    const capacity = limitedClasses.reduce((sum, classItem) => sum + Number(classItem.max_spots ?? 12), 0)
     const reserved = adminData.reservations.filter((reservation) => (
+      limitedClassIds.has(reservation.class_schedule_id) &&
       reservation.status !== 'cancelled' && reservation.reservation_date >= todayDate
     )).length
     if (capacity === 0) return 0
@@ -971,9 +977,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       id: classItem.id,
       day_of_week: classItem.day_of_week,
       time: classItem.time.slice(0, 5),
+      end_time: classItem.end_time?.slice(0, 5) ?? '',
       class_name: classItem.class_name,
       coach: classItem.coach ?? '',
       max_spots: classItem.max_spots,
+      is_open_access: Boolean(classItem.is_open_access),
+      unlimited_capacity: Boolean(classItem.unlimited_capacity),
       active: classItem.active,
     })
   }

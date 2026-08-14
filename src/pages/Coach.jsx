@@ -31,7 +31,7 @@ function ClassSummary({ title, classItem }) {
       <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">{title}</p>
       {classItem ? (
         <>
-          <h3 className="mt-2 text-3xl font-black uppercase leading-none text-white">{classItem.time}</h3>
+          <h3 className="mt-2 text-3xl font-black uppercase leading-none text-white">{classItem.timeLabel || classItem.time}</h3>
           <p className="mt-2 font-black uppercase text-white">{classItem.className}</p>
           <p className="mt-1 text-sm text-white/60">Coach {formatCoachName(classItem.coach)}</p>
           <div className="mt-4 grid grid-cols-2 gap-2">
@@ -41,7 +41,7 @@ function ClassSummary({ title, classItem }) {
             </div>
             <div className="rounded-lg border border-white/10 bg-black/25 p-3">
               <p className="text-[0.65rem] font-black uppercase text-white/50">Disponibles</p>
-              <p className="mt-1 text-2xl font-black text-kupan-flame">{classItem.availableSpots}</p>
+              <p className="mt-1 text-2xl font-black text-kupan-flame">{classItem.unlimitedCapacity ? 'Sin límite' : classItem.availableSpots}</p>
             </div>
           </div>
         </>
@@ -318,7 +318,7 @@ export function Coach({ currentUser, setActivePage }) {
               }`}
               onClick={() => setSelectedClassId(classItem.id)}
             >
-              {classItem.time} · {classItem.className}
+              {classItem.timeLabel || classItem.time} · {classItem.className}
             </button>
           ))}
         </div>
@@ -328,7 +328,7 @@ export function Coach({ currentUser, setActivePage }) {
             <div className="grid grid-cols-3 gap-2">
               <div className="k-stat"><p className="text-2xl font-black text-white">{reservations.length}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Reservados</p></div>
               <div className="k-stat"><p className="text-2xl font-black text-white">{selectedClass.usedSpots}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Usados</p></div>
-              <div className="k-stat"><p className="text-2xl font-black text-kupan-flame">{selectedClass.availableSpots}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Disponibles</p></div>
+              <div className="k-stat"><p className="text-2xl font-black text-kupan-flame">{selectedClass.unlimitedCapacity ? 'Sin límite' : selectedClass.availableSpots}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Disponibles</p></div>
             </div>
             <button type="button" className="k-button mt-4 w-full" onClick={() => setIsManualOpen((current) => !current)}>
               {isManualOpen ? 'Cerrar agregar alumno' : 'Agregar alumno'}
@@ -345,7 +345,7 @@ export function Coach({ currentUser, setActivePage }) {
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Agregar alumno</p>
                 <p className="mt-1 text-sm leading-6 text-white/60">
-                  {selectedClass ? `${selectedClass.className} · ${selectedClass.time} · ${dashboard.today}` : 'Selecciona una clase para continuar.'}
+                  {selectedClass ? `${selectedClass.className} · ${selectedClass.timeLabel || selectedClass.time} · ${dashboard.today}` : 'Selecciona una clase para continuar.'}
                 </p>
               </div>
               <label className="block">

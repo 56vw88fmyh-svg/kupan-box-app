@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button, Card, ErrorState, Input, LoadingState } from '../components/ui/index.js'
 import { loadTrialSchedules, submitTrialRequest } from '../utils/trialRequests.js'
+import { formatScheduleTime } from '../utils/classSchedule.js'
 import { gymConfig } from '../config/gymConfig.js'
 
 const days = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -89,7 +90,7 @@ export function TrialClass({ setActivePage }) {
             <span className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Clase preferida</span>
             <select className="mt-2 min-h-12 w-full rounded-xl border border-kupan-border bg-kupan-black/45 px-4 py-3 text-base text-white outline-none focus:border-kupan-sand" value={form.scheduleId} onChange={(event) => update('scheduleId', event.target.value)}>
               <option value="">Por coordinar</option>
-              {schedules.map((schedule) => <option key={schedule.id} value={schedule.id}>{days[schedule.day_of_week]} · {schedule.time?.slice(0, 5)}</option>)}
+              {schedules.map((schedule) => <option key={schedule.id} value={schedule.id}>{days[schedule.day_of_week]} · {formatScheduleTime(schedule)}</option>)}
             </select>
           </label>
           <Input label="Fecha preferida" type="date" value={form.desiredDate} onChange={(event) => update('desiredDate', event.target.value)} />

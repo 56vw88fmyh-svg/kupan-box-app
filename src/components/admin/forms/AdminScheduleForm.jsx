@@ -7,9 +7,12 @@ export function AdminScheduleForm({ draft, onDraftChange, onSubmit, isSubmitting
     <form className="k-panel grid gap-3 p-4 sm:grid-cols-2" onSubmit={onSubmit}>
       <Field label="Dia 1-7" type="number" value={draft.day_of_week} required onChange={(value) => onDraftChange((current) => ({ ...current, day_of_week: value }))} />
       <Field label="Hora" type="time" value={draft.time} required onChange={(value) => onDraftChange((current) => ({ ...current, time: value }))} />
+      <Field label="Hora fin" type="time" value={draft.end_time ?? ''} onChange={(value) => onDraftChange((current) => ({ ...current, end_time: value }))} />
       <Field label="Clase" value={draft.class_name} required onChange={(value) => onDraftChange((current) => ({ ...current, class_name: value }))} />
       <Field label="Coach" value={draft.coach} onChange={(value) => onDraftChange((current) => ({ ...current, coach: value }))} />
       <Field label="Cupos maximos" type="number" value={draft.max_spots} onChange={(value) => onDraftChange((current) => ({ ...current, max_spots: value }))} />
+      <ToggleField label="Bloque de acceso abierto" checked={Boolean(draft.is_open_access)} onChange={(value) => onDraftChange((current) => ({ ...current, is_open_access: value, unlimited_capacity: value ? true : current.unlimited_capacity }))} />
+      <ToggleField label="Cupos sin límite" checked={Boolean(draft.unlimited_capacity)} onChange={(value) => onDraftChange((current) => ({ ...current, unlimited_capacity: value }))} />
       <ToggleField label="Activo" checked={draft.active} onChange={(value) => onDraftChange((current) => ({ ...current, active: value }))} />
       <button type="submit" className="k-button sm:col-span-2" disabled={isDisabled}>{draft.id ? 'Guardar horario' : 'Crear horario'}</button>
     </form>

@@ -1,4 +1,5 @@
 import { Field, SelectField, TextArea, ToggleField } from '../AdminUi.jsx'
+import { formatScheduleTime } from '../../../utils/classSchedule.js'
 
 export function AdminManualReservationForm({
   formRef,
@@ -39,7 +40,7 @@ export function AdminManualReservationForm({
         <option className="bg-kupan-black" value="">Seleccionar clase</option>
         {scheduleItems.filter((classItem) => classItem.active).map((classItem) => (
           <option key={classItem.id} className="bg-kupan-black" value={classItem.id}>
-            Dia {classItem.day_of_week} · {toTime(classItem.time)} · {classItem.class_name}
+            Dia {classItem.day_of_week} · {formatScheduleTime(classItem) || toTime(classItem.time)} · {classItem.class_name}
           </option>
         ))}
       </SelectField>

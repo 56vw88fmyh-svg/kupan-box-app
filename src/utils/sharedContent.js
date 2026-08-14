@@ -2,6 +2,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { defaultAdminContent, defaultAppText } from './adminContent.js'
 import { getPaymentUrlForPlan } from '../data/paymentLinks.js'
 import { gymConfig } from '../config/gymConfig.js'
+import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from './classSchedule.js'
 
 const dayMap = {
   1: { id: 'monday', short: 'Lun', label: 'Lunes' },
@@ -32,10 +33,14 @@ function buildWeeklySchedule(classes) {
       blocks[block].push({
         id: item.id,
         time: item.time.slice(0, 5),
+        endTime: getScheduleEndTime(item),
+        timeLabel: formatScheduleTime(item),
         name: item.class_name,
         coach: item.coach ?? `Coach ${gymConfig.identity.name}`,
-        spots: item.max_spots ?? 12,
-        maxSpots: item.max_spots ?? 12,
+        spots: isUnlimitedSchedule(item) ? null : item.max_spots ?? 12,
+        maxSpots: isUnlimitedSchedule(item) ? null : item.max_spots ?? 12,
+        isOpenAccess: isOpenAccessSchedule(item),
+        unlimitedCapacity: isUnlimitedSchedule(item),
       })
     })
 
@@ -165,7 +170,7 @@ export async function loadSharedContent() {
 
   const [wod, schedule, plans, posts, settings] = await Promise.all([
     supabase.from('wod').select('id, date, title, warmup, strength, workout, time_cap, notes').order('date', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('class_schedule').select('id, day_of_week, time, class_name, coach, max_spots, active').eq('active', true).order('day_of_week').order('time'),
+    supabase.from('class_schedule').select('id, day_of_week, time, end_time, class_name, coach, max_spots, is_open_access, unlimited_capacity, active').eq('active', true).order('day_of_week').order('time'),
     supabase.from('plans').select('id, name, price, classes_per_week, is_unlimited, active').eq('active', true).order('price'),
     supabase.from('community_posts').select('id, type, title, content, event_date, active, created_at').eq('active', true).order('created_at', { ascending: false }),
     supabase.from('app_settings').select('key, value'),

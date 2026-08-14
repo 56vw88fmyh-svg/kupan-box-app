@@ -1,6 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { gymConfig } from '../config/gymConfig.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
+import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from './classSchedule.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
@@ -67,16 +68,21 @@ function decorateClass(classItem, reservations) {
   const classReservations = reservations.filter((reservation) => reservation.class_schedule_id === classItem.id)
   const usedSpots = classReservations.filter((reservation) => reservation.status !== 'cancelled').length
   const maxSpots = classItem.max_spots ?? 12
+  const unlimitedCapacity = isUnlimitedSchedule(classItem)
 
   return {
     id: classItem.id,
     day: dayNames[classItem.day_of_week],
     time: classItem.time?.slice(0, 5) ?? '',
+    endTime: getScheduleEndTime(classItem),
+    timeLabel: formatScheduleTime(classItem),
     className: classItem.class_name,
     coach: classItem.coach ?? `Coach ${gymConfig.identity.name}`,
-    maxSpots,
+    maxSpots: unlimitedCapacity ? null : maxSpots,
     usedSpots,
-    availableSpots: Math.max(maxSpots - usedSpots, 0),
+    availableSpots: unlimitedCapacity ? null : Math.max(maxSpots - usedSpots, 0),
+    isOpenAccess: isOpenAccessSchedule(classItem),
+    unlimitedCapacity,
     reservations: classReservations,
   }
 }
@@ -87,11 +93,15 @@ function pickCurrentAndNext(classes) {
 
   const withDistance = classes.map((classItem) => {
     const [hours, minutes] = classItem.time.split(':').map(Number)
+    const [endHours, endMinutes] = (classItem.endTime || '').split(':').map(Number)
     const classMinutes = hours * 60 + minutes
+    const endClassMinutes = Number.isFinite(endHours) && Number.isFinite(endMinutes)
+      ? endHours * 60 + endMinutes
+      : classMinutes + 75
     return {
       ...classItem,
       classMinutes,
-      isCurrent: currentMinutes >= classMinutes && currentMinutes < classMinutes + 75,
+      isCurrent: currentMinutes >= classMinutes && currentMinutes < endClassMinutes,
       isUpcoming: classMinutes >= currentMinutes,
     }
   })
@@ -127,7 +137,7 @@ export async function loadCoachDashboard() {
     const [scheduleResult, reservationsResult] = await Promise.all([
       supabase
         .from('class_schedule')
-        .select('id, day_of_week, time, class_name, coach, max_spots, active')
+        .select('id, day_of_week, time, end_time, class_name, coach, max_spots, is_open_access, unlimited_capacity, active')
         .eq('active', true)
         .eq('day_of_week', dayOfWeek)
         .order('time', { ascending: true }),

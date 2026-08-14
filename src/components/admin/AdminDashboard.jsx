@@ -131,7 +131,7 @@ export function AdminClassCard({ classItem, onAction }) {
       <div className="mt-4 grid grid-cols-3 gap-2">
         <div className="rounded-lg border border-white/10 bg-black/25 p-3">
           <p className="text-[0.62rem] font-black uppercase text-white/50">Reservas</p>
-          <p className="mt-1 text-base font-black text-white">{classItem.reserved}/{classItem.maxSpots}</p>
+          <p className="mt-1 text-base font-black text-white">{classItem.unlimitedCapacity ? `${classItem.reserved} · sin límite` : `${classItem.reserved}/${classItem.maxSpots}`}</p>
         </div>
         <div className="rounded-lg border border-white/10 bg-black/25 p-3">
           <p className="text-[0.62rem] font-black uppercase text-white/50">Asistencia</p>

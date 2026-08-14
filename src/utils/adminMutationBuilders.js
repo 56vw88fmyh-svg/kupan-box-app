@@ -14,9 +14,12 @@ export function buildSchedulePayload(scheduleDraft) {
   return {
     day_of_week: Number(scheduleDraft.day_of_week),
     time: scheduleDraft.time,
+    end_time: scheduleDraft.end_time || null,
     class_name: scheduleDraft.class_name,
     coach: scheduleDraft.coach,
     max_spots: Number(scheduleDraft.max_spots),
+    is_open_access: Boolean(scheduleDraft.is_open_access),
+    unlimited_capacity: Boolean(scheduleDraft.unlimited_capacity),
     active: scheduleDraft.active,
   }
 }

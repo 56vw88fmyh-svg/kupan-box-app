@@ -40,7 +40,18 @@ export function createEmptyWodDraft() {
 }
 
 export function createEmptyScheduleDraft() {
-  return { id: '', day_of_week: 1, time: '18:00', class_name: 'CrossFit', coach: 'Coach KUPAN', max_spots: 12, active: true }
+  return {
+    id: '',
+    day_of_week: 1,
+    time: '18:00',
+    end_time: '',
+    class_name: 'CrossFit',
+    coach: 'Coach KUPAN',
+    max_spots: 12,
+    is_open_access: false,
+    unlimited_capacity: false,
+    active: true,
+  }
 }
 
 export function createEmptyPostDraft() {

@@ -84,16 +84,22 @@ assert.deepEqual(buildPlanPayload({
 assert.deepEqual(buildSchedulePayload({
   day_of_week: '3',
   time: '19:00',
+  end_time: '20:00',
   class_name: 'CrossFit',
   coach: 'Coach KUPAN',
   max_spots: '12',
+  is_open_access: true,
+  unlimited_capacity: true,
   active: false,
 }), {
   day_of_week: 3,
   time: '19:00',
+  end_time: '20:00',
   class_name: 'CrossFit',
   coach: 'Coach KUPAN',
   max_spots: 12,
+  is_open_access: true,
+  unlimited_capacity: true,
   active: false,
 })
 

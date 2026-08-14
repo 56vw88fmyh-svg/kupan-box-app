@@ -6,7 +6,7 @@ export async function loadTrialSchedules() {
   if (!isSupabaseConfigured || !supabase) return { ok: false, message: 'El servicio no está disponible en este momento.', schedules: [] }
   const { data, error } = await supabase
     .from('class_schedule')
-    .select('id, day_of_week, time, class_name, coach')
+    .select('id, day_of_week, time, end_time, class_name, coach, is_open_access, unlimited_capacity')
     .eq('active', true)
     .order('day_of_week')
     .order('time')

@@ -12,6 +12,7 @@ import { getChileDateKey, getChileDateTime } from '../utils/chileDateTime.js'
 import { formatCoachName } from '../utils/coachName.js'
 import { getCancellationPolicy } from '../utils/reservationPolicy.js'
 import { gymConfig } from '../config/gymConfig.js'
+import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from '../utils/classSchedule.js'
 
 const CHILE_TIME_ZONE = 'America/Santiago'
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
@@ -73,15 +74,17 @@ function getDurationLabel(item) {
 }
 
 function getSpots(item) {
+  if (isUnlimitedSchedule(item)) return { capacity: null, available: null, occupied: null, unlimited: true }
   const maxSpots = Number(item.maxSpots ?? item.max_spots ?? 0)
   const available = Math.max(Number(item.spots ?? item.available_spots ?? 0), 0)
   const capacity = maxSpots > 0 ? maxSpots : available
   const occupied = Math.max(capacity - available, 0)
-  return { capacity, available, occupied }
+  return { capacity, available, occupied, unlimited: false }
 }
 
 function getClassViewState(item, now = new Date()) {
-  const classDateTime = parseLocalClassDateTime(item.reservationDate, item.time)
+  const boundaryTime = isOpenAccessSchedule(item) && getScheduleEndTime(item) ? getScheduleEndTime(item) : item.time
+  const classDateTime = parseLocalClassDateTime(item.reservationDate, boundaryTime)
   const isPastOrInProgress = classDateTime ? classDateTime <= now : false
   const rawStatus = String(item.status ?? item.class_status ?? '').toLowerCase()
 
@@ -105,7 +108,9 @@ function getClassViewState(item, now = new Date()) {
     return { key: 'full', label: 'Clase completa', badge: 'full', action: 'none' }
   }
 
-  return { key: 'available', label: 'Cupos disponibles', badge: 'available', action: 'reserve' }
+  return isOpenAccessSchedule(item)
+    ? { key: 'available', label: 'Acceso abierto', badge: 'available', action: 'reserve' }
+    : { key: 'available', label: 'Cupos disponibles', badge: 'available', action: 'reserve' }
 }
 
 function getClassKey(item) {
@@ -201,13 +206,14 @@ function ClassCard({ item, reservation, waitlistEntry, currentUser, hasActiveMem
   const isProcessing = processingKey === classKey
   const hasTokens = remainingTokens === null || Number(remainingTokens) > 0
   const canReserve = status.action === 'reserve' && currentUser && hasActiveMembership && hasTokens
-  const progress = spots.capacity > 0 ? Math.min((spots.occupied / spots.capacity) * 100, 100) : 0
+  const progress = !spots.unlimited && spots.capacity > 0 ? Math.min((spots.occupied / spots.capacity) * 100, 100) : 0
+  const timeLabel = item.timeLabel || formatScheduleTime(item)
 
   return (
     <Card variant={status.key === 'reserved' ? 'selected' : 'interactive'} className="p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-3xl font-black leading-none text-text-primary">{item.time}</p>
+          <p className="text-3xl font-black leading-none text-text-primary">{timeLabel}</p>
           <h3 className="mt-2 text-lg font-black text-text-primary">{item.name}</h3>
           <p className="mt-1 text-sm text-text-secondary">Coach {formatCoachName(item.coach)}</p>
           <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-text-muted">
@@ -219,20 +225,38 @@ function ClassCard({ item, reservation, waitlistEntry, currentUser, hasActiveMem
         <Badge status={status.badge}>{status.label}</Badge>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
-          <p className="text-text-muted">Ocupados</p>
-          <p className="mt-1 text-xl font-black text-text-primary">{spots.occupied}/{spots.capacity || '-'}</p>
+      {spots.unlimited ? (
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <div className="rounded-xl border border-brand-red/25 bg-brand-red/10 p-3">
+            <p className="text-text-muted">Modalidad</p>
+            <p className="mt-1 text-lg font-black text-text-primary">Acceso abierto</p>
+          </div>
+          <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
+            <p className="text-text-muted">Cupos</p>
+            <p className="mt-1 text-lg font-black text-text-primary">Sin límite</p>
+          </div>
+          <p className="col-span-2 text-sm font-semibold leading-6 text-text-secondary">
+            Puedes llegar en cualquier momento dentro de este rango. La reserva registra tu acceso y no se bloquea por capacidad.
+          </p>
         </div>
-        <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
-          <p className="text-text-muted">Disponibles</p>
-          <p className="mt-1 text-xl font-black text-text-primary">{spots.available}</p>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
+              <p className="text-text-muted">Ocupados</p>
+              <p className="mt-1 text-xl font-black text-text-primary">{spots.occupied}/{spots.capacity || '-'}</p>
+            </div>
+            <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
+              <p className="text-text-muted">Disponibles</p>
+              <p className="mt-1 text-xl font-black text-text-primary">{spots.available}</p>
+            </div>
+          </div>
 
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-bg-elevated" aria-hidden="true">
-        <div className="h-full rounded-full bg-brand-red transition-all" style={{ width: `${progress}%` }} />
-      </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-bg-elevated" aria-hidden="true">
+            <div className="h-full rounded-full bg-brand-red transition-all" style={{ width: `${progress}%` }} />
+          </div>
+        </>
+      )}
 
       <div className="mt-4">
         {status.action === 'reserve' ? (
@@ -245,7 +269,7 @@ function ClassCard({ item, reservation, waitlistEntry, currentUser, hasActiveMem
             disabled={isProcessing || (Boolean(currentUser) && !canReserve)}
             onClick={() => onReserve(item)}
           >
-            {!currentUser ? 'Iniciar sesión' : !hasActiveMembership ? 'Plan requerido' : !hasTokens ? 'Sin tokens' : 'Reservar'}
+            {!currentUser ? 'Iniciar sesión' : !hasActiveMembership ? 'Plan requerido' : !hasTokens ? 'Sin tokens' : spots.unlimited ? 'Reservar acceso' : 'Reservar'}
           </Button>
         ) : null}
         {status.action === 'cancel' ? (
@@ -292,7 +316,7 @@ function ReservationList({ reservations, onCancel, processingKey }) {
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-text-muted">{item.day} · {formatReservationDate(item.reservationDate)}</p>
                 <h3 className="mt-1 font-black text-text-primary">{item.name}</h3>
-                <p className="mt-1 text-sm text-text-secondary">{item.time} · Coach {item.coach || gymConfig.identity.name}</p>
+                <p className="mt-1 text-sm text-text-secondary">{item.timeLabel || formatScheduleTime(item)} · Coach {item.coach || gymConfig.identity.name}</p>
               </div>
               <Button type="button" variant="tertiary" size="sm" disabled={processingKey === classKey} onClick={() => onCancel(item)}>
                 Cancelar
@@ -324,7 +348,8 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   const filteredClasses = availableClasses
     .filter((classItem) => classItem.dayId === selectedDay?.dayId)
     .sort((a, b) => String(a.time).localeCompare(String(b.time)))
-  const totalSpots = filteredClasses.reduce((sum, item) => sum + getSpots(item).available, 0)
+  const hasOpenAccess = filteredClasses.some(isUnlimitedSchedule)
+  const totalSpots = filteredClasses.reduce((sum, item) => sum + (getSpots(item).available ?? 0), 0)
   const reservationByClassKey = useMemo(() => new Map(userActiveReservations.map((reservation) => [getClassKey(reservation), reservation])), [userActiveReservations])
   const waitlistByClassKey = useMemo(() => new Map(activeWaitlist.map((entry) => [`${entry.class_schedule_id}-${entry.reservation_date}`, entry])), [activeWaitlist])
 
@@ -349,8 +374,12 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
       day: reservation.class_schedule?.day_of_week ? dayNames[reservation.class_schedule.day_of_week] : '',
       block: reservation.class_schedule?.time && Number(reservation.class_schedule.time.slice(0, 2)) < 12 ? 'AM' : 'PM',
       time: reservation.class_schedule?.time?.slice(0, 5) ?? '',
+      endTime: reservation.class_schedule?.end_time?.slice(0, 5) ?? '',
+      timeLabel: formatScheduleTime(reservation.class_schedule),
       name: reservation.class_schedule?.class_name ?? `Clase ${gymConfig.identity.name}`,
       coach: reservation.class_schedule?.coach ?? `Coach ${gymConfig.identity.name}`,
+      isOpenAccess: Boolean(reservation.class_schedule?.is_open_access),
+      unlimitedCapacity: Boolean(reservation.class_schedule?.unlimited_capacity),
       isReserved: reservation.status === 'reserved',
     })))
     setMembership(result.membership)
@@ -407,7 +436,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     showToast({
       type: 'success',
       title: 'Reserva confirmada',
-      description: `${classItem.name} a las ${classItem.time} quedó guardada en tu agenda.`,
+      description: `${classItem.name} · ${classItem.timeLabel || formatScheduleTime(classItem)} quedó guardado en tu agenda.`,
     })
     await refreshReservations()
     setProcessingClassKey('')
@@ -483,7 +512,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
           <div>
             <h1 className="k-display text-4xl font-black leading-none text-text-primary sm:text-5xl">Reserva tu próxima clase</h1>
             <p className="mt-2 max-w-2xl text-base leading-7 text-text-secondary">
-              Elige el día, revisa cupos reales y toma tu clase en un solo paso.
+              Elige el día y reserva. Los bloques de CrossFit y personalizado tienen acceso abierto dentro del rango publicado.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:min-w-60">
@@ -492,8 +521,8 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
               <p className="text-xs font-bold text-text-muted">clases</p>
             </Card>
             <Card variant="standard" className="p-3 text-center">
-              <p className="text-2xl font-black text-success">{totalSpots}</p>
-              <p className="text-xs font-bold text-text-muted">cupos</p>
+              <p className="text-2xl font-black text-success">{hasOpenAccess ? 'Sin límite' : totalSpots}</p>
+              <p className="text-xs font-bold text-text-muted">{hasOpenAccess ? 'acceso abierto' : 'cupos'}</p>
             </Card>
           </div>
         </div>
@@ -555,7 +584,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
         isOpen={Boolean(cancelTarget)}
         onClose={() => setCancelTarget(null)}
         title="Cancelar reserva"
-        description={cancelTarget ? `¿Cancelar tu reserva de ${cancelTarget.name} a las ${cancelTarget.time}?` : ''}
+        description={cancelTarget ? `¿Cancelar tu reserva de ${cancelTarget.name} en el horario ${cancelTarget.timeLabel || formatScheduleTime(cancelTarget)}?` : ''}
         isDestructive
       >
         {cancelPolicy?.valid ? (
