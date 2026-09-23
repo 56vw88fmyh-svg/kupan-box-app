@@ -4,6 +4,7 @@ import { getHumanErrorMessage, logAppError } from './appState.js'
 import { getChileDateKey } from './chileDateTime.js'
 import { formatCoachName } from './coachName.js'
 import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from './classSchedule.js'
+import { ENHANCED_SCHEDULE_FIELDS, isMissingOptionalScheduleColumn, LEGACY_SCHEDULE_FIELDS } from './scheduleCompatibility.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo']
 const shortDayNames = ['', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
@@ -55,18 +56,31 @@ export function mapReservationRow(row) {
   }
 }
 
+async function loadReservationSchedule() {
+  const enhanced = await supabase
+    .from('class_schedule')
+    .select(ENHANCED_SCHEDULE_FIELDS)
+    .eq('active', true)
+    .order('day_of_week', { ascending: true })
+    .order('time', { ascending: true })
+
+  if (!isMissingOptionalScheduleColumn(enhanced.error)) return enhanced
+
+  return supabase
+    .from('class_schedule')
+    .select(LEGACY_SCHEDULE_FIELDS)
+    .eq('active', true)
+    .order('day_of_week', { ascending: true })
+    .order('time', { ascending: true })
+}
+
 export async function loadReservationData(profileId) {
   if (!isSupabaseConfigured || !supabase) {
     return getReservationError('El servicio de datos aún no está configurado.')
   }
 
   const [scheduleResult, reservationsResult, membershipResult, waitlistResult] = await Promise.all([
-    supabase
-      .from('class_schedule')
-      .select('id, day_of_week, time, end_time, class_name, coach, max_spots, is_open_access, unlimited_capacity, active')
-      .eq('active', true)
-      .order('day_of_week', { ascending: true })
-      .order('time', { ascending: true }),
+    loadReservationSchedule(),
     profileId
       ? supabase
         .rpc('get_my_reservations')

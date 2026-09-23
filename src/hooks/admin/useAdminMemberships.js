@@ -70,11 +70,12 @@ export function useAdminMemberships({ supabaseClient = supabase, logError = logA
     })
   }
 
-  async function renewMembership(membership) {
+  async function renewMembership(membership, startDate) {
     const operationKey = `renewMembership:${membership.id}`
     return runOperation(operationKey, async () => {
       const { data, error } = await supabaseClient.rpc('admin_renew_membership', {
         target_membership_id: membership.id,
+        start_date_input: startDate,
       })
 
       if (error) {

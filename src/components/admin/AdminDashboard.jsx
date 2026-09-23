@@ -1,3 +1,6 @@
+import { gymConfig } from '../../config/gymConfig.js'
+import { AdminIcon } from './AdminIcon.jsx'
+
 function cn(...classes) {
   return classes.filter(Boolean).join(' ')
 }
@@ -40,7 +43,9 @@ export function AdminPageHeader({ dateLabel, greeting, status, onAction }) {
               )}
               onClick={() => onAction(action.target)}
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/25 text-[0.62rem]">{action.icon}</span>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/25 text-[0.62rem]">
+                <AdminIcon code={action.icon} className="h-[1.1rem] w-[1.1rem]" />
+              </span>
               <span>{action.label}</span>
             </button>
           ))}
@@ -94,7 +99,7 @@ export function AdminAlertCard({ alert, onAction, onDismiss }) {
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
         <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" onClick={() => onAction(alert.target)}>
-          Resolver
+          {alert.actionLabel ?? `Revisar ${String(alert.label).toLowerCase()}`}
         </button>
         {onDismiss ? (
           <button type="button" className="min-h-11 rounded-lg px-3 py-2 text-xs font-black uppercase text-white/58" onClick={() => onDismiss(alert.id)}>
@@ -208,9 +213,10 @@ export function AdminRecentActivity({ items }) {
 export function AdminMobileModuleNav({ modules, activeModuleId, onNavigate }) {
   const primary = modules.slice(0, 4)
   const secondary = modules.slice(4)
+  const isSecondaryActive = secondary.some((module) => module.id === activeModuleId)
 
   return (
-    <div className="fixed inset-x-2 bottom-[calc(5.65rem+env(safe-area-inset-bottom))] z-30 lg:hidden">
+    <nav className="fixed inset-x-2 bottom-[calc(0.5rem+env(safe-area-inset-bottom))] z-30 lg:hidden" aria-label="Navegación del panel administrativo">
       <div className="rounded-2xl border border-white/10 bg-kupan-black/95 p-2 shadow-2xl backdrop-blur-2xl">
         <div className="grid grid-cols-5 gap-1">
           {primary.map((module) => (
@@ -218,40 +224,62 @@ export function AdminMobileModuleNav({ modules, activeModuleId, onNavigate }) {
               key={module.id}
               type="button"
               className={cn(
-                'min-h-12 rounded-xl px-1 text-[0.58rem] font-black uppercase leading-4 transition',
+                'flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[0.58rem] font-black uppercase leading-4 transition',
                 activeModuleId === module.id ? 'bg-kupan-ember text-white shadow-glow' : 'bg-white/10 text-white/68',
               )}
-              onClick={() => onNavigate(module.items[0])}
+              onClick={() => onNavigate({ ...module.items[0], moduleId: module.id })}
+              aria-current={activeModuleId === module.id ? 'page' : undefined}
             >
-              {module.shortLabel ?? module.label}
+              <AdminIcon code={module.icon} className="h-4 w-4" />
+              <span>{module.shortLabel ?? module.label}</span>
             </button>
           ))}
-          <details className="relative">
-            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-center rounded-xl bg-white/10 px-1 text-[0.58rem] font-black uppercase leading-4 text-white/68">
-              Más
+          <details className="relative" data-admin-more-menu>
+            <summary className={cn(
+              'flex min-h-12 cursor-pointer list-none flex-col items-center justify-center gap-1 rounded-xl px-1 text-[0.58rem] font-black uppercase leading-4',
+              isSecondaryActive ? 'bg-kupan-ember text-white shadow-glow' : 'bg-white/10 text-white/68',
+            )}>
+              <AdminIcon code="CF" className="h-4 w-4" />
+              <span>Más</span>
             </summary>
-            <div className="absolute bottom-full right-0 mb-2 grid w-56 gap-1 rounded-xl border border-white/10 bg-kupan-gray p-2 shadow-2xl">
+            <div className="absolute bottom-full right-0 mb-2 max-h-[65dvh] w-[min(20rem,calc(100vw-1rem))] overflow-y-auto rounded-xl border border-white/10 bg-kupan-gray p-2 shadow-2xl">
+              <p className="px-2 pb-2 pt-1 text-[0.62rem] font-black uppercase tracking-[0.18em] text-kupan-flame">Más opciones</p>
               {secondary.map((module) => (
-                <button
-                  key={module.id}
-                  type="button"
-                  className={cn(
-                    'min-h-11 rounded-lg px-3 text-left text-xs font-black uppercase',
-                    activeModuleId === module.id ? 'bg-kupan-ember text-white' : 'bg-white/10 text-white/75',
-                  )}
-                  onClick={(event) => {
-                    event.currentTarget.closest('details')?.removeAttribute('open')
-                    onNavigate(module.items[0])
-                  }}
-                >
-                  {module.label}
-                </button>
+                <details key={module.id} className="mb-1 rounded-lg border border-white/10 bg-white/[0.04] last:mb-0" open={module.id === activeModuleId}>
+                  <summary
+                    className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-3 text-left text-xs font-black uppercase text-white/80"
+                    aria-label={`Abrir ${module.label}`}
+                  >
+                    <AdminIcon code={module.icon} className="h-4 w-4 shrink-0 text-kupan-flame" />
+                    <span className="flex-1">{module.label}</span>
+                    <span aria-hidden="true">›</span>
+                  </summary>
+                  <div className="grid gap-1 px-2 pb-2">
+                    {module.items.map((item) => (
+                      <button
+                        key={`${module.id}-${item.label}-${item.target ?? item.id}`}
+                        type="button"
+                        className={cn(
+                          'min-h-11 rounded-lg px-3 text-left text-xs font-black uppercase',
+                          activeModuleId === module.id ? 'bg-kupan-ember/20 text-white' : 'bg-white/10 text-white/75',
+                        )}
+                        onClick={(event) => {
+                          event.currentTarget.closest('[data-admin-more-menu]')?.removeAttribute('open')
+                          onNavigate({ ...item, moduleId: module.id })
+                        }}
+                        aria-label={`${item.label}. ${item.hint}`}
+                      >
+                        <span className="block">{item.label}</span>
+                        <span className="mt-0.5 block text-[0.65rem] normal-case text-white/50">{item.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
               ))}
             </div>
           </details>
         </div>
       </div>
-    </div>
+    </nav>
   )
 }
-import { gymConfig } from '../../config/gymConfig.js'

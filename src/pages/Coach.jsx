@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
 import { Button, Dialog, ErrorState, PermissionDeniedState, SuccessState } from '../components/ui/index.js'
@@ -36,7 +36,7 @@ function ClassSummary({ title, classItem }) {
           <p className="mt-1 text-sm text-white/60">Coach {formatCoachName(classItem.coach)}</p>
           <div className="mt-4 grid grid-cols-2 gap-2">
             <div className="rounded-lg border border-white/10 bg-black/25 p-3">
-              <p className="text-[0.65rem] font-black uppercase text-white/50">Usados</p>
+              <p className="text-[0.65rem] font-black uppercase text-white/50">Cupos ocupados</p>
               <p className="mt-1 text-2xl font-black text-white">{classItem.usedSpots}</p>
             </div>
             <div className="rounded-lg border border-white/10 bg-black/25 p-3">
@@ -56,12 +56,18 @@ function ReservationRow({ reservation, onMark, onLate, onCancel, onNote, busyId 
   const isBusy = busyId === reservation.id
   const student = reservation.profile?.full_name ?? 'Alumno KUPAN'
   const email = reservation.profile?.email
+  const statusLabel = {
+    reserved: 'Pendiente',
+    attended: 'Presente',
+    no_show: 'Ausente',
+    cancelled: 'Cancelada',
+  }[reservation.status] ?? reservation.status
 
   return (
     <MotionCard as="article" className="k-panel p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">{reservation.status}</p>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">{statusLabel}</p>
           <h3 className="mt-2 break-words font-black uppercase text-white">{student}</h3>
           {email ? <p className="mt-1 break-words text-sm text-white/55">{email}</p> : null}
           <p className="mt-2 text-xs font-black uppercase text-white/45">
@@ -71,29 +77,36 @@ function ReservationRow({ reservation, onMark, onLate, onCancel, onNote, busyId 
         </div>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" disabled={isBusy || reservation.status === 'attended' || reservation.status === 'cancelled'} onClick={() => onMark(reservation.id, 'attended')}>
+        <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" aria-label={`Marcar presente a ${student}`} disabled={isBusy || reservation.status === 'attended' || reservation.status === 'cancelled'} onClick={() => onMark(reservation.id, 'attended')}>
           {isBusy ? 'Guardando...' : 'Presente'}
         </button>
-        <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" disabled={isBusy || reservation.status === 'cancelled'} onClick={() => onLate(reservation.id)}>
+        <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" aria-label={`Marcar llegada tarde de ${student}`} disabled={isBusy || reservation.status === 'cancelled'} onClick={() => onLate(reservation.id)}>
           Llegó tarde
         </button>
-        <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" disabled={isBusy || reservation.status === 'no_show' || reservation.status === 'cancelled'} onClick={() => onMark(reservation.id, 'no_show')}>
-          No show
+        <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" aria-label={`Marcar ausente a ${student}`} disabled={isBusy || reservation.status === 'no_show' || reservation.status === 'cancelled'} onClick={() => onMark(reservation.id, 'no_show')}>
+          Ausente
         </button>
         {['attended', 'no_show'].includes(reservation.status) ? (
-          <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" disabled={isBusy} onClick={() => onMark(reservation.id, 'reserved')}>
+          <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" aria-label={`Corregir asistencia de ${student}`} disabled={isBusy} onClick={() => onMark(reservation.id, 'reserved')}>
             Corregir
           </button>
         ) : null}
-        <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" disabled={isBusy} onClick={() => onNote(reservation)}>
+        <button type="button" className="k-button-secondary min-h-11 px-3 py-2 text-xs" aria-label={`Agregar nota privada para ${student}`} disabled={isBusy} onClick={() => onNote(reservation)}>
           Nota privada
         </button>
-        <button type="button" className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white disabled:opacity-50" disabled={isBusy || reservation.status === 'attended' || reservation.status === 'no_show' || reservation.status === 'cancelled'} onClick={() => onCancel(reservation.id)}>
+        <button type="button" className="rounded-lg border border-kupan-red/40 bg-kupan-red/10 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white disabled:opacity-50" aria-label={`Cancelar reserva de ${student}`} disabled={isBusy || reservation.status === 'attended' || reservation.status === 'no_show' || reservation.status === 'cancelled'} onClick={() => onCancel(reservation)}>
           Cancelar
         </button>
       </div>
     </MotionCard>
   )
+}
+
+function focusCoachSection(ref) {
+  window.setTimeout(() => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    ref.current?.focus?.({ preventScroll: true })
+  }, 80)
 }
 
 export function Coach({ currentUser, setActivePage }) {
@@ -112,8 +125,12 @@ export function Coach({ currentUser, setActivePage }) {
   const [noteDraft, setNoteDraft] = useState({ noteType: 'scaling', content: '' })
   const [privateNotes, setPrivateNotes] = useState([])
   const [isNoteSaving, setIsNoteSaving] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const feedbackRef = useRef(null)
+  const attendanceRef = useRef(null)
+  const manualFormRef = useRef(null)
 
-  async function refreshCoach() {
+  async function refreshCoach({ preserveMessage = false } = {}) {
     if (!canAccess) return
 
     setIsLoading(true)
@@ -123,18 +140,23 @@ export function Coach({ currentUser, setActivePage }) {
     if (!result.ok) {
       setMessageType('error')
       setMessage(result.message)
-      return
+      return result
     }
 
     setDashboard(result)
     setSelectedClassId((current) => current || result.currentClass?.id || result.classes[0]?.id || '')
-    setMessage('')
+    if (!preserveMessage) setMessage('')
+    return result
   }
 
   useEffect(() => {
     refreshCoach()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAccess])
+
+  useEffect(() => {
+    if (isManualOpen) focusCoachSection(manualFormRef)
+  }, [isManualOpen])
 
   useEffect(() => {
     let isMounted = true
@@ -167,7 +189,8 @@ export function Coach({ currentUser, setActivePage }) {
     setBusyId('')
     setMessageType(result.ok ? 'success' : 'error')
     setMessage(result.message)
-    if (result.ok) refreshCoach()
+    if (result.ok) await refreshCoach({ preserveMessage: true })
+    focusCoachSection(feedbackRef)
   }
 
   async function handleLate(reservationId) {
@@ -176,7 +199,8 @@ export function Coach({ currentUser, setActivePage }) {
     setBusyId('')
     setMessageType(result.ok ? 'success' : 'error')
     setMessage(result.message)
-    if (result.ok) refreshCoach()
+    if (result.ok) await refreshCoach({ preserveMessage: true })
+    focusCoachSection(feedbackRef)
   }
 
   async function openPrivateNotes(reservation) {
@@ -184,7 +208,11 @@ export function Coach({ currentUser, setActivePage }) {
     setPrivateNotes([])
     const result = await loadCoachPrivateNotes(reservation.profile_id)
     if (result.ok) setPrivateNotes(result.notes)
-    else setMessage(result.message)
+    else {
+      setMessageType('error')
+      setMessage(result.message)
+      focusCoachSection(feedbackRef)
+    }
   }
 
   async function savePrivateNote(event) {
@@ -203,6 +231,7 @@ export function Coach({ currentUser, setActivePage }) {
       setNoteTarget(null)
       setNoteDraft({ noteType: 'scaling', content: '' })
     }
+    focusCoachSection(feedbackRef)
   }
 
   async function markPendingPresent() {
@@ -214,16 +243,24 @@ export function Coach({ currentUser, setActivePage }) {
     const failed = results.filter((result) => !result.ok)
     setMessageType(failed.length ? 'error' : 'success')
     setMessage(failed.length ? `${failed.length} asistencias no pudieron actualizarse.` : 'Asistencias pendientes marcadas correctamente.')
-    refreshCoach()
+    await refreshCoach({ preserveMessage: true })
+    focusCoachSection(feedbackRef)
   }
 
-  async function handleCancel(reservationId) {
-    setBusyId(reservationId)
-    const result = await cancelCoachReservation(reservationId)
+  function handleCancel(reservation) {
+    setCancelTarget(reservation)
+  }
+
+  async function confirmCancel() {
+    if (!cancelTarget) return
+    setBusyId(cancelTarget.id)
+    const result = await cancelCoachReservation(cancelTarget.id)
     setBusyId('')
     setMessageType(result.ok ? 'success' : 'error')
     setMessage(result.message)
-    if (result.ok) refreshCoach()
+    setCancelTarget(null)
+    if (result.ok) await refreshCoach({ preserveMessage: true })
+    focusCoachSection(feedbackRef)
   }
 
   async function handleManualReservation(event) {
@@ -231,6 +268,7 @@ export function Coach({ currentUser, setActivePage }) {
     if (!selectedClass) {
       setMessageType('error')
       setMessage('Selecciona una clase antes de agregar alumno.')
+      focusCoachSection(feedbackRef)
       return
     }
 
@@ -248,8 +286,10 @@ export function Coach({ currentUser, setActivePage }) {
 
     if (result.ok) {
       setManualDraft({ profileId: '', query: '', note: '', allowWithoutMembership: false })
-      refreshCoach()
+      setIsManualOpen(false)
+      await refreshCoach({ preserveMessage: true })
     }
+    focusCoachSection(feedbackRef)
   }
 
   if (!currentUser) {
@@ -292,42 +332,50 @@ export function Coach({ currentUser, setActivePage }) {
           <button type="button" className="k-button w-full" onClick={() => setActivePage('wod')}>
             Ver WOD del día
           </button>
-          <button type="button" className="k-button-secondary w-full" onClick={refreshCoach} disabled={isLoading}>
+          <button type="button" className="k-button-secondary w-full" onClick={() => refreshCoach()} disabled={isLoading}>
             {isLoading ? 'Actualizando...' : 'Actualizar'}
           </button>
         </div>
       </section>
 
-      {message && messageType === 'success' ? <SuccessState title="Acción realizada" description={message} /> : null}
-      {message && messageType !== 'success' ? <ErrorState title="No fue posible completar la acción" description={message} onAction={refreshCoach} /> : null}
+      {message ? (
+        <div ref={feedbackRef} className="scroll-mt-28 outline-none" tabIndex={-1}>
+          {messageType === 'success' ? <SuccessState title="Acción realizada" description={message} /> : null}
+          {messageType !== 'success' ? <ErrorState title="No fue posible completar la acción" description={message} onAction={() => refreshCoach()} /> : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-2">
-        <ClassSummary title="Clase actual" classItem={dashboard.currentClass} />
-        <ClassSummary title="Próxima clase" classItem={dashboard.nextClass} />
+        <ClassSummary title={dashboard.currentClass?.isCurrent ? 'Clase actual' : 'Siguiente clase'} classItem={dashboard.currentClass} />
+        <ClassSummary title={dashboard.currentClass?.isCurrent ? 'Próxima clase' : 'Clase posterior'} classItem={dashboard.nextClass} />
       </div>
 
-      <section>
+      <section ref={attendanceRef} className="scroll-mt-28 outline-none" tabIndex={-1}>
         <SectionTitle eyebrow="Asistencia" title="Alumnos reservados" />
-        <div className="mb-4 flex gap-2 overflow-x-auto k-scroll-x pb-1">
-          {dashboard.classes.map((classItem) => (
-            <button
-              key={classItem.id}
-              type="button"
-              className={`min-w-max rounded-lg px-4 py-3 text-sm font-black uppercase transition ${
-                selectedClass?.id === classItem.id ? 'bg-kupan-ember text-white shadow-glow' : 'bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
-              }`}
-              onClick={() => setSelectedClassId(classItem.id)}
-            >
-              {classItem.timeLabel || classItem.time} · {classItem.className}
-            </button>
-          ))}
-        </div>
+        <label className="mb-4 block rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <span className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Clase del día</span>
+          <select
+            className="mt-2 min-h-12 w-full rounded-lg border border-white/10 bg-kupan-black px-3 text-base font-black text-white outline-none focus:border-kupan-ember"
+            value={selectedClass?.id ?? ''}
+            onChange={(event) => {
+              setSelectedClassId(event.target.value)
+              focusCoachSection(attendanceRef)
+            }}
+          >
+            {dashboard.classes.length === 0 ? <option value="">No hay clases disponibles</option> : null}
+            {dashboard.classes.map((classItem) => (
+              <option key={classItem.id} value={classItem.id}>
+                {classItem.timeLabel || classItem.time} · {classItem.className} · Coach {formatCoachName(classItem.coach)}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {selectedClass ? (
           <MotionCard className="k-card mb-4 p-4">
             <div className="grid grid-cols-3 gap-2">
               <div className="k-stat"><p className="text-2xl font-black text-white">{reservations.length}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Reservados</p></div>
-              <div className="k-stat"><p className="text-2xl font-black text-white">{selectedClass.usedSpots}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Usados</p></div>
+              <div className="k-stat"><p className="text-2xl font-black text-white">{selectedClass.usedSpots}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Cupos ocupados</p></div>
               <div className="k-stat"><p className="text-2xl font-black text-kupan-flame">{selectedClass.unlimitedCapacity ? 'Sin límite' : selectedClass.availableSpots}</p><p className="text-[0.65rem] font-black uppercase text-white/60">Disponibles</p></div>
             </div>
             <button type="button" className="k-button mt-4 w-full" onClick={() => setIsManualOpen((current) => !current)}>
@@ -340,7 +388,7 @@ export function Coach({ currentUser, setActivePage }) {
         ) : null}
 
         {isManualOpen ? (
-          <MotionCard className="k-panel mb-4 p-4">
+          <MotionCard ref={manualFormRef} className="k-panel mb-4 scroll-mt-28 p-4 outline-none" tabIndex={-1}>
             <form className="space-y-3" onSubmit={handleManualReservation}>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Agregar alumno</p>
@@ -353,6 +401,7 @@ export function Coach({ currentUser, setActivePage }) {
                 <input
                   className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-3 text-sm font-bold text-white outline-none transition focus:border-kupan-ember"
                   value={manualDraft.query}
+                  placeholder="Nombre, correo o teléfono"
                   onChange={(event) => setManualDraft((current) => ({ ...current, query: event.target.value }))}
                 />
               </label>
@@ -421,6 +470,26 @@ export function Coach({ currentUser, setActivePage }) {
           )}
         </div>
       </section>
+
+      <Dialog
+        isDestructive
+        isOpen={Boolean(cancelTarget)}
+        onClose={() => setCancelTarget(null)}
+        title="Confirmar cancelación"
+        description="La reserva se cancelará y el token se devolverá cuando corresponda."
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-kupan-flame">Alumno</p>
+            <p className="mt-2 font-black uppercase text-white">{cancelTarget?.profile?.full_name ?? 'Alumno KUPAN'}</p>
+            <p className="mt-1 text-sm font-bold text-white/60">{selectedClass ? `${selectedClass.className} · ${selectedClass.timeLabel || selectedClass.time}` : 'Clase del día'}</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button fullWidth disabled={Boolean(busyId)} variant="secondary" onClick={() => setCancelTarget(null)}>Volver</Button>
+            <Button fullWidth isLoading={Boolean(busyId)} loadingLabel="Cancelando" variant="destructive" onClick={confirmCancel}>Cancelar reserva</Button>
+          </div>
+        </div>
+      </Dialog>
 
       <Dialog isOpen={Boolean(noteTarget)} onClose={() => setNoteTarget(null)} title="Observación privada" description="Solo coach y administración pueden ver esta información.">
         <form className="space-y-4" onSubmit={savePrivateNote}>

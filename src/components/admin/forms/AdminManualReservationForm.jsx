@@ -18,7 +18,7 @@ export function AdminManualReservationForm({
   const isDisabled = disabled || isSubmitting
 
   return (
-    <form ref={formRef} className="k-panel grid scroll-mt-28 gap-3 p-4 sm:grid-cols-2" onSubmit={onSubmit}>
+    <form ref={formRef} className="k-panel grid scroll-mt-28 gap-3 p-4 outline-none sm:grid-cols-2" onSubmit={onSubmit} tabIndex={-1}>
       <div className="sm:col-span-2">
         <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Agregar alumno a clase</p>
         <p className="mt-1 text-sm leading-6 text-white/60">

@@ -2,6 +2,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { gymConfig } from '../config/gymConfig.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
 import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from './classSchedule.js'
+import { ENHANCED_SCHEDULE_FIELDS, isMissingOptionalScheduleColumn, LEGACY_SCHEDULE_FIELDS } from './scheduleCompatibility.js'
 
 const dayNames = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
@@ -87,8 +88,7 @@ function decorateClass(classItem, reservations) {
   }
 }
 
-function pickCurrentAndNext(classes) {
-  const now = getChileNow()
+export function pickCurrentAndNext(classes, now = getChileNow()) {
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
   const withDistance = classes.map((classItem) => {
@@ -107,10 +107,11 @@ function pickCurrentAndNext(classes) {
   })
 
   const currentClass = withDistance.find((classItem) => classItem.isCurrent)
-  const nextClass = withDistance.find((classItem) => classItem.isUpcoming && classItem.id !== currentClass?.id)
+  const resolvedCurrentClass = currentClass ?? withDistance.find((classItem) => classItem.isUpcoming) ?? withDistance[0] ?? null
+  const nextClass = withDistance.find((classItem) => classItem.isUpcoming && classItem !== resolvedCurrentClass)
 
   return {
-    currentClass: currentClass ?? withDistance.find((classItem) => classItem.isUpcoming) ?? withDistance[0] ?? null,
+    currentClass: resolvedCurrentClass,
     nextClass: nextClass ?? null,
   }
 }
@@ -125,6 +126,26 @@ async function loadCoachReservations(date) {
   return (adminResult.data ?? []).filter((reservation) => reservation.reservation_date === date)
 }
 
+async function loadCoachSchedule(dayOfWeek) {
+  const enhancedSchedule = await supabase
+    .from('class_schedule')
+    .select(ENHANCED_SCHEDULE_FIELDS)
+    .eq('active', true)
+    .eq('day_of_week', dayOfWeek)
+    .order('time', { ascending: true })
+
+  if (!enhancedSchedule.error) return enhancedSchedule
+
+  if (!isMissingOptionalScheduleColumn(enhancedSchedule.error)) return enhancedSchedule
+
+  return supabase
+    .from('class_schedule')
+    .select(LEGACY_SCHEDULE_FIELDS)
+    .eq('active', true)
+    .eq('day_of_week', dayOfWeek)
+    .order('time', { ascending: true })
+}
+
 export async function loadCoachDashboard() {
   if (!isSupabaseConfigured || !supabase) {
     return getCoachError('El servicio de datos aún no está configurado.')
@@ -135,12 +156,7 @@ export async function loadCoachDashboard() {
 
   try {
     const [scheduleResult, reservationsResult] = await Promise.all([
-      supabase
-        .from('class_schedule')
-        .select('id, day_of_week, time, end_time, class_name, coach, max_spots, is_open_access, unlimited_capacity, active')
-        .eq('active', true)
-        .eq('day_of_week', dayOfWeek)
-        .order('time', { ascending: true }),
+      loadCoachSchedule(dayOfWeek),
       loadCoachReservations(today),
     ])
 

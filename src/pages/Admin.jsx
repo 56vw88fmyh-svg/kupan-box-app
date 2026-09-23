@@ -37,6 +37,8 @@ import {
   AdminPageHeader,
 } from '../components/admin/AdminDashboard.jsx'
 import { AdminPasswordModal } from '../components/admin/AdminPasswordModal.jsx'
+import { AdminMembershipActionDialog } from '../components/admin/AdminMembershipActionDialog.jsx'
+import { AdminIcon } from '../components/admin/AdminIcon.jsx'
 import { AdminSidebar, QuickActionButton } from '../components/admin/AdminUi.jsx'
 import { AdminBirthdaysModule } from '../components/admin/modules/AdminBirthdaysModule.jsx'
 import { AdminCommunicationsModule } from '../components/admin/modules/AdminCommunicationsModule.jsx'
@@ -67,9 +69,77 @@ function buildWhatsAppUrl(phone, credentials) {
   return `https://wa.me/${chilePhone}?text=${encodeURIComponent(text)}`
 }
 
+function getRpcPayload(data) {
+  return Array.isArray(data) ? data[0] ?? {} : data ?? {}
+}
+
+function buildTokenSummary({ isUnlimited, total, used = 0, available }) {
+  if (isUnlimited || total === null) return 'Ilimitados · no descuenta · disponibles ilimitados'
+  const safeTotal = Number(total ?? 0)
+  const safeUsed = Number(used ?? 0)
+  const safeAvailable = Number(available ?? Math.max(safeTotal - safeUsed, 0))
+  return `${safeTotal} totales · ${safeUsed} usados · ${safeAvailable} disponibles`
+}
+
+function getMembershipActionCopy(kind, nextStatus) {
+  if (kind === 'activate') return {
+    title: 'Confirmar activación',
+    description: 'Revisa el nuevo ciclo antes de activar el plan.',
+    confirmLabel: 'Activar plan',
+    warning: 'Si el alumno tiene otro plan activo, ese ciclo pasará al historial.',
+  }
+  if (kind === 'simulate') return {
+    title: 'Confirmar pago de prueba',
+    description: 'Esta prueba crea una membresía real de 30 días.',
+    confirmLabel: 'Confirmar prueba',
+    warning: 'Úsalo solo cuando quieras registrar un pago aprobado de prueba.',
+  }
+  if (kind === 'renew') return {
+    title: 'Confirmar renovación',
+    description: 'Revisa el nuevo período y sus tokens antes de continuar.',
+    confirmLabel: 'Renovar plan',
+    warning: 'El ciclo actual pasará al historial y los tokens anteriores no se acumularán.',
+  }
+  if (kind === 'extend') return {
+    title: 'Confirmar extensión',
+    description: 'La vigencia actual se extenderá por 7 días.',
+    confirmLabel: 'Extender 7 días',
+    warning: 'Los tokens y el resto de la membresía no cambiarán.',
+  }
+  if (nextStatus === 'cancelled') return {
+    title: 'Confirmar cancelación',
+    description: 'La membresía dejará de estar disponible para reservar.',
+    confirmLabel: 'Cancelar plan',
+    warning: 'Esta acción cambia inmediatamente el estado del plan.',
+    destructive: true,
+  }
+  if (nextStatus === 'paused') return {
+    title: 'Confirmar pausa',
+    description: 'El plan quedará congelado hasta que un administrador lo reactive.',
+    confirmLabel: 'Pausar plan',
+    warning: 'La vigencia no se extenderá automáticamente durante la pausa.',
+  }
+  return {
+    title: 'Confirmar reactivación',
+    description: 'El alumno recuperará el acceso a su plan actual.',
+    confirmLabel: 'Reactivar plan',
+  }
+}
+
+function getMembershipReceiptTitle(kind, nextStatus) {
+  if (kind === 'activate') return 'Plan activado correctamente'
+  if (kind === 'simulate') return 'Pago de prueba aprobado y plan activado'
+  if (kind === 'renew') return 'Plan renovado correctamente'
+  if (kind === 'extend') return 'Plan extendido correctamente'
+  if (nextStatus === 'cancelled') return 'Plan cancelado correctamente'
+  if (nextStatus === 'paused') return 'Plan pausado correctamente'
+  return 'Plan reactivado correctamente'
+}
+
 export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [activeSection, setActiveSection] = useState('overview')
-  const [openModules, setOpenModules] = useState(['inicio', 'clases', 'alumnos'])
+  const [activeModuleId, setActiveModuleId] = useState('inicio')
+  const [openModules, setOpenModules] = useState(['inicio'])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
   const [pendingFocusTarget, setPendingFocusTarget] = useState('')
@@ -158,6 +228,9 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   })
   const [createdCredentials, setCreatedCredentials] = useState(null)
   const [passwordStudent, setPasswordStudent] = useState(null)
+  const [membershipAction, setMembershipAction] = useState(null)
+  const [membershipReceipt, setMembershipReceipt] = useState(null)
+  const [isConfirmingMembership, setIsConfirmingMembership] = useState(false)
   const contentTopRef = useRef(null)
   const createStudentRef = useRef(null)
   const membershipsOverviewRef = useRef(null)
@@ -165,8 +238,10 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const membershipEditRef = useRef(null)
   const membershipHistoryRef = useRef(null)
   const tokenMovementsRef = useRef(null)
+  const membershipReceiptRef = useRef(null)
   const manualReservationRef = useRef(null)
   const scrollTimeoutRef = useRef(null)
+  const highlightTimeoutRef = useRef(null)
   const hasHydratedTextDraftRef = useRef(false)
   const isTextDraftDirtyRef = useRef(false)
 
@@ -202,6 +277,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   useEffect(() => () => {
     if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current)
+    if (highlightTimeoutRef.current) window.clearTimeout(highlightTimeoutRef.current)
   }, [])
 
   const activeMembershipByProfile = useMemo(() => {
@@ -259,7 +335,6 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
   }, [adminData, todayDate])
 
-  const currentModuleId = getAdminModuleId(activeSection)
   const failedDataKeys = useMemo(() => new Set(sectionErrors.map((error) => error.key)), [sectionErrors])
   const hasDataError = useCallback((key) => failedDataKeys.has(key), [failedDataKeys])
   const todayDayOfWeek = getChileDayOfWeek()
@@ -552,7 +627,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     if (!query) return []
 
     return adminNavigationModules
-      .flatMap((module) => module.items.map((item) => ({ ...item, module: module.label })))
+      .flatMap((module) => module.items.map((item) => ({ ...item, module: module.label, moduleId: module.id })))
       .filter((item) => `${item.module} ${item.label} ${item.hint}`.toLowerCase().includes(query))
       .slice(0, 6)
   }, [globalQuery])
@@ -566,19 +641,38 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       'membership-edit': membershipEditRef,
       'membership-history': membershipHistoryRef,
       'token-movements': tokenMovementsRef,
+      'membership-receipt': membershipReceiptRef,
       'manual-reservation': manualReservationRef,
     }
     const targetRef = targetMap[target] ?? contentTopRef
 
     if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current)
     scrollTimeoutRef.current = window.setTimeout(() => {
-      targetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const targetNode = targetRef.current
+      targetNode?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      targetNode?.focus?.({ preventScroll: true })
+      if (targetNode) {
+        targetNode.classList.add('k-admin-target-highlight')
+        if (highlightTimeoutRef.current) window.clearTimeout(highlightTimeoutRef.current)
+        highlightTimeoutRef.current = window.setTimeout(() => {
+          targetNode.classList.remove('k-admin-target-highlight')
+          highlightTimeoutRef.current = null
+        }, 1800)
+      }
       scrollTimeoutRef.current = null
     }, 80)
   }
 
   function navigateAdmin(item) {
+    const resolvedModuleId = item.moduleId
+      ?? adminNavigationModules.find((module) => module.items.some((candidate) => (
+        candidate.id === item.id && (candidate.target ?? '') === (item.target ?? '')
+      )))?.id
+      ?? getAdminModuleId(item.id)
+
     setActiveSection(item.id)
+    setActiveModuleId(resolvedModuleId)
+    setOpenModules([resolvedModuleId])
     setPendingFocusTarget(item.target ?? (item.id === 'create-student' ? 'create-student-form' : 'top'))
     setGlobalQuery('')
   }
@@ -586,8 +680,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   function toggleAdminModule(moduleId) {
     setOpenModules((current) => (
       current.includes(moduleId)
-        ? current.filter((item) => item !== moduleId)
-        : [...current, moduleId]
+        ? []
+        : [moduleId]
     ))
   }
 
@@ -729,11 +823,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     })
   }
 
-  async function saveMembership(event) {
-    event.preventDefault()
-    if (!(await ensureFreshAdmin())) return
+  function openMembershipActivationReview(kind = 'activate') {
+    clearFeedback()
     const selectedPlan = adminData.plans.find((plan) => plan.id === membershipDraft.plan_id)
-    const payload = buildMembershipActivationPayload(membershipDraft, selectedPlan)
+    const reviewDraft = kind === 'simulate' ? { ...membershipDraft, classes_used: 0 } : { ...membershipDraft }
+    const payload = buildMembershipActivationPayload(reviewDraft, selectedPlan)
     const classesTotal = payload.classes_total
     const initialClassesUsed = payload.classes_used
 
@@ -762,16 +856,32 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       return
     }
 
-    const result = await persistMembership(membershipDraft, selectedPlan)
+    const profile = adminData.profiles.find((item) => item.id === payload.profile_id)
+    const copy = getMembershipActionCopy(kind)
+    setMembershipAction({
+      ...copy,
+      kind,
+      draft: reviewDraft,
+      payload,
+      plan: selectedPlan,
+      profile,
+      studentName: profile?.full_name ?? 'Alumno KUPAN',
+      planName: selectedPlan.name,
+      startDate: payload.start_date,
+      endDate: payload.end_date,
+      startDateLabel: formatDate(payload.start_date),
+      endDateLabel: formatDate(payload.end_date),
+      tokenSummary: buildTokenSummary({
+        isUnlimited: selectedPlan.is_unlimited,
+        total: payload.classes_total,
+        used: payload.classes_used,
+      }),
+    })
+  }
 
-    if (!result.success) {
-      showError(`No pudimos crear la membresia: ${result.error?.message ?? 'Error desconocido'}`)
-      return
-    }
-
-    setMembershipDraft(createEmptyMembershipDraft())
-    showSuccess(initialClassesUsed > 0 ? 'Plan activado con tokens ya usados registrados.' : 'Membresía creada correctamente.')
-    await reloadAffectedSections(result.affectedSections)
+  function saveMembership(event) {
+    event.preventDefault()
+    openMembershipActivationReview('activate')
   }
 
   function startEditMembership(membership) {
@@ -839,43 +949,88 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     await reloadAffectedSections(result.affectedSections)
   }
 
-  async function updateMembershipStatus(membership, status) {
-    if (!(await ensureFreshAdmin())) return
-    const result = await persistMembershipStatus(membership, status)
+  function requestMembershipAction(kind, membership, nextStatus = '') {
+    clearFeedback()
+    const profile = adminData.profiles.find((item) => item.id === membership.profile_id) ?? membership.profile
+    const plan = adminData.plans.find((item) => item.id === membership.plan_id) ?? membership.plan
+    const currentTokens = getMembershipTokens({ ...membership, plan })
+    const startDate = kind === 'renew' ? todayDate : membership.start_date
+    const endDate = kind === 'renew'
+      ? addDays(todayDate, 30)
+      : kind === 'extend'
+        ? addDays(membership.end_date, 7)
+        : membership.end_date
+    const usedTokens = kind === 'renew' ? 0 : membership.classes_used ?? 0
+    const totalTokens = plan?.is_unlimited ? null : membership.classes_total ?? currentTokens.total
+    const copy = getMembershipActionCopy(kind, nextStatus)
 
-    if (!result.success) {
-      showError(`No pudimos cambiar estado de membresia: ${result.error?.message ?? 'Error desconocido'}`)
-      return
-    }
-
-    showSuccess(`Membresia actualizada a ${status}.`)
-    await reloadAffectedSections(result.affectedSections)
+    setMembershipAction({
+      ...copy,
+      kind,
+      nextStatus,
+      membership,
+      plan,
+      profile,
+      studentName: profile?.full_name ?? 'Alumno KUPAN',
+      planName: plan?.name ?? 'Plan KUPAN',
+      startDate,
+      endDate,
+      startDateLabel: formatDate(startDate),
+      endDateLabel: formatDate(endDate),
+      tokenSummary: buildTokenSummary({
+        isUnlimited: plan?.is_unlimited,
+        total: totalTokens,
+        used: usedTokens,
+      }),
+    })
   }
 
-  async function renewMembership(membership) {
-    if (!(await ensureFreshAdmin())) return
-    const result = await persistMembershipRenewal(membership)
+  async function confirmMembershipAction() {
+    const action = membershipAction
+    if (!action || isConfirmingMembership) return
 
-    if (!result.success) {
-      showError(`No pudimos renovar la membresia: ${result.error?.message ?? 'Error desconocido'}`)
+    setIsConfirmingMembership(true)
+    if (!(await ensureFreshAdmin())) {
+      setIsConfirmingMembership(false)
+      setMembershipAction(null)
       return
     }
 
-    showSuccess('Plan renovado. Se creo un nuevo ciclo de 30 dias sin acumular tokens anteriores.')
-    await reloadAffectedSections(result.affectedSections)
-  }
+    let result
+    if (action.kind === 'activate') result = await persistMembership(action.draft, action.plan)
+    if (action.kind === 'simulate') result = await persistApprovedPaymentSimulation(action.draft, action.plan)
+    if (action.kind === 'renew') result = await persistMembershipRenewal(action.membership, action.startDate)
+    if (action.kind === 'extend') result = await persistMembershipExtension(action.membership)
+    if (action.kind === 'status') result = await persistMembershipStatus(action.membership, action.nextStatus)
 
-  async function extendMembershipSevenDays(membership) {
-    if (!(await ensureFreshAdmin())) return
-    const result = await persistMembershipExtension(membership)
-
-    if (!result.success) {
-      showError(`No pudimos extender la membresia: ${result.error?.message ?? 'Error desconocido'}`)
+    if (!result?.success) {
+      setIsConfirmingMembership(false)
+      setMembershipAction(null)
+      showError(`No pudimos actualizar el plan: ${result?.error?.message ?? 'Error desconocido'}`)
+      scrollToTarget('top')
       return
     }
 
-    showSuccess('Membresia extendida 7 dias.')
+    const rpcPayload = getRpcPayload(result.data)
+    const isUnlimited = Boolean(action.plan?.is_unlimited) || rpcPayload.classes_total === null
+    const total = Object.hasOwn(rpcPayload, 'classes_total') ? rpcPayload.classes_total : (isUnlimited ? null : action.membership?.classes_total ?? action.payload?.classes_total)
+    const used = Object.hasOwn(rpcPayload, 'classes_used') ? rpcPayload.classes_used : (action.kind === 'renew' ? 0 : action.membership?.classes_used ?? action.payload?.classes_used ?? 0)
+    const available = Object.hasOwn(rpcPayload, 'available_tokens') ? rpcPayload.available_tokens : undefined
+    const finalEndDate = rpcPayload.end_date ?? action.endDate
+
+    setMembershipReceipt({
+      title: getMembershipReceiptTitle(action.kind, action.nextStatus),
+      studentName: action.studentName,
+      planName: action.planName,
+      startDateLabel: formatDate(action.startDate),
+      endDateLabel: formatDate(finalEndDate),
+      tokenSummary: buildTokenSummary({ isUnlimited, total, used, available }),
+    })
+    setMembershipAction(null)
+    if (['activate', 'simulate'].includes(action.kind)) setMembershipDraft(createEmptyMembershipDraft())
     await reloadAffectedSections(result.affectedSections)
+    setIsConfirmingMembership(false)
+    setPendingFocusTarget('membership-receipt')
   }
 
   async function adjustMembershipTokens(membership) {
@@ -1084,31 +1239,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     await reloadAffectedSections(result.affectedSections)
   }
 
-  async function simulateApprovedPayment() {
-    if (!(await ensureFreshAdmin())) return
-    clearFeedback()
-
-    if (!membershipDraft.profile_id || !membershipDraft.plan_id) {
-      showError('Selecciona alumno y plan para simular un pago aprobado.')
-      return
-    }
-
-    const selectedPlan = adminData.plans.find((plan) => plan.id === membershipDraft.plan_id)
-    if (!selectedPlan) {
-      showError('Selecciona un plan válido para simular el pago.')
-      return
-    }
-
-    const result = await persistApprovedPaymentSimulation(membershipDraft, selectedPlan)
-
-    if (!result.success) {
-      showError(`No pudimos simular el pago: ${result.error?.message ?? 'Error desconocido'}`)
-      return
-    }
-
-    showSuccess('Pago simulado aprobado. Membresia activada por 30 dias.')
-    setMembershipDraft(createEmptyMembershipDraft())
-    await reloadAffectedSections(result.affectedSections)
+  function simulateApprovedPayment() {
+    openMembershipActivationReview('simulate')
   }
 
   async function createStudent(event) {
@@ -1236,6 +1368,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           <p className={`mt-3 rounded-lg border p-3 text-sm font-bold text-white ${
             messageType === 'success' ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-kupan-flame/30 bg-kupan-flame/10'
           }`}
+          role="status"
+          aria-live="polite"
           >
             {message}
           </p>
@@ -1295,13 +1429,13 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 	          openModules={openModules}
 	          onToggleModule={toggleAdminModule}
 	          activeSection={activeSection}
-	          activeModuleId={currentModuleId}
+	          activeModuleId={activeModuleId}
 	          onNavigate={navigateAdmin}
 	          isCollapsed={isSidebarCollapsed}
 	          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
         />
 
-        <div ref={contentTopRef} className="min-w-0 space-y-5 scroll-mt-28">
+        <div ref={contentTopRef} className="min-w-0 space-y-5 scroll-mt-28 outline-none" tabIndex={-1}>
           <div className="k-card p-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
@@ -1314,7 +1448,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
                 <QuickActionButton label="Nuevo alumno" icon="NA" primary onClick={() => navigateAdmin({ id: 'create-student', target: 'create-student-form' })} />
                 <QuickActionButton label="Membresia" icon="ME" onClick={() => navigateAdmin({ id: 'memberships', target: 'membership-activate' })} />
                 <QuickActionButton label="Reservas" icon="RE" onClick={() => navigateAdmin({ id: 'reservations' })} />
-                <QuickActionButton label="Modo Coach" icon="CO" onClick={() => setActivePage('coach')} />
+                <QuickActionButton label="Modo Coach" icon="MC" onClick={() => setActivePage('coach')} />
               </div>
             </div>
 
@@ -1417,6 +1551,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
             edit: membershipEditRef,
             history: membershipHistoryRef,
             tokenMovements: tokenMovementsRef,
+            receipt: membershipReceiptRef,
           }}
           draft={membershipDraft}
           editDraft={membershipEditDraft}
@@ -1427,6 +1562,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           isSavingActivation={isSavingMembership}
           isSavingEdit={isSavingMembershipEdit}
           isSimulatingPayment={isSimulatingPayment}
+          receipt={membershipReceipt}
           actions={{
             setDraft: setMembershipDraft,
             setEditDraft: setMembershipEditDraft,
@@ -1434,12 +1570,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
             saveEdit: saveMembershipEdit,
             closeEdit: () => setMembershipEditDraft(createEmptyMembershipEditDraft()),
             simulatePayment: simulateApprovedPayment,
-            renew: renewMembership,
+            requestAction: requestMembershipAction,
             adjustTokens: adjustMembershipTokens,
-            updateStatus: updateMembershipStatus,
-            extendSevenDays: extendMembershipSevenDays,
             startEdit: startEditMembership,
             prepareActivation: prepareMembershipActivation,
+            dismissReceipt: () => setMembershipReceipt(null),
           }}
           formatDate={formatDate}
           addDays={addDays}
@@ -1541,7 +1676,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 	      </div>
       <AdminMobileModuleNav
         modules={adminNavigationModules}
-        activeModuleId={currentModuleId}
+        activeModuleId={activeModuleId}
         onNavigate={navigateAdmin}
       />
       <div className="fixed bottom-5 right-4 z-30 hidden gap-2 lg:grid">
@@ -1551,7 +1686,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           onClick={() => navigateAdmin({ id: 'create-student', target: 'create-student-form' })}
           aria-label="Crear alumno rapido"
         >
-          NA
+          <AdminIcon code="NA" className="h-5 w-5" />
         </button>
         <button
           type="button"
@@ -1559,7 +1694,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           onClick={() => navigateAdmin({ id: 'memberships', target: 'membership-activate' })}
           aria-label="Activar membresia rapido"
         >
-          ME
+          <AdminIcon code="ME" className="h-5 w-5" />
         </button>
       </div>
       <AdminPasswordModal
@@ -1567,6 +1702,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         student={passwordStudent}
         onClose={() => setPasswordStudent(null)}
         onSuccess={() => showSuccess('Gestión de contraseña actualizada.')}
+      />
+      <AdminMembershipActionDialog
+        action={membershipAction}
+        isSaving={isConfirmingMembership}
+        onClose={() => setMembershipAction(null)}
+        onConfirm={confirmMembershipAction}
       />
     </div>
   )

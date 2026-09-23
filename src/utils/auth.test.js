@@ -8,7 +8,7 @@ const appRoot = process.cwd()
 const authSource = readFileSync(join(appRoot, 'src/pages/Auth.jsx'), 'utf8')
 const authUtilsSource = readFileSync(join(appRoot, 'src/utils/auth.js'), 'utf8')
 
-assert.match(authSource, /Olvidé mi contraseña/, 'login debe mostrar recuperación visible')
+assert.match(authSource, /Olvidaste tu contraseña/, 'login debe mostrar recuperación visible')
 assert.match(authSource, /Enviar enlace de recuperación/, 'recuperación debe tener una acción clara')
 assert.match(authSource, /Reintentar/, 'errores recuperables deben ofrecer reintento')
 assert.match(authUtilsSource, /resetPasswordForEmail/, 'recuperación debe usar Supabase Auth')

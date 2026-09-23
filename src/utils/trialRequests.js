@@ -1,15 +1,26 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { gymConfig } from '../config/gymConfig.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
+import { ENHANCED_SCHEDULE_FIELDS, isMissingOptionalScheduleColumn, LEGACY_SCHEDULE_FIELDS } from './scheduleCompatibility.js'
 
 export async function loadTrialSchedules() {
   if (!isSupabaseConfigured || !supabase) return { ok: false, message: 'El servicio no está disponible en este momento.', schedules: [] }
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('class_schedule')
-    .select('id, day_of_week, time, end_time, class_name, coach, is_open_access, unlimited_capacity')
+    .select(ENHANCED_SCHEDULE_FIELDS)
     .eq('active', true)
     .order('day_of_week')
     .order('time')
+  if (isMissingOptionalScheduleColumn(error)) {
+    const legacyResult = await supabase
+      .from('class_schedule')
+      .select(LEGACY_SCHEDULE_FIELDS)
+      .eq('active', true)
+      .order('day_of_week')
+      .order('time')
+    data = legacyResult.data
+    error = legacyResult.error
+  }
   if (error) {
     logAppError('trial.load_schedules', error)
     return { ok: false, message: getHumanErrorMessage(error, 'No pudimos cargar los horarios disponibles.'), schedules: [] }

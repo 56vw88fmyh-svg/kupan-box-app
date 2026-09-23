@@ -2,6 +2,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { defaultAdminContent, defaultAppText } from './adminContent.js'
 import { getPaymentUrlForPlan } from '../data/paymentLinks.js'
 import { gymConfig } from '../config/gymConfig.js'
+import { ENHANCED_SCHEDULE_FIELDS, isMissingOptionalScheduleColumn, LEGACY_SCHEDULE_FIELDS } from './scheduleCompatibility.js'
 import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from './classSchedule.js'
 
 const dayMap = {
@@ -165,12 +166,30 @@ function mapAppText(settings) {
   return appText
 }
 
+async function loadSharedSchedule() {
+  const enhanced = await supabase
+    .from('class_schedule')
+    .select(ENHANCED_SCHEDULE_FIELDS)
+    .eq('active', true)
+    .order('day_of_week')
+    .order('time')
+
+  if (!isMissingOptionalScheduleColumn(enhanced.error)) return enhanced
+
+  return supabase
+    .from('class_schedule')
+    .select(LEGACY_SCHEDULE_FIELDS)
+    .eq('active', true)
+    .order('day_of_week')
+    .order('time')
+}
+
 export async function loadSharedContent() {
   if (!isSupabaseConfigured || !supabase) return defaultAdminContent
 
   const [wod, schedule, plans, posts, settings] = await Promise.all([
     supabase.from('wod').select('id, date, title, warmup, strength, workout, time_cap, notes').order('date', { ascending: false }).limit(1).maybeSingle(),
-    supabase.from('class_schedule').select('id, day_of_week, time, end_time, class_name, coach, max_spots, is_open_access, unlimited_capacity, active').eq('active', true).order('day_of_week').order('time'),
+    loadSharedSchedule(),
     supabase.from('plans').select('id, name, price, classes_per_week, is_unlimited, active').eq('active', true).order('price'),
     supabase.from('community_posts').select('id, type, title, content, event_date, active, created_at').eq('active', true).order('created_at', { ascending: false }),
     supabase.from('app_settings').select('key, value'),

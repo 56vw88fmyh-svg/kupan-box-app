@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v30'
+const CACHE_VERSION = 'v32'
 const HOST_CACHE_PREFIX = `wl-${self.location.hostname.replace(/[^a-z0-9-]/gi, '-')}`
 const STATIC_CACHE = `${HOST_CACHE_PREFIX}-static-${CACHE_VERSION}`
 const HTML_CACHE = `${HOST_CACHE_PREFIX}-html-${CACHE_VERSION}`
@@ -8,6 +8,7 @@ const APP_SHELL = [
 ]
 
 const PRIVATE_PATTERNS = [
+  '/nomina',
   'supabase.co',
   '/auth/v1/',
   '/rest/v1/',

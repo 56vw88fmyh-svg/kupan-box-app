@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button, Card } from './ui/index.js'
 import { gymConfig } from '../config/gymConfig.js'
 
-export function PwaUpdateBanner() {
+export function PwaUpdateBanner({ keepAboveModeNavigation = false }) {
   const [waitingWorker, setWaitingWorker] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showBanner, setShowBanner] = useState(false)
@@ -104,7 +104,7 @@ export function PwaUpdateBanner() {
   if (!showBanner && !isOffline) return null
 
   return (
-    <Card className="fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-5xl p-3 backdrop-blur-2xl sm:bottom-5" variant="elevated">
+    <Card className={`fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-5xl p-3 backdrop-blur-2xl ${keepAboveModeNavigation ? 'lg:bottom-5' : 'sm:bottom-5'}`} variant="elevated">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-black uppercase text-white">
@@ -117,9 +117,14 @@ export function PwaUpdateBanner() {
           </p>
         </div>
         {showBanner ? (
-          <Button className="shrink-0" isLoading={isRefreshing} loadingLabel="Actualizando" size="sm" onClick={updateApp}>
-            Actualizar ahora
-          </Button>
+          <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+            <Button size="sm" variant="tertiary" onClick={() => setShowBanner(false)}>
+              Ahora no
+            </Button>
+            <Button className="shrink-0" isLoading={isRefreshing} loadingLabel="Actualizando" size="sm" onClick={updateApp}>
+              Actualizar ahora
+            </Button>
+          </div>
         ) : null}
       </div>
     </Card>

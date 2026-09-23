@@ -1,6 +1,7 @@
 import { SectionTitle } from '../SectionTitle.jsx'
+import { AdminIcon } from './AdminIcon.jsx'
 
-export function Field({ label, value, onChange, type = 'text', required = false }) {
+export function Field({ label, value, onChange, type = 'text', required = false, readOnly = false }) {
   return (
     <label className="block">
       <span className="text-xs font-black uppercase text-white/60">{label}</span>
@@ -9,6 +10,7 @@ export function Field({ label, value, onChange, type = 'text', required = false 
         type={type}
         value={value ?? ''}
         required={required}
+        readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
       />
     </label>
@@ -115,16 +117,17 @@ export function AdminSidebar({ modules, openModules, onToggleModule, activeSecti
                 className={`flex min-h-12 w-full items-center gap-3 px-3 text-left transition ${moduleHasActive ? 'text-white' : 'text-white/70 hover:text-white'}`}
                 onClick={() => onToggleModule(module.id)}
                 aria-expanded={isOpen}
+                aria-controls={`admin-module-${module.id}`}
               >
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[0.62rem] font-black ${moduleHasActive ? 'bg-kupan-ember text-white' : 'bg-white/10 text-white/70'}`}>
-                  {module.icon}
+                  <AdminIcon code={module.icon} className="h-4 w-4" />
                 </span>
                 <span className={`min-w-0 flex-1 text-sm font-black uppercase ${isCollapsed ? 'lg:hidden' : ''}`}>{module.label}</span>
                 <span className={`text-xs font-black transition ${isOpen ? 'rotate-90' : ''} ${isCollapsed ? 'lg:hidden' : ''}`}>{'>'}</span>
               </button>
 
               {isOpen ? (
-                <div className={`space-y-1 px-2 pb-2 ${isCollapsed ? 'lg:hidden' : ''}`}>
+                <div id={`admin-module-${module.id}`} className={`space-y-1 px-2 pb-2 ${isCollapsed ? 'lg:hidden' : ''}`}>
                   {module.items.map((item) => {
                     const isActive = item.id === activeSection
                     return (
@@ -134,7 +137,7 @@ export function AdminSidebar({ modules, openModules, onToggleModule, activeSecti
                         className={`w-full rounded-md px-3 py-2 text-left transition ${
                           isActive ? 'bg-kupan-ember/95 text-white shadow-glow' : 'text-white/60 hover:bg-white/10 hover:text-white'
                         }`}
-                        onClick={() => onNavigate(item)}
+                        onClick={() => onNavigate({ ...item, moduleId: module.id })}
                       >
                         <span className="block text-xs font-black uppercase">{item.label}</span>
                         <span className="mt-0.5 block text-[0.68rem] font-bold text-white/45">{item.hint}</span>
@@ -160,7 +163,9 @@ export function QuickActionButton({ label, icon, onClick, primary = false }) {
       }`}
       onClick={onClick}
     >
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-[0.62rem]">{icon}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/10 text-[0.62rem]">
+        <AdminIcon code={icon} className="h-4 w-4" />
+      </span>
       <span>{label}</span>
     </button>
   )

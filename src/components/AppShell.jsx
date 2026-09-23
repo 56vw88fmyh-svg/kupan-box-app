@@ -17,8 +17,9 @@ async function forceAppUpdate() {
   window.location.reload()
 }
 
-export function AppShell({ title, eyebrow, children, currentUser }) {
+export function AppShell({ title, eyebrow, children, currentUser, variant = 'app' }) {
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine))
+  const isAuthLayout = variant === 'auth'
 
   useEffect(() => {
     function updateOnlineState() {
@@ -34,8 +35,8 @@ export function AppShell({ title, eyebrow, children, currentUser }) {
   }, [])
 
   return (
-    <div className="k-app-shell overflow-x-hidden text-kupan-bone">
-      <header className="k-app-header sticky top-0 z-20 border-b border-white/10 bg-kupan-black/90 px-4 pb-3 backdrop-blur-2xl">
+    <div className={`${isAuthLayout ? 'k-auth-shell' : 'k-app-shell'} overflow-x-hidden text-kupan-bone`}>
+      {!isAuthLayout ? <header className="k-app-header sticky top-0 z-20 border-b border-white/10 bg-kupan-black/90 px-4 pb-3 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="max-w-[11rem] break-words text-[0.68rem] font-black uppercase leading-4 tracking-[0.18em] text-kupan-sand sm:max-w-none">{eyebrow}</p>
@@ -48,22 +49,22 @@ export function AppShell({ title, eyebrow, children, currentUser }) {
             </div>
           </div>
         </div>
-      </header>
-      <main className="k-app-main mx-auto max-w-5xl py-4 sm:px-4 sm:py-5">
+      </header> : null}
+      <main className={isAuthLayout ? 'k-auth-main' : 'k-app-main mx-auto max-w-5xl py-4 sm:px-4 sm:py-5'}>
         {!isOnline ? (
-          <div className="mb-4 rounded-xl border border-kupan-warning/40 bg-kupan-warning/10 p-3 text-sm font-bold leading-6 text-white">
+          <div className={`${isAuthLayout ? 'k-auth-offline' : 'mb-4'} rounded-xl border border-kupan-warning/40 bg-kupan-warning/10 p-3 text-sm font-bold leading-6 text-white`}>
             Estás sin conexión. Puedes seguir revisando lo visible; los cambios se sincronizarán cuando vuelva internet.
           </div>
         ) : null}
         {children}
-        <div className="mt-8 flex flex-col items-center justify-center gap-2 text-center">
+        {!isAuthLayout ? <div className="mt-8 flex flex-col items-center justify-center gap-2 text-center">
           <p className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-white/30">
             {gymConfig.identity.name} App v2.1.2
           </p>
           <button type="button" className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-kupan-sand" onClick={forceAppUpdate}>
             Actualizar app
           </button>
-        </div>
+        </div> : null}
       </main>
     </div>
   )

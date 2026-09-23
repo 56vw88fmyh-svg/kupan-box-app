@@ -10,6 +10,7 @@ const statusClasses = {
 export function Input({
   className = '',
   disabled = false,
+  endAdornment = null,
   error = '',
   helpText = '',
   icon = null,
@@ -41,6 +42,7 @@ export function Input({
           className={cn(
             'min-h-12 w-full rounded-xl border bg-kupan-black/45 px-4 py-3 text-base font-bold text-kupan-bone outline-none transition placeholder:text-white/55 disabled:cursor-not-allowed disabled:opacity-55',
             icon ? 'pl-10' : '',
+            endAdornment ? 'pr-14' : '',
             statusClasses[status],
             className,
           )}
@@ -50,6 +52,7 @@ export function Input({
           required={required}
           {...props}
         />
+        {endAdornment ? <span className="absolute inset-y-0 right-1 flex items-center">{endAdornment}</span> : null}
       </div>
       {error ? <p id={errorId} className="mt-2 text-sm font-bold leading-5 text-kupan-red">{error}</p> : null}
       {!error && success ? <p id={helpId} className="mt-2 text-sm font-bold leading-5 text-kupan-success">{success}</p> : null}

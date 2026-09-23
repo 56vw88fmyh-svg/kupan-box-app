@@ -42,3 +42,8 @@ for (const moduleName of moduleNames) {
     )
   }
 }
+
+const membershipsSource = readFileSync(join(moduleRoot, 'AdminMembershipsModule.jsx'), 'utf8')
+assert.match(membershipsSource, /Gestionar plan/, 'Membresías debe agrupar acciones secundarias en un menú claro')
+assert.match(membershipsSource, /actions\.requestAction\('renew'/, 'Renovar debe pasar por la revisión previa')
+assert.match(membershipsSource, /aria-live="polite"/, 'El comprobante de membresía debe anunciarse como resultado dinámico')

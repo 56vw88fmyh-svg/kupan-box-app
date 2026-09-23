@@ -9,10 +9,10 @@ export function MotionPage({ children }) {
   )
 }
 
-export function MotionCard({ children, className = '', as: Component = 'div' }) {
+export function MotionCard({ children, className = '', as: Component = 'div', ...props }) {
   return createElement(
     Component,
-    { className: cn('animate-page-enter transition duration-200 hover:-translate-y-0.5', className) },
+    { ...props, className: cn('animate-page-enter transition duration-200 hover:-translate-y-0.5', className) },
     children,
   )
 }

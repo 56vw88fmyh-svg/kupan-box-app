@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase.js'
 import { logAppError } from '../../utils/appState.js'
 import { buildSchedulePayload } from '../../utils/adminMutationBuilders.js'
+import { buildLegacySchedulePayload, isMissingOptionalScheduleColumn } from '../../utils/scheduleCompatibility.js'
 import { createMutationResult, useAdminMutationState } from './useAdminMutationState.js'
 
 export function useAdminSchedule({ supabaseClient = supabase, logError = logAppError } = {}) {
@@ -12,7 +13,17 @@ export function useAdminSchedule({ supabaseClient = supabase, logError = logAppE
       const mutation = scheduleDraft.id
         ? supabaseClient.from('class_schedule').update(payload).eq('id', scheduleDraft.id)
         : supabaseClient.from('class_schedule').insert(payload)
-      const { data, error } = await mutation
+      let { data, error } = await mutation
+
+      if (isMissingOptionalScheduleColumn(error)) {
+        const legacyPayload = buildLegacySchedulePayload(payload)
+        const legacyMutation = scheduleDraft.id
+          ? supabaseClient.from('class_schedule').update(legacyPayload).eq('id', scheduleDraft.id)
+          : supabaseClient.from('class_schedule').insert(legacyPayload)
+        const legacyResult = await legacyMutation
+        data = legacyResult.data
+        error = legacyResult.error
+      }
 
       if (error) {
         logError('admin.schedule.save', error, { scheduleId: scheduleDraft.id || null })

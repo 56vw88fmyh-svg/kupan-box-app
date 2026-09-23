@@ -15,7 +15,7 @@ export function AdminMembershipEditForm({
   const isDisabled = disabled || isSubmitting
 
   return (
-    <form ref={formRef} className="k-panel grid scroll-mt-28 gap-3 border-kupan-ember/40 bg-kupan-ember/10 p-4 sm:grid-cols-2" onSubmit={onSubmit}>
+    <form ref={formRef} className="k-panel grid scroll-mt-28 gap-3 border-kupan-ember/40 bg-kupan-ember/10 p-4 outline-none sm:grid-cols-2" onSubmit={onSubmit} tabIndex={-1}>
       <div className="sm:col-span-2">
         <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Editar membresia</p>
         <p className="mt-1 text-sm leading-6 text-white/60">Cambia plan, pausa, cancela, reactiva, extiende vencimiento o actualiza observaciones.</p>

@@ -46,6 +46,11 @@ for (const hookFile of hookFiles) {
 const membershipsHookSource = readFileSync(join(hooksRoot, 'useAdminMemberships.js'), 'utf8')
 assert.match(
   membershipsHookSource,
+  /renewMembership\(membership, startDate\)[\s\S]*start_date_input: startDate/,
+  'La renovación debe enviar una fecha explícita para que el comprobante coincida con el ciclo guardado',
+)
+assert.match(
+  membershipsHookSource,
   /simulateApprovedPayment[\s\S]*rpc\('admin_activate_membership'/,
   'La simulación de pago debe activar la membresía con el RPC administrativo disponible en FITTEST',
 )

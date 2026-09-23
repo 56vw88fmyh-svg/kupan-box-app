@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { BottomNav } from './components/BottomNav.jsx'
 import { AppShell } from './components/AppShell.jsx'
@@ -35,6 +35,7 @@ export default function App() {
   const [appContent, setAppContent] = useState(defaultAdminContent)
   const [currentUser, setCurrentUser] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const hasLoadedSharedContent = useRef(false)
   const page = useMemo(() => getRouteMeta(location.pathname), [location.pathname])
 
   function goToPage(pageId) {
@@ -119,7 +120,12 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (hasLoadedSharedContent.current) return undefined
+    if (!authChecked) return undefined
+    if (!currentUser && ['/', '/login', '/admin', '/coach'].includes(location.pathname)) return undefined
+
     let isMounted = true
+    hasLoadedSharedContent.current = true
 
     loadSharedContent().then((content) => {
       if (isMounted) setAppContent(content)
@@ -128,7 +134,7 @@ export default function App() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [authChecked, currentUser, location.pathname])
 
   useEffect(() => {
     const shortcut = new window.URLSearchParams(location.search).get('shortcut')
@@ -153,17 +159,29 @@ export default function App() {
   const mustChangePassword = Boolean(
     currentUser?.forcePasswordChange && !['/cambio-password-obligatorio', '/login'].includes(location.pathname),
   )
+  const isAuthSurface = location.pathname === '/login' && !currentUser
+  const isAdminSurface = location.pathname === '/admin'
+  const isCheckingGuestEntry = location.pathname === '/' && !authChecked
 
   return (
-    <AppShell title={page.title} eyebrow={page.eyebrow} currentUser={currentUser}>
-      {isLoading ? <LoadingScreen /> : null}
+    <AppShell title={page.title} eyebrow={page.eyebrow} currentUser={currentUser} variant={isAuthSurface ? 'auth' : 'app'}>
+      {isLoading || isCheckingGuestEntry ? <LoadingScreen /> : null}
       <MotionPage key={location.pathname}>
         <Suspense fallback={<div className="k-card p-5 text-sm font-bold uppercase text-white/60">Cargando {gymConfig.identity.name}...</div>}>
           {mustChangePassword ? (
             <Navigate to="/cambio-password-obligatorio" replace />
           ) : (
             <Routes location={location}>
-                <Route path="/" element={<Home setActivePage={goToPage} appContent={appContent} currentUser={currentUser} />} />
+                <Route
+                  path="/"
+                  element={(
+                    !authChecked
+                      ? null
+                      : currentUser
+                        ? <Home setActivePage={goToPage} appContent={appContent} currentUser={currentUser} />
+                        : <Navigate to="/login" replace />
+                  )}
+                />
                 {routeAliases.map((alias) => <Route key={alias.from} path={alias.from} element={<Navigate to={alias.to} replace />} />)}
                 <Route
                   path="/reservas"
@@ -188,7 +206,7 @@ export default function App() {
                 <Route path="/wod/pr" element={gymConfig.features.wod ? <PersonalRecords currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />
                 <Route path="/ranking" element={gymConfig.features.community && gymConfig.features.wod ? <Ranking /> : <Navigate to="/" replace />} />
                 <Route path="/comunidad/ranking" element={gymConfig.features.community && gymConfig.features.wod ? <Ranking /> : <Navigate to="/" replace />} />
-                <Route path="/login" element={<Auth onLogin={login} onRegister={register} />} />
+                <Route path="/login" element={authChecked && currentUser ? <Navigate to="/perfil" replace /> : <Auth onLogin={login} onRegister={register} />} />
                 <Route path="/actualizar-password" element={<PasswordUpdate currentUser={currentUser} onUserUpdate={setCurrentUser} />} />
                 <Route
                   path="/cambio-password-obligatorio"
@@ -221,8 +239,8 @@ export default function App() {
           )}
         </Suspense>
       </MotionPage>
-      <PwaUpdateBanner />
-      <BottomNav currentUser={currentUser} />
+      {!isAuthSurface ? <PwaUpdateBanner keepAboveModeNavigation={isAdminSurface} /> : null}
+      {!isAuthSurface && !isAdminSurface ? <BottomNav currentUser={currentUser} /> : null}
     </AppShell>
   )
 }

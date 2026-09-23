@@ -1,7 +1,7 @@
 const SESSION_PATTERNS = ['jwt', 'session', 'refresh token', 'auth session', 'expired']
 const PERMISSION_PATTERNS = ['permission denied', 'not authorized', 'row-level', 'rls', 'policy', 'violates row-level']
 const OFFLINE_PATTERNS = ['failed to fetch', 'network', 'offline', 'load failed', 'timeout', 'abort']
-const DELETED_PATTERNS = ['not found', 'no rows', 'deleted', 'does not exist']
+const DELETED_PATTERNS = ['not found', 'no rows', 'deleted']
 
 function normalizeErrorText(error) {
   if (!error) return ''
