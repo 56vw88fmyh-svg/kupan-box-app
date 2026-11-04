@@ -38,7 +38,7 @@ export function createEmptyMembershipEditDraft() {
 }
 
 export function createEmptyWodDraft() {
-  return { date: new Date().toISOString().slice(0, 10), title: '', warmup: '', strength: '', workout: '', time_cap: '', notes: '' }
+  return { date: new Date().toISOString().slice(0, 10), training_details: { scaling: [], skill: '', cooldown: '', type: '' }, title: '', warmup: '', strength: '', workout: '', time_cap: '', notes: '' }
 }
 
 export function createEmptyScheduleDraft() {

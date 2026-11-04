@@ -1,0 +1,12 @@
+<!doctype html><html lang="es"><body><div id="root"></div><script type="module">
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import {AdminWodForm} from '/src/components/admin/forms/AdminWodForm.jsx';
+import {Wod} from '/src/pages/Wod.jsx';
+import {ToastProvider} from '/src/components/ui/Toast.jsx';
+const {useState}=React;
+function Harness(){const [draft,setDraft]=useState({date:'2026-11-04',title:'Test',warmup:'',strength:'',workout:'Base',notes:'',time_cap:'10',training_details:{scaling:[]}});const [athlete,setAthlete]=useState(false);
+return React.createElement(ToastProvider,null,athlete ? React.createElement(Wod,{appContent:{},currentUser:null}) : React.createElement('div',null,
+React.createElement(AdminWodForm,{draft,onDraftChange:setDraft,onSubmit:e=>e.preventDefault()}),React.createElement('pre',{id:'draft'},JSON.stringify(draft)),React.createElement('button',{onClick:()=>setAthlete(true)},'Ver atleta')));}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Harness));
+</script></body></html>

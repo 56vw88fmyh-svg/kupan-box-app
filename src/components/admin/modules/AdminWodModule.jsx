@@ -70,7 +70,10 @@ export function AdminWodModule({
       ) : null}
       <AdminWodForm draft={draft} onDraftChange={onDraftChange} onSubmit={onSave} isSubmitting={isSaving} />
       {wodItems.map((item) => (
-        <SmallRow key={item.id} title={item.title || 'WOD KUPAN'} meta={formatDate(item.date)} detail={item.time_cap || item.workout} />
+        <div key={item.id}>
+          <SmallRow title={item.title || 'WOD KUPAN'} meta={formatDate(item.date)} detail={item.time_cap || item.workout} />
+          <button type="button" className="k-button-secondary mt-2" onClick={() => onDraftChange({ ...item, training_details: item.training_details ?? { scaling: [] } })}>Editar programación · {formatDate(item.date)}</button>
+        </div>
       ))}
     </AdminSection>
   )

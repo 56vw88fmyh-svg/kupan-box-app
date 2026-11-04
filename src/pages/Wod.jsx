@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Input, LoadingState, useToast } from '../components/ui/index.js'
-import { createPersonalRecord, getPersonalRecordHistory } from '../services/personalRecordsService.ts'
+import { createPersonalRecord, getWorkoutResultHistory } from '../services/personalRecordsService.ts'
 import { formatChileDisplayDate, loadTodaysWod } from '../utils/communityFeed.js'
+
+import { buildResultInput, isBetterResult, resultContext } from '../utils/workoutResults.js'
 
 const LEVEL_STORAGE_KEY = 'kupan_wod_selected_level_v1'
 const levelOptions = ['Iniciado', 'Rookie', 'Scaled', 'RX']
@@ -48,7 +50,7 @@ function getStrengthLines(value) {
 
 function normalizeWod(rawWod, fallbackWod) {
   if (!rawWod) return null
-  const sameFallback = fallbackWod?.title && fallbackWod.title === rawWod.title
+  const sameFallback = fallbackWod?.id && fallbackWod.id === rawWod.id
   const fallbackScaling = sameFallback && Array.isArray(fallbackWod.scaling) ? fallbackWod.scaling : []
 
   return {
@@ -71,7 +73,7 @@ function normalizeWod(rawWod, fallbackWod) {
 
 function wodHasContent(wod) {
   if (!wod || wod.isHidden) return false
-  return ['warmup', 'skill', 'strength', 'workout', 'cooldown', 'notes'].some((key) => wod[key]?.length > 0)
+  return wod.scaling?.some(plan => plan.items?.length) || ['warmup', 'skill', 'strength', 'workout', 'cooldown', 'notes'].some((key) => wod[key]?.length > 0)
 }
 
 function getLevelPlan(wod, selectedLevel) {
@@ -97,72 +99,6 @@ function buildWodSections(wod, selectedLevel) {
     { id: 'cooldown', title: 'Vuelta a la calma', duration: wod.cooldownDuration, items: wod.cooldown },
     { id: 'notes', title: 'Notas del coach', items: wod.notes },
   ].filter((section) => section.description || section.items?.length > 0)
-}
-
-function parsePositiveNumber(value) {
-  if (value === '' || value === null || value === undefined) return null
-  const number = Number(String(value).replace(',', '.'))
-  return Number.isFinite(number) && number > 0 ? number : null
-}
-
-function parseTimeToSeconds(value) {
-  const text = String(value ?? '').trim()
-  if (!text) return null
-  const parts = text.split(':').map((part) => Number(part))
-  if (parts.length === 1) return parsePositiveNumber(parts[0])
-  if (parts.length === 2 && parts.every(Number.isFinite)) return parts[0] * 60 + parts[1]
-  if (parts.length === 3 && parts.every(Number.isFinite)) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-  return null
-}
-
-function buildResultInput(wod, selectedLevel, draft) {
-  const movement = `WOD: ${wod.title}`
-  const notes = [
-    `Resultado WOD ${wod.date}`,
-    `Nivel ${selectedLevel}`,
-    draft.notes?.trim() ? draft.notes.trim() : '',
-  ].filter(Boolean).join(' · ')
-
-  if (draft.type === 'time') {
-    const seconds = parseTimeToSeconds(draft.time)
-    if (!seconds) return { ok: false, message: 'Ingresa un tiempo válido. Puedes usar 12:35 o segundos.' }
-    return { ok: true, value: { movement, value: seconds, unit: 'tiempo', recordDate: wod.date, notes, timeSeconds: seconds } }
-  }
-
-  if (draft.type === 'rounds_reps') {
-    const rounds = parsePositiveNumber(draft.rounds)
-    const reps = draft.reps === '' ? 0 : parsePositiveNumber(draft.reps)
-    if (!rounds || reps === null) return { ok: false, message: 'Ingresa rondas y repeticiones válidas.' }
-    return { ok: true, value: { movement, value: rounds, unit: 'reps', recordDate: wod.date, notes, rounds, reps } }
-  }
-
-  if (draft.type === 'load') {
-    const load = parsePositiveNumber(draft.load)
-    if (!load) return { ok: false, message: 'Ingresa una carga válida en kilos.' }
-    return { ok: true, value: { movement, value: load, unit: 'kg', recordDate: wod.date, notes } }
-  }
-
-  if (draft.type === 'distance') {
-    const distance = parsePositiveNumber(draft.distance)
-    if (!distance) return { ok: false, message: 'Ingresa una distancia válida en metros.' }
-    return { ok: true, value: { movement, value: distance, unit: 'metros', recordDate: wod.date, notes } }
-  }
-
-  const calories = parsePositiveNumber(draft.calories)
-  if (!calories) return { ok: false, message: 'Ingresa calorías válidas.' }
-  return { ok: true, value: { movement, value: calories, unit: 'calorias', recordDate: wod.date, notes } }
-}
-
-function isBetterResult(input, record) {
-  if (!record) return true
-  if (input.unit === 'tiempo') return Number(input.value) < Number(record.value)
-  if (input.rounds !== undefined || input.reps !== undefined) {
-    const inputRounds = Number(input.rounds ?? Math.floor(Number(input.value)))
-    const recordRounds = Number(record.rounds ?? Math.floor(Number(record.value)))
-    if (inputRounds !== recordRounds) return inputRounds > recordRounds
-    return Number(input.reps ?? 0) > Number(record.reps ?? 0)
-  }
-  return Number(input.value) > Number(record.value)
 }
 
 function ResultFields({ draft, onChange }) {
@@ -278,6 +214,7 @@ export function Wod({ appContent, currentUser, setActivePage }) {
   const [isResultOpen, setIsResultOpen] = useState(false)
   const [isSubmittingResult, setIsSubmittingResult] = useState(false)
   const [resultMessage, setResultMessage] = useState('')
+  const [savedResults, setSavedResults] = useState([])
   const [resultDraft, setResultDraft] = useState(emptyResultDraft)
 
   useEffect(() => {
@@ -304,6 +241,15 @@ export function Wod({ appContent, currentUser, setActivePage }) {
   const levelPlan = getLevelPlan(wod, selectedLevel)
   const canUseAdminMode = ['admin', 'coach'].includes(currentUser?.role)
 
+  useEffect(() => {
+    let active = true
+    if (!wod || !currentUser) return undefined
+    getWorkoutResultHistory(resultContext(wod, selectedLevel, resultDraft.type)).then(result => {
+      if (active) setSavedResults(result.ok ? result.data ?? [] : [])
+    })
+    return () => { active = false }
+  }, [wod, currentUser, selectedLevel, resultDraft.type, isResultOpen])
+
   function handleLevelChange(level) {
     setSelectedLevel(level)
     saveLevel(level)
@@ -328,21 +274,15 @@ export function Wod({ appContent, currentUser, setActivePage }) {
     }
 
     setIsSubmittingResult(true)
-    const history = await getPersonalRecordHistory(input.value.movement)
-    if (!history.ok && history.status === 'unauthenticated') {
+    input.value.resultContext = resultContext(wod, selectedLevel, resultDraft.type)
+    const history = await getWorkoutResultHistory(input.value.resultContext)
+    if (!history.ok && history.status !== 'offline') {
       setIsSubmittingResult(false)
-      setResultMessage('Tu sesión expiró. Inicia sesión nuevamente.')
+      setResultMessage(history.message)
       return
     }
 
     const previousRecords = history.data ?? []
-    const duplicate = previousRecords.some((record) => record.record_date === wod.date && record.unit === input.value.unit)
-    if (duplicate) {
-      setIsSubmittingResult(false)
-      setResultMessage('Ya registraste un resultado de este tipo para el WOD de hoy.')
-      return
-    }
-
     const sameUnitRecords = previousRecords.filter((record) => record.unit === input.value.unit)
     const bestRecord = sameUnitRecords.find((record) => sameUnitRecords.every((candidate) => !isBetterResult(candidate, record)))
     const isNewPr = isBetterResult(input.value, bestRecord)
@@ -362,8 +302,8 @@ export function Wod({ appContent, currentUser, setActivePage }) {
 
     showToast({
       type: 'success',
-      title: isNewPr ? 'Nuevo PR registrado' : 'Resultado registrado',
-      description: isNewPr ? 'Buena. Este resultado supera tu marca anterior.' : 'Tu resultado quedó guardado.',
+      title: isNewPr && bestRecord ? 'Mejor resultado comparable' : 'Resultado registrado',
+      description: isNewPr && bestRecord ? 'Buena. Este resultado supera tu marca anterior del mismo nivel.' : 'Tu resultado quedó guardado.',
     })
     setResultDraft(emptyResultDraft)
     setResultMessage('')
@@ -438,6 +378,10 @@ export function Wod({ appContent, currentUser, setActivePage }) {
         </>
       ) : null}
 
+      {savedResults.length ? <Card className="p-5">
+        <h2 className="text-xl font-black text-white">Tus resultados · {selectedLevel}</h2>
+        <ul className="mt-3 space-y-2">{savedResults.map(record => <li key={record.id} className="text-white/75">{record.record_date} · {record.rounds !== null ? `${record.rounds} rondas + ${record.reps ?? 0} reps` : record.unit === 'tiempo' ? `${Math.floor(record.value / 60)}:${String(record.value % 60).padStart(2, '0')}` : `${record.value} ${record.unit}`}</li>)}</ul>
+      </Card> : null}
       <Dialog
         isOpen={isResultOpen}
         onClose={() => setIsResultOpen(false)}

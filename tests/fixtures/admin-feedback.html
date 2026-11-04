@@ -1,0 +1,18 @@
+<!doctype html><html lang="es"><body><div id="root"></div><script type="module">
+import React from 'react';
+const {useCallback,useEffect,useState,StrictMode}=React;
+import ReactDOM from 'react-dom/client';
+const {createRoot}=ReactDOM;
+import {useAdminFeedback} from '/src/hooks/admin/useAdminFeedback.js';
+function Panel(){
+ const [loads,setLoads]=useState(0);
+ const {clearFeedback,showSuccess,message}=useAdminFeedback();
+ const refresh=useCallback(()=>{clearFeedback();setLoads(n=>n+1);showSuccess('Actualizado')},[clearFeedback,showSuccess]);
+ useEffect(()=>{refresh()},[refresh]);
+ return React.createElement('div',null,
+  React.createElement('output',{id:'loads'},loads),
+  React.createElement('p',null,message),
+  React.createElement('button',{onClick:refresh},'Actualizar'));
+}
+createRoot(document.getElementById('root')).render(React.createElement(StrictMode,null,React.createElement(Panel)));
+</script></body></html>

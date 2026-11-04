@@ -10,6 +10,10 @@ export function AdminWodForm({ draft, onDraftChange, onSubmit, isSubmitting = fa
       <TextArea label="Warm up" value={draft.warmup} onChange={(value) => onDraftChange((current) => ({ ...current, warmup: value }))} />
       <TextArea label="Skill / Strength" value={draft.strength} onChange={(value) => onDraftChange((current) => ({ ...current, strength: value }))} />
       <TextArea label="WOD" value={draft.workout} onChange={(value) => onDraftChange((current) => ({ ...current, workout: value }))} />
+      <Field label="Tipo de entrenamiento" value={draft.training_details?.type ?? ''} onChange={(value) => onDraftChange(current => ({ ...current, training_details: { ...current.training_details, type: value } }))} />
+      <TextArea label="Técnica" value={draft.training_details?.skill ?? ''} onChange={(value) => onDraftChange(current => ({ ...current, training_details: { ...current.training_details, skill: value } }))} />
+      {['Iniciado', 'Rookie', 'Scaled', 'RX'].map(level => <TextArea key={level} label={`WOD ${level}`} value={draft.training_details?.scaling?.find(item => item.level === level)?.items?.join('\n') ?? ''} onChange={value => onDraftChange(current => ({ ...current, training_details: { ...current.training_details, scaling: [...(current.training_details?.scaling ?? []).filter(item => item.level !== level), { level, items: value.split('\n').filter(Boolean) }] } }))} />)}
+      <TextArea label="Vuelta a la calma" value={draft.training_details?.cooldown ?? ''} onChange={(value) => onDraftChange(current => ({ ...current, training_details: { ...current.training_details, cooldown: value } }))} />
       <Field label="Time cap" value={draft.time_cap} onChange={(value) => onDraftChange((current) => ({ ...current, time_cap: value }))} />
       <TextArea label="Notas" value={draft.notes} onChange={(value) => onDraftChange((current) => ({ ...current, notes: value }))} />
       <button type="submit" className="k-button w-full" disabled={isDisabled}>Guardar WOD</button>

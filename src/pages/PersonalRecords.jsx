@@ -1,3 +1,4 @@
+import { parseTimeToSeconds } from '../utils/workoutResults.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Input, LoadingState, useToast } from '../components/ui/index.js'
 import {
@@ -52,15 +53,6 @@ function parsePositiveNumber(value) {
   return Number.isFinite(number) && number >= 0 ? number : null
 }
 
-function parseTimeToSeconds(value) {
-  const text = normalizeName(value)
-  if (!text) return null
-  const parts = text.split(':').map(Number)
-  if (parts.length === 1) return parsePositiveNumber(parts[0])
-  if (parts.length === 2 && parts.every(Number.isFinite)) return parts[0] * 60 + parts[1]
-  if (parts.length === 3 && parts.every(Number.isFinite)) return parts[0] * 3600 + parts[1] * 60 + parts[2]
-  return null
-}
 
 function formatTime(seconds) {
   const total = Math.max(Number(seconds) || 0, 0)
@@ -102,10 +94,11 @@ function groupRecords(records) {
 
   return [...groups.values()].map((group) => {
     const history = [...group.history].sort((a, b) => new Date(`${b.record_date}T00:00:00`) - new Date(`${a.record_date}T00:00:00`))
-    const best = history.reduce((current, item) => (compareRecords(item, current) < 0 ? item : current), null)
-    const previousBest = history.filter((item) => item.id !== best.id).reduce((current, item) => (compareRecords(item, current) < 0 ? item : current), null)
+    const legacyWorkout = /^WOD:/i.test(group.movement)
+    const best = legacyWorkout ? history[0] : history.reduce((current, item) => (compareRecords(item, current) < 0 ? item : current), null)
+    const previousBest = legacyWorkout ? null : history.filter((item) => item.id !== best.id).reduce((current, item) => (compareRecords(item, current) < 0 ? item : current), null)
     const category = getCategoryForMovement(group.movement)
-    return { ...group, best, category, history, previousBest, trend: previousBest ? compareRecords(best, previousBest) < 0 ? 'up' : 'same' : 'new' }
+    return { ...group, legacyWorkout, best, category, history, previousBest, trend: previousBest ? compareRecords(best, previousBest) < 0 ? 'up' : 'same' : 'new' }
   }).sort((a, b) => a.movement.localeCompare(b.movement))
 }
 
@@ -125,7 +118,7 @@ function buildPayload(formData) {
   if (formData.resultType === 'rounds_reps') {
     const rounds = parsePositiveNumber(formData.rounds)
     const reps = parsePositiveNumber(formData.reps || 0)
-    if (rounds === null || reps === null) return { ok: false, message: 'Ingresa rondas y repeticiones válidas.' }
+    if (rounds === null || reps === null || !Number.isSafeInteger(rounds) || !Number.isSafeInteger(reps) || rounds + reps <= 0) return { ok: false, message: 'Ingresa rondas y repeticiones válidas.' }
     return { ok: true, payload: { ...base, value: rounds, unit: 'reps', rounds, reps } }
   }
 
@@ -233,7 +226,7 @@ function RecordCard({ group, onOpen }) {
             <p className="mt-1 text-sm text-text-muted">{formatDate(group.best.record_date)}</p>
           </div>
           <Badge state={group.trend === 'up' ? 'success' : group.trend === 'new' ? 'available' : 'neutral'}>
-            {group.trend === 'up' ? 'Mejorando' : group.trend === 'new' ? 'Nuevo' : 'Estable'}
+            {group.legacyWorkout ? 'Histórico' : group.trend === 'up' ? 'Mejorando' : group.trend === 'new' ? 'Nuevo' : 'Estable'}
           </Badge>
         </div>
       </Card>
@@ -501,7 +494,7 @@ export function PersonalRecords({ currentUser, setActivePage }) {
         {selectedHistory ? (
           <div className="space-y-4">
             <Card variant="selected" className="p-4">
-              <p className="text-sm font-semibold text-text-secondary">Récord actual</p>
+              <p className="text-sm font-semibold text-text-secondary">{selectedHistory.legacyWorkout ? 'Último resultado histórico · nivel sin verificar' : 'Récord actual'}</p>
               <p className="mt-1 text-3xl font-black text-kupan-flame">{formatValue(selectedHistory.best)}</p>
               <p className="mt-1 text-sm text-text-muted">{formatDate(selectedHistory.best.record_date)}</p>
               {selectedHistory.best.notes ? <p className="mt-3 text-sm leading-6 text-text-secondary">{selectedHistory.best.notes}</p> : null}

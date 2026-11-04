@@ -43,6 +43,8 @@ function mapWodRow(row) {
   if (!row) return null
 
   return {
+    ...row.training_details,
+    scaling: row.training_details?.scaling?.filter(plan => plan.items?.length) ?? [],
     id: row.id,
     date: row.date,
     title: row.title || `WOD ${gymConfig.identity.name}`,
@@ -73,7 +75,7 @@ export async function loadTodaysWod() {
   }
 
   const today = toChileDateString()
-  const rpcResult = await supabase.rpc('get_public_todays_wod', { target_date: today })
+  const rpcResult = await supabase.rpc('get_public_todays_wod_v2', { target_date: today })
 
   if (!rpcResult.error) {
     const row = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data
@@ -82,7 +84,7 @@ export async function loadTodaysWod() {
 
   const { data, error } = await supabase
     .from('wod')
-    .select('id, date, title, warmup, strength, workout, time_cap, notes, created_at, updated_at')
+    .select('id, date, title, warmup, strength, workout, time_cap, notes, training_details, created_at, updated_at')
     .eq('date', today)
     .maybeSingle()
 

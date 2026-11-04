@@ -9,6 +9,7 @@ export interface PersonalRecordInput {
   value: string | number
   unit: PersonalRecordUnit | string
   recordDate: string
+  resultContext?: { wod_id: string; version: string; level: string; result_type: string }
   notes?: string | null
   rounds?: string | number | null
   reps?: string | number | null
@@ -64,11 +65,13 @@ interface SupabaseQuery<T> extends PromiseLike<QueryResponse<T>> {
 interface SupabaseClientLike {
   auth: {
     getUser(): Promise<AuthResponse>
+    getSession?(): Promise<{ data: { session: { user: AuthUser } | null } | null; error: unknown }>
   }
   from<T = unknown>(table: string): SupabaseQuery<T>
 }
 
 interface PendingCreate {
+  ownerId: string
   type: 'create'
   clientId: string
   payload: PersonalRecordInput
@@ -76,6 +79,7 @@ interface PendingCreate {
 }
 
 interface PendingUpdate {
+  ownerId: string
   type: 'update'
   clientId: string
   recordId: string
@@ -84,6 +88,7 @@ interface PendingUpdate {
 }
 
 interface PendingDelete {
+  ownerId: string
   type: 'delete'
   clientId: string
   recordId: string
@@ -101,7 +106,7 @@ interface StorageHost {
   localStorage?: StorageLike | null
 }
 
-const PENDING_PR_KEY = 'kupan_pr_pending_v1'
+const PENDING_PR_KEY = 'kupan_pr_pending_v2'
 const TABLE = 'personal_records'
 const SELECT_COLUMNS = 'id, profile_id, movement, value, unit, record_date, notes, created_at, updated_at, rounds, reps, time_seconds'
 const PUBLIC_MESSAGE = 'No pudimos sincronizar tus récords. Intenta nuevamente.'
@@ -125,16 +130,24 @@ function fail<T>(status: PersonalRecordStatus, message = PUBLIC_MESSAGE): Person
 
 function isNetworkLikeError(error: unknown): boolean {
   const text = String(error instanceof Error ? error.message : error ?? '').toLowerCase()
-  return text.includes('network') || text.includes('fetch') || text.includes('offline') || text.includes('failed')
+  const message = typeof error === 'object' && error ? String((error as { message?: string }).message ?? '') : text
+  return /network|fetch|offline|failed to fetch/i.test(message)
 }
 
 async function getAuthenticatedUserId(client?: SupabaseClientLike | null): Promise<PersonalRecordResult<string>> {
   const activeClient = getClient(client)
   if (!activeClient) return fail('offline')
 
-  const { data, error } = await activeClient.auth.getUser()
-  if (error || !data?.user?.id) return fail('unauthenticated', UNAUTHENTICATED_MESSAGE)
-  return ok(data.user.id)
+  try {
+    const { data, error } = await activeClient.auth.getUser()
+    if (!error && data?.user?.id) return ok(data.user.id)
+    if (!isNetworkLikeError(error)) return fail('unauthenticated', UNAUTHENTICATED_MESSAGE)
+  } catch {
+    // Offline intent can use the cached owner; server RLS still verifies every write.
+  }
+  const session = await activeClient.auth.getSession?.()
+  const owner = session?.data?.session?.user?.id
+  return owner ? ok(owner) : fail('unauthenticated', UNAUTHENTICATED_MESSAGE)
 }
 
 function normalizeText(value: unknown): string {
@@ -191,6 +204,7 @@ function normalizeInput(input: PersonalRecordInput): PersonalRecordResult<Omit<P
   if ((rounds !== null && rounds < 0) || (reps !== null && reps < 0) || (timeSeconds !== null && timeSeconds < 0)) return fail('error', 'Revisa los datos del récord.')
 
   return ok({
+    ...(input.resultContext ? { result_context: input.resultContext } : {}),
     movement,
     value,
     unit,
@@ -216,6 +230,7 @@ function mapRecord(row: unknown): PersonalRecord {
     updated_at: record.updated_at ? String(record.updated_at) : null,
     rounds: record.rounds === null || record.rounds === undefined ? null : Number(record.rounds),
     reps: record.reps === null || record.reps === undefined ? null : Number(record.reps),
+    ...(record.result_context ? { result_context: record.result_context } : {}),
     time_seconds: record.time_seconds === null || record.time_seconds === undefined ? null : Number(record.time_seconds),
   }
 }
@@ -262,8 +277,12 @@ function enqueuePending(operation: PendingOperation, globalObject?: StorageHost)
   writePending([...queue, operation], globalObject)
 }
 
-function pendingId(type: string, payload: unknown): string {
-  return `${type}:${Date.now()}:${Math.random().toString(36).slice(2)}:${JSON.stringify(payload).length}`
+function tableFor(input?: PersonalRecordInput): string {
+  return input?.resultContext ? 'workout_results' : TABLE
+}
+
+function columnsFor(input?: PersonalRecordInput): string {
+  return SELECT_COLUMNS + (input?.resultContext ? ', result_context' : '')
 }
 
 export async function getPersonalRecords(client?: SupabaseClientLike | null): Promise<PersonalRecordResult<PersonalRecord[]>> {
@@ -298,7 +317,7 @@ export async function getCurrentPersonalRecords(client?: SupabaseClientLike | nu
   if (!result.ok || !result.data) return result
 
   const bestByExercise = new Map<string, PersonalRecord>()
-  result.data.forEach((record) => {
+  result.data.filter(record => !/^WOD:/i.test(record.movement)).forEach((record) => {
     const key = groupKey(record)
     const current = bestByExercise.get(key)
     if (!current || compareRecords(record, current) < 0) bestByExercise.set(key, record)
@@ -307,94 +326,101 @@ export async function getCurrentPersonalRecords(client?: SupabaseClientLike | nu
   return ok([...bestByExercise.values()].sort((a, b) => a.movement.localeCompare(b.movement)), SUCCESS_MESSAGE)
 }
 
+// Save intent before transmission. The same UUID is reused after a lost response.
+async function performOperation(operation: PendingOperation, client?: SupabaseClientLike | null): Promise<PersonalRecordResult<unknown>> {
+  const auth = await getAuthenticatedUserId(client)
+  if (!auth.ok || auth.data !== operation.ownerId) return fail('unauthenticated', UNAUTHENTICATED_MESSAGE)
+  const activeClient = getClient(client)
+  if (!activeClient) return fail('offline')
+  try {
+    if (operation.type === 'delete') {
+      const { error } = await activeClient.from(TABLE).delete().eq('id', operation.recordId).eq('profile_id', operation.ownerId)
+      return error ? fail('pending', PENDING_MESSAGE) : ok({ id: operation.recordId })
+    }
+    const normalized = normalizeInput(operation.payload)
+    if (!normalized.ok || !normalized.data) return normalized
+    const table = tableFor(operation.payload)
+    const columns = columnsFor(operation.payload)
+    const query = activeClient.from(table)
+    const response = operation.type === 'create'
+      ? await query.insert({ ...normalized.data, id: operation.clientId, profile_id: operation.ownerId }).select(columns).single()
+      : await query.update(normalized.data).eq('id', operation.recordId).eq('profile_id', operation.ownerId).select(columns).single()
+    if (response.error) {
+      // A committed insert whose response was lost is safe to acknowledge on retry.
+      if (operation.type === 'create' && (response.error as { code?: string }).code === '23505') {
+        const existing = await activeClient.from(table).select(columns).eq('id', operation.clientId).eq('profile_id', operation.ownerId).single()
+        if (!existing.error && existing.data) return ok(mapRecord(existing.data))
+      }
+      return fail(isNetworkLikeError(response.error) ? 'pending' : 'error', isNetworkLikeError(response.error) ? PENDING_MESSAGE : PUBLIC_MESSAGE)
+    }
+    return ok(mapRecord(response.data))
+  } catch {
+    return fail('pending', PENDING_MESSAGE)
+  }
+}
+
+async function saveOperation(operation: PendingOperation, client?: SupabaseClientLike | null): Promise<PersonalRecordResult<unknown>> {
+  try { enqueuePending(operation) } catch { return fail('error', 'No pudimos guardar el cambio de forma segura en este dispositivo.') }
+  const result = await performOperation(operation, client)
+  if (result.ok || result.status === 'error') writePending(readPending().filter(item => item.clientId !== operation.clientId))
+  return result
+}
+
 export async function createPersonalRecord(input: PersonalRecordInput, client?: SupabaseClientLike | null): Promise<PersonalRecordResult<PersonalRecord>> {
   const auth = await getAuthenticatedUserId(client)
   if (!auth.ok || !auth.data) return fail(auth.status, auth.message)
   const normalized = normalizeInput(input)
-  if (!normalized.ok || !normalized.data) return fail(normalized.status, normalized.message)
-  const activeClient = getClient(client)
-  if (!activeClient) return fail('offline')
-
-  const payload = { ...normalized.data, profile_id: auth.data }
-  const { data, error } = await activeClient
-    .from<unknown>(TABLE)
-    .insert(payload)
-    .select(SELECT_COLUMNS)
-    .single()
-
-  if (error) {
-    if (isNetworkLikeError(error)) enqueuePending({ type: 'create', clientId: pendingId('create', payload), payload: input, createdAt: new Date().toISOString() })
-    return fail(isNetworkLikeError(error) ? 'pending' : 'error', isNetworkLikeError(error) ? PENDING_MESSAGE : PUBLIC_MESSAGE)
-  }
-
-  return ok(mapRecord(data), 'PR registrado.')
+  if (!normalized.ok) return fail(normalized.status, normalized.message)
+  // Repeated taps/retries of an unresolved form reuse its original operation.
+  const existing = readPending().find(item => item.type === 'create' && item.ownerId === auth.data && JSON.stringify(item.payload) === JSON.stringify(input))
+  const operation: PendingCreate = existing as PendingCreate ?? { type: 'create', ownerId: auth.data, clientId: crypto.randomUUID(), payload: input, createdAt: new Date().toISOString() }
+  return saveOperation(operation, client) as Promise<PersonalRecordResult<PersonalRecord>>
 }
 
 export async function updatePersonalRecord(recordId: string, input: PersonalRecordInput, client?: SupabaseClientLike | null): Promise<PersonalRecordResult<PersonalRecord>> {
   const auth = await getAuthenticatedUserId(client)
   if (!auth.ok || !auth.data) return fail(auth.status, auth.message)
-  const normalized = normalizeInput(input)
-  if (!normalized.ok || !normalized.data) return fail(normalized.status, normalized.message)
-  const activeClient = getClient(client)
-  if (!activeClient) return fail('offline')
-
-  const { data, error } = await activeClient
-    .from<unknown>(TABLE)
-    .update(normalized.data)
-    .eq('id', recordId)
-    .eq('profile_id', auth.data)
-    .select(SELECT_COLUMNS)
-    .single()
-
-  if (error) {
-    if (isNetworkLikeError(error)) enqueuePending({ type: 'update', clientId: pendingId('update', { recordId, input }), recordId, payload: input, createdAt: new Date().toISOString() })
-    return fail(isNetworkLikeError(error) ? 'pending' : 'error', isNetworkLikeError(error) ? PENDING_MESSAGE : PUBLIC_MESSAGE)
-  }
-
-  return ok(mapRecord(data), 'PR actualizado.')
+  return saveOperation({ type: 'update', ownerId: auth.data, clientId: crypto.randomUUID(), recordId, payload: input, createdAt: new Date().toISOString() }, client) as Promise<PersonalRecordResult<PersonalRecord>>
 }
 
 export async function deletePersonalRecord(recordId: string, client?: SupabaseClientLike | null): Promise<PersonalRecordResult<{ id: string }>> {
   const auth = await getAuthenticatedUserId(client)
   if (!auth.ok || !auth.data) return fail(auth.status, auth.message)
-  const activeClient = getClient(client)
-  if (!activeClient) return fail('offline')
-
-  const { error } = await activeClient
-    .from<unknown>(TABLE)
-    .delete()
-    .eq('id', recordId)
-    .eq('profile_id', auth.data)
-
-  if (error) {
-    if (isNetworkLikeError(error)) enqueuePending({ type: 'delete', clientId: pendingId('delete', recordId), recordId, createdAt: new Date().toISOString() })
-    return fail(isNetworkLikeError(error) ? 'pending' : 'error', isNetworkLikeError(error) ? PENDING_MESSAGE : PUBLIC_MESSAGE)
-  }
-
-  return ok({ id: recordId }, 'PR eliminado.')
+  return saveOperation({ type: 'delete', ownerId: auth.data, clientId: crypto.randomUUID(), recordId, createdAt: new Date().toISOString() }, client) as Promise<PersonalRecordResult<{ id: string }>>
 }
 
-export async function retryPendingPersonalRecords(client?: SupabaseClientLike | null, globalObject?: StorageHost): Promise<PersonalRecordResult<{ retried: number; remaining: number }>> {
-  const queue = readPending(globalObject)
-  if (queue.length === 0) return ok({ retried: 0, remaining: 0 }, SUCCESS_MESSAGE)
+let retryInFlight: Promise<PersonalRecordResult<{ retried: number; remaining: number }>> | null = null
+export function retryPendingPersonalRecords(client?: SupabaseClientLike | null, globalObject?: StorageHost): Promise<PersonalRecordResult<{ retried: number; remaining: number }>> {
+  if (retryInFlight) return retryInFlight
+  retryInFlight = (async () => {
+    const auth = await getAuthenticatedUserId(client)
+    if (!auth.ok || !auth.data) return fail<{ retried: number; remaining: number }>(auth.status, auth.message)
+    const queue = readPending(globalObject).filter(item => item.ownerId === auth.data)
+    let retried = 0
+    for (const operation of queue) {
+      const result = await performOperation(operation, client)
+      if (result.ok) {
+        retried++
+        // Re-read to preserve work added while the request was in flight.
+        writePending(readPending(globalObject).filter(item => item.clientId !== operation.clientId), globalObject)
+      }
+      if (result.status === 'unauthenticated') break
+    }
+    const remaining = readPending(globalObject).filter(item => item.ownerId === auth.data).length
+    return { ok: remaining === 0, status: remaining ? 'pending' as const : 'success' as const, message: remaining ? PENDING_MESSAGE : SUCCESS_MESSAGE, data: { retried, remaining } }
+  })().finally(() => { retryInFlight = null })
+  return retryInFlight
+}
 
-  const remaining: PendingOperation[] = []
-  let retried = 0
-
-  for (const operation of queue) {
-    let result: PersonalRecordResult<unknown>
-    if (operation.type === 'create') result = await createPersonalRecord(operation.payload, client)
-    else if (operation.type === 'update') result = await updatePersonalRecord(operation.recordId, operation.payload, client)
-    else result = await deletePersonalRecord(operation.recordId, client)
-
-    if (result.ok) retried += 1
-    else remaining.push(operation)
-  }
-
-  writePending(remaining, globalObject)
-  return remaining.length > 0
-    ? { ok: false, status: 'pending', message: 'Algunos récords siguen pendientes.', data: { retried, remaining: remaining.length } }
-    : ok({ retried, remaining: 0 }, SUCCESS_MESSAGE)
+export async function getWorkoutResultHistory(context: NonNullable<PersonalRecordInput['resultContext']>, client?: SupabaseClientLike | null) {
+  const auth = await getAuthenticatedUserId(client)
+  if (!auth.ok || !auth.data) return fail<PersonalRecord[]>(auth.status, auth.message)
+  const { data, error } = await getClient(client)!.from<unknown[]>('workout_results').select(SELECT_COLUMNS + ', result_context').eq('profile_id', auth.data).order('record_date', { ascending: false })
+  if (error) return fail<PersonalRecord[]>(isNetworkLikeError(error) ? 'offline' : 'error', PUBLIC_MESSAGE)
+  return ok((data ?? []).filter(row => {
+    const saved = (row as { result_context: typeof context }).result_context
+    return saved && saved.wod_id === context.wod_id && saved.version === context.version && saved.level === context.level && saved.result_type === context.result_type
+  }).map(mapRecord))
 }
 
 export const personalRecordUnits = VALID_UNITS

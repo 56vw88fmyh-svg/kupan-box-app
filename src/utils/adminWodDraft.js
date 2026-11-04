@@ -2,13 +2,13 @@ export const WOD_DRAFT_STORAGE_KEY = 'kupan_admin_wod_draft_v1'
 export const WOD_DRAFT_VERSION = 1
 export const WOD_DRAFT_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
 
-const WOD_CONTENT_FIELDS = ['title', 'warmup', 'strength', 'workout', 'time_cap', 'notes']
+const WOD_CONTENT_FIELDS = ['training_details', 'title', 'warmup', 'strength', 'workout', 'time_cap', 'notes']
 const WOD_COMPARISON_FIELDS = ['date', ...WOD_CONTENT_FIELDS]
 
 export function hasMeaningfulWodDraftContent(draft) {
   if (!draft || typeof draft !== 'object') return false
 
-  return WOD_CONTENT_FIELDS.some((field) => String(draft[field] ?? '').trim().length > 0)
+  return WOD_CONTENT_FIELDS.some((field) => (field === 'training_details' ? Boolean(draft[field]?.scaling?.some(item => item.items?.length) || draft[field]?.skill || draft[field]?.cooldown || draft[field]?.type) : String(draft[field] ?? '').trim().length > 0))
 }
 
 export function cloneSerializableWodDraft(draft) {
@@ -63,7 +63,7 @@ export function isStoredWodDraftExpired(storedDraft, now = () => new Date()) {
 export function areWodDraftsEqual(leftDraft, rightDraft) {
   if (!leftDraft || !rightDraft) return false
 
-  return WOD_COMPARISON_FIELDS.every((field) => String(leftDraft[field] ?? '') === String(rightDraft[field] ?? ''))
+  return WOD_COMPARISON_FIELDS.every((field) => JSON.stringify(leftDraft[field] ?? '') === JSON.stringify(rightDraft[field] ?? ''))
 }
 
 export function classifyStoredWodDraft(storedDraft, remoteWod = null, now = () => new Date()) {

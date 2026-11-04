@@ -13,6 +13,8 @@ import { getCurrentSupabaseUser, loginWithSupabase, logoutFromSupabase, register
 import { defaultAdminContent } from './utils/adminContent.js'
 import { loadSharedContent } from './utils/sharedContent.js'
 
+import { retryPendingPersonalRecords } from './services/personalRecordsService.ts'
+
 const Admin = lazy(() => import('./pages/Admin.jsx').then((module) => ({ default: module.Admin })))
 const Auth = lazy(() => import('./pages/Auth.jsx').then((module) => ({ default: module.Auth })))
 const Coach = lazy(() => import('./pages/Coach.jsx').then((module) => ({ default: module.Coach })))
@@ -36,6 +38,14 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false)
   const hasLoadedSharedContent = useRef(false)
   const page = useMemo(() => getRouteMeta(location.pathname), [location.pathname])
+
+  useEffect(() => {
+    if (!currentUser?.id) return undefined
+    const retry = () => { retryPendingPersonalRecords().catch(() => {}) }
+    window.addEventListener('online', retry)
+    retry()
+    return () => window.removeEventListener('online', retry)
+  }, [currentUser?.id])
 
   function goToPage(pageId) {
     navigate(getPathForPageId(pageId))

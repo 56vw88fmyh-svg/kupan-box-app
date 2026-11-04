@@ -101,12 +101,14 @@ export function createAdminFeedbackController(options = {}) {
  * Centraliza feedback visual del panel admin.
  * Mantiene compatibilidad con `message` y `messageType`.
  */
+const stableTimerApi = getTimerApi()
+
 export function useAdminFeedback(options = {}) {
   const {
     defaultType = DEFAULT_TYPE,
     defaultAutoDismiss = false,
     defaultDuration = 4000,
-    timerApi = getTimerApi(),
+    timerApi = stableTimerApi,
   } = options
   const [feedback, setFeedback] = useState({ message: DEFAULT_MESSAGE, type: normalizeFeedbackType(defaultType) })
   const timerRef = useRef(null)
@@ -151,9 +153,12 @@ export function useAdminFeedback(options = {}) {
     }
   }, [cancelTimer, defaultAutoDismiss, defaultDuration, defaultType, timerApi])
 
-  useEffect(() => () => {
-    mountedRef.current = false
-    cancelTimer()
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      cancelTimer()
+    }
   }, [cancelTimer])
 
   return {

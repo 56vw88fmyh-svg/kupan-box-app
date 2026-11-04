@@ -191,8 +191,9 @@ export function useAdminData(options = {}) {
   const globalRequestIdRef = useRef(0)
   const sectionRequestIdsRef = useRef({})
 
-  useEffect(() => () => {
-    mountedRef.current = false
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
   }, [])
 
   const reloadAll = useCallback(async () => {
