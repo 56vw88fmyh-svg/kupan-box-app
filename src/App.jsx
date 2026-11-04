@@ -202,7 +202,7 @@ export default function App() {
                 <Route path="/wod" element={gymConfig.features.wod ? <Wod appContent={appContent} currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />
                 <Route path="/planes" element={<Plans appContent={appContent} />} />
                 <Route path="/prueba" element={<TrialClass setActivePage={goToPage} />} />
-                <Route path="/comunidad" element={gymConfig.features.community ? <Community appContent={appContent} /> : <Navigate to="/" replace />} />
+                <Route path="/comunidad" element={gymConfig.features.community ? <Community key={currentUser?.id ?? 'guest'} appContent={appContent} currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />
                 <Route path="/perfil" element={<Profile currentUser={currentUser} onLogout={logout} setActivePage={goToPage} onUserUpdate={setCurrentUser} />} />
                 <Route path="/mis-pr" element={gymConfig.features.wod ? <PersonalRecords currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />
                 <Route path="/wod/pr" element={gymConfig.features.wod ? <PersonalRecords currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />

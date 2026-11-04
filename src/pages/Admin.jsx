@@ -1,5 +1,7 @@
 import { RegistrationDeliveryStatus } from '../components/admin/RegistrationDeliveryStatus.jsx'
 import { gymConfig } from '../config/gymConfig.js'
+import { renewalCandidates, weeklyOccupancy as calculateWeeklyOccupancy, monthlyAttendance } from '../utils/metricDefinitions.js'
+import { formatRecordValue, formatStatus } from '../utils/displayFormats.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buildBirthdayGreeting, formatBirthdayDayMonth } from '../utils/birthdays.js'
 import { defaultAppText } from '../utils/adminContent.js'
@@ -315,7 +317,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   const totals = useMemo(() => {
     const activeStudents = adminData.profiles.filter((profile) => profile.status === 'active').length
-    const expiredMemberships = adminData.memberships.filter((membership) => membership.status === 'expired' || membership.end_date < todayDate).length
+    const expiredMemberships = renewalCandidates(adminData.profiles, adminData.memberships, todayDate).length
     const todayReservations = adminData.reservations.filter((reservation) => (
       reservation.reservation_date === todayDate && ['reserved', 'attended'].includes(reservation.status)
     )).length
@@ -411,7 +413,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const alerts = []
     const missingCoachClasses = todayClasses?.filter((classItem) => classItem.coach === 'Sin coach asignado' || classItem.coach.toLowerCase().includes('por definir')) ?? []
     const highOccupancyClasses = todayClasses?.filter((classItem) => classItem.status === 'Alta ocupación' || classItem.status === 'Completa') ?? []
-    const expiredMemberships = hasDataError('memberships') ? [] : adminData.memberships.filter((membership) => membership.status === 'expired' || membership.end_date < todayDate)
+    const expiredMemberships = hasDataError('memberships') ? [] : renewalCandidates(adminData.profiles, adminData.memberships, todayDate)
     const pendingPayments = hasDataError('memberships') ? [] : adminData.memberships.filter((membership) => membership.payment_status === 'pending')
     const incompleteProfiles = hasDataError('profiles') ? [] : adminData.profiles.filter((profile) => !profile.phone || !profile.birth_date)
 
@@ -443,7 +445,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       alerts.push({
         id: 'expired-memberships',
         label: 'Planes y pagos',
-        title: `${expiredMemberships.length} plan(es) vencidos`,
+        title: `${expiredMemberships.length} alumno(s) por renovar`,
         description: 'Hay alumnos con membresía vencida. Revisa renovaciones o estados de pago.',
         priority: 'high',
         priorityLabel: 'Alto',
@@ -491,16 +493,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }, [adminData.memberships, adminData.profiles, dismissedAlertIds, hasDataError, todayClasses, todayDate, tomorrowWod])
 
   const weeklyOccupancy = useMemo(() => {
-    const activeClasses = adminData.schedule.filter((classItem) => classItem.active)
-    const limitedClasses = activeClasses.filter((classItem) => !isUnlimitedSchedule(classItem))
-    const limitedClassIds = new Set(limitedClasses.map((classItem) => classItem.id))
-    const capacity = limitedClasses.reduce((sum, classItem) => sum + Number(classItem.max_spots ?? gymConfig.operations.defaultClassCapacity), 0)
-    const reserved = adminData.reservations.filter((reservation) => (
-      limitedClassIds.has(reservation.class_schedule_id) &&
-      reservation.status !== 'cancelled' && reservation.reservation_date >= todayDate
-    )).length
-    if (capacity === 0) return 0
-    return Math.min(Math.round((reserved / capacity) * 100), 100)
+    return calculateWeeklyOccupancy(adminData.schedule, adminData.reservations, todayDate)
   }, [adminData.reservations, adminData.schedule, todayDate])
 
   const newStudentsThisMonth = useMemo(() => {
@@ -513,7 +506,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       id: `reservation-${reservation.id}`,
       type: reservation.status === 'cancelled' ? 'Cancelación' : 'Reserva',
       title: reservation.profile?.full_name ?? 'Alumno KUPAN',
-      detail: `${reservation.class_schedule?.class_name ?? 'Clase'} · ${formatDate(reservation.reservation_date)} · ${reservation.status}`,
+      detail: `${reservation.class_schedule?.class_name ?? 'Clase'} · ${formatDate(reservation.reservation_date)} · ${formatStatus(reservation.status)}`,
       sortDate: getDateTimeValue(reservation.reservation_date, reservation.class_schedule?.time),
     }))
 
@@ -521,7 +514,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       id: `membership-${membership.id}`,
       type: 'Membresía',
       title: membership.profile?.full_name ?? 'Alumno KUPAN',
-      detail: `${membership.plan?.name ?? 'Plan'} · ${membership.status} · vence ${formatDate(membership.end_date)}`,
+      detail: `${membership.plan?.name ?? 'Plan'} · ${formatStatus(membership.status)} · vence ${formatDate(membership.end_date)}`,
       sortDate: membership.updated_at ?? membership.created_at ?? membership.start_date,
     }))
 
@@ -535,9 +528,9 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
     const prItems = adminData.prs.slice(0, 3).map((record) => ({
       id: `pr-${record.id}`,
-      type: 'PR',
+      type: 'Marca registrada',
       title: record.profile?.full_name ?? 'Atleta KUPAN',
-      detail: `${record.movement} · ${record.value} ${record.unit}`,
+      detail: `${record.movement} · ${formatRecordValue(record)}`,
       sortDate: record.created_at ?? record.record_date,
     }))
 
@@ -580,14 +573,14 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     totalStudents: hasDataError('profiles') ? 'No disponible' : `${totals.students} registrados`,
     todayReservations: hasDataError('reservations') ? 'Sin cargar' : totals.todayReservations,
     todayClasses: hasDataError('schedule') ? 'No disponible' : `${todayClasses?.length ?? 0} clases`,
-    weeklyOccupancy: hasDataError('reservations') || hasDataError('schedule') ? 'Sin cargar' : `${weeklyOccupancy}%`,
-    expiredMemberships: hasDataError('memberships') ? 'Sin cargar' : totals.expiredMemberships,
+    weeklyOccupancy: hasDataError('reservations') || hasDataError('schedule') ? 'Sin cargar' : weeklyOccupancy === null ? 'Sin datos' : `${weeklyOccupancy}%`,
+    expiredMemberships: hasDataError('memberships') || hasDataError('profiles') ? 'Sin cargar' : totals.expiredMemberships,
     upcomingExpirations: hasDataError('memberships') ? 'Sin cargar' : upcomingExpirations.length,
     newStudentsThisMonth: hasDataError('profiles') ? 'Sin cargar' : newStudentsThisMonth,
     pendingPayments: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.pending_payments ?? 0),
     confirmedIncome: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.confirmed_income ?? 0),
     averageTicket: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.average_ticket ?? 0),
-    noShowRate: hasDataError('operationalMetrics') ? 'Sin cargar' : `${Number(adminData.operationalMetrics?.no_show_rate ?? 0).toFixed(1)}%`,
+    noShowRate: hasDataError('reservations') ? 'Sin cargar' : monthlyAttendance(adminData.reservations, todayDate).noShowRate === null ? 'Sin datos' : `${monthlyAttendance(adminData.reservations, todayDate).noShowRate.toFixed(1)}%`,
     waitlistCount: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.waitlist_count ?? 0),
     pendingTrials: hasDataError('operationalMetrics') ? 'Sin cargar' : Number(adminData.operationalMetrics?.pending_trials ?? 0),
   }

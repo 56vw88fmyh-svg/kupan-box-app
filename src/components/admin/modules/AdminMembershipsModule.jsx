@@ -1,3 +1,4 @@
+import { formatStatus } from '../../../utils/displayFormats.js'
 import { AdminMembershipActivationForm } from '../forms/AdminMembershipActivationForm.jsx'
 import { AdminMembershipEditForm } from '../forms/AdminMembershipEditForm.jsx'
 import { AdminSection, SmallRow } from '../AdminUi.jsx'
@@ -181,7 +182,7 @@ export function AdminMembershipsModule({
               <SmallRow
                 key={membership.id}
                 title={`${membership.profile?.full_name ?? 'Alumno'} · ${membership.plan?.name ?? 'Plan'}`}
-                meta={`${membership.status} · pago ${membership.payment_status ?? 'sin estado'} · vence ${formatDate(membership.end_date)}`}
+                meta={`${formatStatus(membership.status)} · pago ${formatStatus(membership.payment_status)} · vence ${formatDate(membership.end_date)}`}
                 detail={`Inicio ${formatDate(membership.start_date)} · tokens ${tokens.used}/${tokens.total} · disponibles ${tokens.remaining}${membership.notes ? ` · ${membership.notes}` : ''}`}
                 action={(
                   <details className="relative shrink-0">

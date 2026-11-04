@@ -1,3 +1,4 @@
+import { formatRecordValue, formatCalendarDate } from '../utils/displayFormats.js'
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Input, LoadingState, useToast } from '../components/ui/index.js'
 import { createPersonalRecord, getWorkoutResultHistory } from '../services/personalRecordsService.ts'
@@ -194,13 +195,13 @@ function LevelSelector({ selectedLevel, onSelect }) {
   )
 }
 
-function WodSurprise({ today }) {
+function WodSurprise({ today, hidden }) {
   return (
     <Card as="section" variant="elevated" className="mx-auto w-full max-w-3xl px-6 py-10 text-center sm:px-10 sm:py-14">
       <span className="inline-flex rounded-lg border border-kupan-border bg-white/[0.04] px-3 py-2 text-sm font-bold normal-case text-kupan-sand">{today}</span>
-      <h1 className="mt-6 text-4xl font-black leading-tight text-text-primary sm:text-5xl">WOD sorpresa</h1>
+      <h1 className="mt-6 text-4xl font-black leading-tight text-text-primary sm:text-5xl">{hidden ? 'WOD sorpresa' : 'WOD aún no publicado'}</h1>
       <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-text-secondary sm:text-lg">
-        La programación se revelará al comenzar la clase.
+        {hidden ? 'La programación se revelará al comenzar la clase.' : 'El coach todavía no ha publicado la programación de hoy. Vuelve a revisar más tarde.'}
       </p>
     </Card>
   )
@@ -318,7 +319,7 @@ export function Wod({ appContent, currentUser, setActivePage }) {
         <ErrorState title="No pudimos cargar el WOD" description={state.message} onAction={() => window.location.reload()} />
       ) : null}
 
-      {!state.isLoading && !state.message && isSurprise ? <WodSurprise today={todayLabel} /> : null}
+      {!state.isLoading && !state.message && isSurprise ? <WodSurprise today={todayLabel} hidden={Boolean(wod?.isHidden)} /> : null}
 
       {!state.isLoading && wod && !isSurprise ? (
         <>
@@ -335,7 +336,7 @@ export function Wod({ appContent, currentUser, setActivePage }) {
             <div className="grid grid-cols-2 gap-0 border-b border-border-default sm:grid-cols-4">
               <div className="p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-text-muted">Fecha</p>
-                <p className="mt-1 font-black text-text-primary">{wod.date}</p>
+                <p className="mt-1 font-black text-text-primary">{formatCalendarDate(wod.date)}</p>
               </div>
               <div className="border-l border-border-default p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.12em] text-text-muted">Tipo</p>
@@ -380,7 +381,7 @@ export function Wod({ appContent, currentUser, setActivePage }) {
 
       {savedResults.length ? <Card className="p-5">
         <h2 className="text-xl font-black text-white">Tus resultados · {selectedLevel}</h2>
-        <ul className="mt-3 space-y-2">{savedResults.map(record => <li key={record.id} className="text-white/75">{record.record_date} · {record.rounds !== null ? `${record.rounds} rondas + ${record.reps ?? 0} reps` : record.unit === 'tiempo' ? `${Math.floor(record.value / 60)}:${String(record.value % 60).padStart(2, '0')}` : `${record.value} ${record.unit}`}</li>)}</ul>
+        <ul className="mt-3 space-y-2">{savedResults.map(record => <li key={record.id} className="text-white/75">{formatCalendarDate(record.record_date)} · {formatRecordValue(record)}</li>)}</ul>
       </Card> : null}
       <Dialog
         isOpen={isResultOpen}

@@ -1,3 +1,4 @@
+import { formatRecordValue } from '../utils/displayFormats.js'
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, StaleDataState } from '../components/ui/index.js'
 import { formatBirthdayDayMonth } from '../utils/birthdays.js'
@@ -21,21 +22,20 @@ function stripText(value, fallback = '') {
 
 function formatDate(value) {
   if (!value) return 'Sin fecha'
-  const dateText = String(value).slice(0, 10)
-  return formatShortChileDate(dateText)
+  return formatShortChileDate(value)
 }
 
 function monthLabel(date = new Date()) {
   return new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'numeric', timeZone: 'America/Santiago' }).format(date)
 }
 
-function buildActivity({ news, recentPrs, ranking }) {
+function buildActivity({ news, recentPrs }) {
   const prItems = (gymConfig.features.wod ? recentPrs : []).slice(0, 4).map((record) => ({
     id: `pr-${record.id}`,
-    type: 'Nuevo PR',
+    type: 'Marca registrada',
     title: stripText(record.full_name, `Atleta ${gymConfig.identity.name}`),
-    detail: `${stripText(record.movement, 'Movimiento')} · ${record.value} ${record.unit ?? ''}`,
-    date: record.record_date ?? record.created_at,
+    detail: `${stripText(record.movement, 'Movimiento')} · ${formatRecordValue(record)}`,
+    date: record.created_at ?? record.record_date,
   }))
 
   const newsItems = news.slice(0, 3).map((post) => ({
@@ -46,15 +46,7 @@ function buildActivity({ news, recentPrs, ranking }) {
     date: post.created_at ?? post.event_date,
   }))
 
-  const attendanceItems = ranking.slice(0, 2).map((athlete, index) => ({
-    id: `attendance-${athlete.profile_id}`,
-    type: 'Asistencia destacada',
-    title: stripText(athlete.full_name, `Atleta ${gymConfig.identity.name}`),
-    detail: `Posición ${index + 1} · ${athlete.reservations_count} reservas registradas`,
-    date: new Date().toISOString(),
-  }))
-
-  return [...prItems, ...newsItems, ...attendanceItems]
+  return [...prItems, ...newsItems]
     .filter((item) => item.title)
     .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))
 }
@@ -72,7 +64,7 @@ function SectionHeader({ eyebrow, title, description }) {
 function ActivitySection({ items }) {
   return (
     <section className="space-y-4">
-      <SectionHeader eyebrow="Actividad" title="Lo último en el box" description={gymConfig.features.wod ? 'PR, publicaciones y asistencia destacada en contexto.' : 'Publicaciones y asistencia destacada en contexto.'} />
+      <SectionHeader eyebrow="Actividad" title="Lo último en el box" description={gymConfig.features.wod ? 'Marcas y publicaciones compartidas por los miembros.' : 'Publicaciones y asistencia destacada en contexto.'} />
       {items.length === 0 ? <EmptyState title="Sin actividad reciente." description="Cuando haya PR, resultados o publicaciones nuevas, aparecerán aquí." /> : null}
       <div className="space-y-3">
         {items.slice(0, 20).map((item) => (
@@ -153,8 +145,8 @@ function RankingSection({ ranking }) {
   const period = monthLabel()
   return (
     <section className="space-y-4">
-      <SectionHeader eyebrow="Ranking" title={`Ranking de asistencia — ${period}`} description="Mide reservas confirmadas y asistencias registradas durante el mes actual." />
-      {ranking.length === 0 ? <EmptyState title="Ranking vacío." description="Todavía no hay reservas suficientes para mostrar posiciones este mes." /> : null}
+      <SectionHeader eyebrow="Ranking" title={`Ranking de asistencia — ${period}`} description="Cuenta solo asistencias confirmadas del mes actual; no incluye reservas ni ausencias." />
+      {ranking.length === 0 ? <EmptyState title="Ranking vacío." description="No hay asistencias compartidas este mes. Participar es opcional desde Perfil." /> : null}
       <div className="space-y-3">
         {ranking.slice(0, 25).map((athlete, index) => (
           <Card key={athlete.profile_id} as="article" variant="standard" className="p-4">
@@ -165,12 +157,12 @@ function RankingSection({ ranking }) {
                 </div>
                 <div className="min-w-0">
                   <h3 className="break-words font-black text-text-primary">{stripText(athlete.full_name, `Atleta ${gymConfig.identity.name}`)}</h3>
-                  <p className="mt-1 text-sm text-text-muted">Posición {index + 1} · actualizado {formatDate(new Date().toISOString())}</p>
+                  <p className="mt-1 text-sm text-text-muted">Posición {index + 1} · mes actual</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xl font-black text-kupan-flame">{athlete.reservations_count}</p>
-                <p className="text-xs font-bold uppercase text-text-muted">reservas</p>
+                <p className="text-xl font-black text-kupan-flame">{athlete.attendance_count}</p>
+                <p className="text-xs font-bold uppercase text-text-muted">asistencias</p>
               </div>
             </div>
           </Card>
@@ -183,8 +175,8 @@ function RankingSection({ ranking }) {
 function BirthdaysSection({ birthdays }) {
   return (
     <section className="space-y-4">
-      <SectionHeader eyebrow="Cumpleaños" title="Celebramos este mes" description="Solo se muestra nombre y día/mes. No se expone año, edad ni datos de contacto." />
-      {birthdays.length === 0 ? <EmptyState title="Sin cumpleaños este mes." description="Cuando haya cumpleaños registrados, aparecerán de forma privada y acotada." /> : null}
+      <SectionHeader eyebrow="Cumpleaños" title="Celebramos este mes" description="Solo aparecen quienes eligieron compartir su alias y día/mes." />
+      {birthdays.length === 0 ? <EmptyState title="Sin cumpleaños compartidos este mes." description="Puedes elegir participar desde Perfil." /> : null}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {birthdays.map((person) => (
           <Card key={person.profile_id} as="article" variant="standard" className="p-4">
@@ -204,8 +196,8 @@ function BirthdaysSection({ birthdays }) {
   )
 }
 
-export function Community({ appContent }) {
-  const phrase = appContent.appText.communityPhrase
+export function Community({ appContent, currentUser, setActivePage }) {
+  const phrase = appContent?.appText?.communityPhrase ?? gymConfig.identity.slogan
   const [activeTab, setActiveTab] = useState('activity')
   const [state, setState] = useState({
     isLoading: true,
@@ -220,6 +212,7 @@ export function Community({ appContent }) {
 
   useEffect(() => {
     let isMounted = true
+    if (!currentUser?.id) { setState({ isLoading: false, message: '', birthdays: [], events: [], ranking: [], news: [], recentPrs: [] }); return undefined }
     loadCommunityFeed().then((result) => {
       if (!isMounted) return
       const posts = result.news ?? []
@@ -236,7 +229,7 @@ export function Community({ appContent }) {
     return () => {
       isMounted = false
     }
-  }, [reloadKey])
+  }, [reloadKey, currentUser?.id])
 
   const activity = useMemo(() => buildActivity(state), [state])
   const hasVisibleData = activity.length > 0 || state.events.length > 0 || state.news.length > 0 || state.ranking.length > 0 || state.birthdays.length > 0
@@ -249,6 +242,7 @@ export function Community({ appContent }) {
     birthdays: <BirthdaysSection birthdays={state.birthdays} />,
   }[activeTab]
 
+  if (!currentUser) return <Card className="p-5"><h1 className="text-2xl font-black text-white">Comunidad de miembros</h1><p className="mt-3 text-white/70">Inicia sesión para ver actividad y reconocimientos compartidos por los atletas.</p><Button className="mt-4" onClick={() => setActivePage('login')}>Iniciar sesión</Button></Card>
   return (
     <div className="space-y-6 pb-24 md:pb-8">
       <Card as="section" variant="elevated" className="overflow-hidden p-0">
@@ -256,7 +250,7 @@ export function Community({ appContent }) {
           <Badge state="neutral">Comunidad {gymConfig.identity.name}</Badge>
           <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">Comunidad en una sola pizarra.</h1>
           <p className="mt-3 text-base leading-7 text-text-secondary">
-            {gymConfig.features.wod ? 'Actividad, eventos, noticias, ranking y cumpleaños sin competir con reservas ni WOD.' : 'Actividad, eventos, noticias y ranking del centro de entrenamiento.'}
+            {gymConfig.features.wod ? 'Noticias, eventos y reconocimientos de quienes eligen participar.' : 'Actividad, eventos, noticias y ranking del centro de entrenamiento.'}
           </p>
         </div>
         <div className="bg-kupan-ember/15 p-5">
@@ -287,7 +281,7 @@ export function Community({ appContent }) {
       {state.isLoading ? <LoadingState label="Cargando comunidad" lines={4} /> : null}
       {!state.isLoading && state.message ? <ErrorState title="Algunos bloques no cargaron" description={state.message} onAction={() => setReloadKey((current) => current + 1)} /> : null}
       {!state.isLoading && state.message && hasVisibleData ? <StaleDataState onRetry={() => setReloadKey((current) => current + 1)} /> : null}
-      {!state.isLoading ? activeContent : null}
+      {!state.isLoading && (!state.message || hasVisibleData) ? activeContent : null}
     </div>
   )
 }

@@ -1,3 +1,6 @@
+import { AthletePreferences } from '../components/AthletePreferences.jsx'
+import { completedThisWeek, weekRange, addCalendarDays } from '../utils/metricDefinitions.js'
+import { formatRecordValue, formatCalendarDate, formatStatus } from '../utils/displayFormats.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
@@ -16,7 +19,7 @@ import {
 import { gymConfig } from '../config/gymConfig.js'
 
 const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
-const weekDayInitials = ['L', 'M', 'M', 'J', 'V', 'S']
+const weekDayInitials = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
 function getChileDateString(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -29,10 +32,7 @@ function getChileDateString(date = new Date()) {
 
 function buildWeeklyProgress(reservations) {
   const todayKey = getChileDateString()
-  const today = new Date(`${todayKey}T12:00:00`)
-  const mondayOffset = (today.getDay() + 6) % 7
-  const monday = new Date(today)
-  monday.setDate(today.getDate() - mondayOffset)
+  const { start } = weekRange(todayKey)
   const attendedDates = new Set(
     reservations
       .filter((reservation) => reservation.status === 'attended')
@@ -40,22 +40,12 @@ function buildWeeklyProgress(reservations) {
   )
 
   return weekDayInitials.map((day, index) => {
-    const date = new Date(monday)
-    date.setDate(monday.getDate() + index)
-    const dateKey = getChileDateString(date)
+    const dateKey = addCalendarDays(start, index)
     return { day, date: dateKey, done: attendedDates.has(dateKey) }
   })
 }
 
-function formatDate(date) {
-  if (!date) return 'Sin registrar'
-
-  return new Intl.DateTimeFormat('es-CL', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(`${date}T00:00:00`))
-}
+const formatDate = formatCalendarDate
 
 function formatCurrency(value) {
   if (value === null || value === undefined) return ''
@@ -98,7 +88,7 @@ function MembershipSummary({
 }) {
   const membershipEndDate = membership?.end_date ?? membership?.expires_at
   const hasMembership = Boolean(membership)
-  const statusLabel = hasMembership ? 'Plan activo' : 'Sin plan activo'
+  const statusLabel = isLoading ? 'Consultando plan' : message && !hasMembership ? 'Estado sin confirmar' : hasMembership ? 'Plan activo' : 'Sin plan activo'
   const progress = tokenSummary.isUnlimited || tokenSummary.total <= 0
     ? 0
     : Math.min((tokenSummary.used / tokenSummary.total) * 100, 100)
@@ -171,7 +161,7 @@ function MembershipSummary({
             <ProfileField label="Inicio" value={formatDate(membership.start_date)} />
             <ProfileField label="Días restantes" value={daysRemaining !== null ? `${daysRemaining} días` : 'Sin registrar'} />
             <ProfileField label="Tokens totales" value={tokenSummary.isUnlimited ? 'Ilimitado' : tokenSummary.total} />
-            <ProfileField label="Estado" value={membership.status === 'active' ? 'Activa' : membership.status} />
+            <ProfileField label="Estado" value={formatStatus(membership.status)} />
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-3">
@@ -180,11 +170,11 @@ function MembershipSummary({
           </div>
 
           <p className="mt-4 text-sm font-bold leading-6 text-white/55">
-            {planPrice ? `${formatCurrency(planPrice)} · ` : ''}Los tokens no utilizados vencen al terminar el plan y no son acumulables.
+            {planPrice ? `${formatCurrency(planPrice)} · ` : ''}{tokenSummary.isUnlimited ? 'Este plan no descuenta tokens.' : 'Los tokens no utilizados vencen al terminar el plan y no son acumulables.'}
           </p>
           <button type="button" className="k-button mt-4 w-full" onClick={onRenew}>Ver opciones de renovación</button>
         </div>
-      ) : (
+      ) : isLoading || message ? <p className="p-5 text-sm text-white/70">{isLoading ? 'Cargando tu membresía…' : 'No pudimos confirmar tu membresía. Actualiza el plan para intentarlo nuevamente.'}</p> : (
         <div className="p-5">
           <div className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-4">
             <p className="font-black uppercase text-white">Aún no tienes una membresía activa.</p>
@@ -299,6 +289,7 @@ function StudentDashboard({
 
 export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) {
   const location = useLocation()
+  const [weeklyGoal, setWeeklyGoal] = useState(null)
   const profileRequestIdRef = useRef(0)
   const [profileData, setProfileData] = useState(null)
   const [isFetchingProfile, setIsFetchingProfile] = useState(false)
@@ -443,9 +434,8 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
   }, [supabaseReservations])
 
   const weeklyProgress = useMemo(() => buildWeeklyProgress(supabaseReservations), [supabaseReservations])
-  const weeklyCompleted = weeklyProgress.filter((item) => item.done).length
-  const weeklyGoal = weeklyProgress.length
-  const weeklyPercent = Math.round((weeklyCompleted / weeklyGoal) * 100)
+  const weeklyCompleted = completedThisWeek(supabaseReservations, getChileDateString())
+  const weeklyPercent = weeklyGoal ? Math.min(100, Math.round((weeklyCompleted / weeklyGoal) * 100)) : 0
   const currentMonth = getChileDateString().slice(0, 7)
   const attendance = supabaseReservations.filter((reservation) => (
     reservation.status === 'attended'
@@ -454,10 +444,10 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
   const motivation = 'Entrena fuerte, entrena acompañado. El progreso se construye apareciendo.'
 
   const stats = useMemo(() => ([
-    { label: 'Reservas', value: visibleReservations.length },
-    { label: 'Asist. mes', value: attendance },
+    { label: 'Reservas', value: visibleReservations.filter(item => item.status === 'reserved').length },
+    { label: 'Asist. mes', value: isFetchingProfile || profileData?.reservationsIssue ? '—' : attendance },
     { label: 'Nivel', value: level },
-  ]), [attendance, level, visibleReservations.length])
+  ]), [attendance, level, visibleReservations, isFetchingProfile, profileData?.reservationsIssue])
 
   const hasUnsavedProfileChanges = useMemo(() => (
     formData.fullName !== (supabaseProfile?.full_name ?? currentUser?.name ?? '')
@@ -769,8 +759,10 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         </AnimatePresence>
       </MotionCard>
 
+      <AthletePreferences key={currentUser.id} userId={currentUser.id} onGoalChange={setWeeklyGoal} />
+
       <MotionCard as="section" className="k-card p-5" delay={0.06}>
-        <SectionTitle eyebrow="Progreso semanal" title={`${weeklyCompleted}/${weeklyGoal} entrenamientos`} />
+        <SectionTitle eyebrow="Progreso semanal" title={isFetchingProfile || profileData?.reservationsIssue ? 'Asistencia por confirmar' : weeklyGoal ? `${weeklyCompleted}/${weeklyGoal} sesiones` : `${weeklyCompleted} sesiones · sin meta definida`} />
         <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10">
           <Motion.div
             className="h-full rounded-full bg-kupan-ember shadow-glow"
@@ -780,11 +772,11 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           />
         </div>
-        <div className="mt-4 grid grid-cols-6 gap-2">
+        <div className="mt-4 grid grid-cols-7 gap-2">
           {weeklyProgress.map((item, index) => (
             <Motion.div
               key={`${item.day}-${index}`}
-              className={`rounded-lg border p-3 text-center ${
+              className={`rounded-lg border p-2 text-center ${
               item.done ? 'border-kupan-ember bg-kupan-ember/15 text-white' : 'border-white/10 bg-white/5 text-white/40'
             }`}
               initial={{ opacity: 0, y: 8 }}
@@ -849,7 +841,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
                   {record.record_date ? <p className="mt-1 text-xs font-bold uppercase text-white/45">{formatDate(record.record_date)}</p> : null}
                 </div>
                 <p className="text-lg font-black text-kupan-flame">
-                  {record.value} {record.unit ?? ''}
+                  {formatRecordValue(record)}
                 </p>
               </MotionCard>
             ))}

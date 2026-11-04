@@ -6,14 +6,7 @@ function getRankingError(message = `No pudimos cargar el ranking ${gymConfig.ide
   return { ok: false, message }
 }
 
-export function formatRankingDate(date) {
-  if (!date) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-CL', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(`${date}T00:00:00`))
-}
+export { formatCalendarDate as formatRankingDate } from './displayFormats.js'
 
 export async function loadPrRanking({ movement = '', level = '' } = {}) {
   if (!isSupabaseConfigured || !supabase) {

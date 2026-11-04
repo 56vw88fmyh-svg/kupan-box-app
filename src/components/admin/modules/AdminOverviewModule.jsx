@@ -25,8 +25,8 @@ export function AdminOverviewModule({
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <AdminStatCard label="Alumnos activos" value={dashboardValues.activeStudents} detail={dashboardValues.totalStudents} status={dataStatus.profiles ? 'attention' : 'normal'} onClick={() => onNavigate({ id: 'students' })} />
         <AdminStatCard label="Reservas de hoy" value={dashboardValues.todayReservations} detail={dashboardValues.todayClasses} status={dataStatus.reservations ? 'attention' : 'normal'} onClick={() => onNavigate({ id: 'reservations' })} />
-        <AdminStatCard label="Ocupación semanal" value={dashboardValues.weeklyOccupancy} detail="Según reservas futuras" status={dataStatus.reservations || dataStatus.schedule ? 'attention' : 'normal'} onClick={() => onNavigate({ id: 'reservations' })} />
-        <AdminStatCard label="Planes vencidos" value={dashboardValues.expiredMemberships} status={dataStatus.memberships ? 'attention' : totals.expiredMemberships > 0 ? 'critical' : 'normal'} detail="Revisar renovaciones" onClick={() => onNavigate({ id: 'memberships', target: 'membership-history' })} />
+        <AdminStatCard label="Ocupación semanal" value={dashboardValues.weeklyOccupancy} detail="Semana actual · lunes a domingo" status={dataStatus.reservations || dataStatus.schedule ? 'attention' : 'normal'} onClick={() => onNavigate({ id: 'reservations' })} />
+        <AdminStatCard label="Alumnos por renovar" value={dashboardValues.expiredMemberships} status={dataStatus.memberships ? 'attention' : totals.expiredMemberships > 0 ? 'critical' : 'normal'} detail="Sin ciclo vigente tras vencer el último" onClick={() => onNavigate({ id: 'memberships', target: 'membership-history' })} />
         <AdminStatCard label="Próximos vencimientos" value={dashboardValues.upcomingExpirations} status={dataStatus.memberships ? 'attention' : upcomingExpirations.length > 0 ? 'attention' : 'normal'} detail="10 días o menos" onClick={() => onNavigate({ id: 'memberships', target: 'membership-history' })} />
         <AdminStatCard label="Nuevos del mes" value={dashboardValues.newStudentsThisMonth} detail="Alumnos creados" status={dataStatus.profiles ? 'attention' : 'normal'} onClick={() => onNavigate({ id: 'students' })} />
       </section>
@@ -35,13 +35,13 @@ export function AdminOverviewModule({
         <div className="mb-4">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-sand">Operación comercial</p>
           <h3 id="commercial-metrics-title" className="k-display mt-1 text-2xl font-black uppercase text-white">Señales del mes</h3>
-          <p className="mt-2 text-sm leading-6 text-white/55">Ingresos considera pagos aprobados del mes. No-show usa asistencias cerradas. Lista de espera y pruebas muestran pendientes actuales.</p>
+          <p className="mt-2 text-sm leading-6 text-white/55">Ingresos considera pagos aprobados del mes. Ausencias se calcula sobre asistencias cerradas. Lista de espera y pruebas muestran pendientes actuales.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <AdminStatCard label="Pagos pendientes" value={dashboardValues.pendingPayments} detail="Por confirmar" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
-          <AdminStatCard label="Ingresos confirmados" value={typeof dashboardValues.confirmedIncome === 'number' ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(dashboardValues.confirmedIncome) : dashboardValues.confirmedIncome} detail="Mes actual" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
+          <AdminStatCard label="Ingresos confirmados" value={typeof dashboardValues.confirmedIncome === 'number' ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(dashboardValues.confirmedIncome) : dashboardValues.confirmedIncome} detail="Pagos aprobados del mes" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
           <AdminStatCard label="Ticket promedio" value={typeof dashboardValues.averageTicket === 'number' ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(dashboardValues.averageTicket) : dashboardValues.averageTicket} detail="Pagos aprobados" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
-          <AdminStatCard label="No-show" value={dashboardValues.noShowRate} detail="Mes actual" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
+          <AdminStatCard label="Ausencias" value={dashboardValues.noShowRate} detail="Asistencias cerradas del mes" status={dataStatus.reservations ? 'attention' : 'normal'} />
           <AdminStatCard label="Lista de espera" value={dashboardValues.waitlistCount} detail="Esperando cupo" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} onClick={() => onNavigate({ id: 'reservations' })} />
           <AdminStatCard label="Pruebas pendientes" value={dashboardValues.pendingTrials} detail="Por contactar" status={dataStatus.operationalMetrics ? 'attention' : 'normal'} />
         </div>

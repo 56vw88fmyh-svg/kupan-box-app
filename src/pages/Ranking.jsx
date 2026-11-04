@@ -1,3 +1,4 @@
+import { formatRecordValue as formatValue } from '../utils/displayFormats.js'
 import { useEffect, useMemo, useState } from 'react'
 import { MotionCard } from '../components/Motion.jsx'
 import { SectionTitle } from '../components/SectionTitle.jsx'
@@ -7,10 +8,6 @@ import { formatRankingDate, loadPrRanking } from '../utils/ranking.js'
 import { gymConfig } from '../config/gymConfig.js'
 
 const levels = ['Todos', 'Iniciado', 'Rookie', 'Scaled', 'RX']
-
-function formatValue(record) {
-  return `${Number(record.value).toLocaleString('es-CL')} ${record.unit}`
-}
 
 function RankingRow({ record, index }) {
   return (

@@ -1,3 +1,4 @@
+import { formatRecordValue as formatValue } from '../utils/displayFormats.js'
 import { parseTimeToSeconds } from '../utils/workoutResults.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Input, LoadingState, useToast } from '../components/ui/index.js'
@@ -53,19 +54,6 @@ function parsePositiveNumber(value) {
   return Number.isFinite(number) && number >= 0 ? number : null
 }
 
-
-function formatTime(seconds) {
-  const total = Math.max(Number(seconds) || 0, 0)
-  const minutes = Math.floor(total / 60)
-  const rest = total % 60
-  return `${minutes}:${String(rest).padStart(2, '0')}`
-}
-
-function formatValue(record) {
-  if (record.unit === 'tiempo') return formatTime(record.time_seconds ?? record.value)
-  if (record.rounds !== null && record.rounds !== undefined) return `${record.rounds} rondas + ${record.reps ?? 0} reps`
-  return `${Number(record.value).toLocaleString('es-CL')} ${record.unit}`
-}
 
 function getCategoryForMovement(movement) {
   const normalized = normalizeName(movement).toLowerCase()
@@ -367,7 +355,7 @@ export function PersonalRecords({ currentUser, setActivePage }) {
       resultType: record.rounds !== null && record.rounds !== undefined ? 'rounds_reps' : getDefaultResultType(record.unit),
       unit: record.unit,
       value: record.unit === 'tiempo' || record.rounds !== null && record.rounds !== undefined ? '' : String(record.value),
-      time: record.unit === 'tiempo' ? formatTime(record.time_seconds ?? record.value) : '',
+      time: record.unit === 'tiempo' ? formatValue({ ...record, unit: 'tiempo' }) : '',
       rounds: record.rounds ?? '',
       reps: record.reps ?? '',
       recordDate: record.record_date,

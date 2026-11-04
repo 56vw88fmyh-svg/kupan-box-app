@@ -1,0 +1,17 @@
+<!doctype html><html lang="es"><body><div id="root"></div><script type="module">
+import React from 'react'; import ReactDOM from 'react-dom/client';
+import {AthletePreferences} from '/src/components/AthletePreferences.jsx';
+import {Community} from '/src/pages/Community.jsx';
+import {Reservations} from '/src/pages/Reservations.jsx';
+import {ToastProvider} from '/src/components/ui/Toast.jsx';
+import {supabase} from '/src/lib/supabase.js';
+import '/src/styles.css';
+const {useState}=React;
+function Harness(){const [mode,setMode]=useState('preferences');const [goal,setGoal]=useState(null);
+if(supabase) supabase.auth.getSession=async()=>({data:{session:mode==='member'?{user:{id:'test-a'}}:null},error:null});
+return React.createElement(ToastProvider,null,React.createElement('main',null,
+ ...['preferences','guest','member','reservations'].map(m=>React.createElement('button',{key:m,onClick:()=>setMode(m)},m)),
+ mode==='preferences'?React.createElement(React.Fragment,null,React.createElement(AthletePreferences,{userId:'test-a',onGoalChange:setGoal}),React.createElement('output',{id:'goal'},String(goal))):
+ mode==='reservations'?React.createElement(Reservations,{currentUser:null,setActivePage:()=>{}}):React.createElement(Community,{key:mode,currentUser:mode==='member'?{id:'test-a'}:null,appContent:{},setActivePage:()=>{}})))}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Harness));
+</script></body></html>

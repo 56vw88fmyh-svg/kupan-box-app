@@ -1,3 +1,4 @@
+import { formatCoachName } from '../../utils/coachName.js'
 import { gymConfig } from '../../config/gymConfig.js'
 import { AdminIcon } from './AdminIcon.jsx'
 
@@ -118,7 +119,7 @@ export function AdminClassCard({ classItem, onAction }) {
         <div>
           <p className="text-2xl font-black text-white">{classItem.time}</p>
           <h4 className="mt-2 text-lg font-black uppercase leading-tight text-white">{classItem.name}</h4>
-          <p className="mt-1 text-sm font-bold leading-5 text-white/62">Coach {classItem.coach}</p>
+          <p className="mt-1 text-sm font-bold leading-5 text-white/62">Coach {formatCoachName(classItem.coach)}</p>
         </div>
         <span className={cn(
           'rounded-full border px-3 py-1 text-[0.62rem] font-black uppercase',

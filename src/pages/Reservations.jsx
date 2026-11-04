@@ -139,7 +139,7 @@ function PlanStatusCard({ currentUser, hasActiveMembership, membership, remainin
           </h2>
         </div>
         <Badge status={hasActiveMembership && hasTokens ? 'success' : 'warning'}>
-          {hasActiveMembership ? (hasTokens ? 'Listo para reservar' : 'Sin tokens') : 'Revisar plan'}
+          {hasActiveMembership ? (hasTokens ? 'Listo para reservar' : 'Sin tokens') : currentUser ? 'Revisar plan' : 'Sesión requerida'}
         </Badge>
       </div>
       {currentUser ? (
@@ -340,6 +340,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   const [remainingTokens, setRemainingTokens] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [reservationMessage, setReservationMessage] = useState('')
+  const [availabilityLoaded, setAvailabilityLoaded] = useState(false)
   const [selectedDateKey, setSelectedDateKey] = useState(weekDays[0]?.dateKey ?? getChileDateKey())
   const [processingClassKey, setProcessingClassKey] = useState('')
   const [cancelTarget, setCancelTarget] = useState(null)
@@ -354,6 +355,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   const waitlistByClassKey = useMemo(() => new Map(activeWaitlist.map((entry) => [`${entry.class_schedule_id}-${entry.reservation_date}`, entry])), [activeWaitlist])
 
   const refreshReservations = useCallback(async () => {
+    if (!currentUser?.id) { setAvailableClasses([]); setUserActiveReservations([]); setAvailabilityLoaded(false); setIsLoading(false); setReservationMessage(''); return }
     setIsLoading(true)
     const result = await loadReservationData(currentUser?.id)
     setIsLoading(false)
@@ -363,6 +365,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
       return
     }
 
+    setAvailabilityLoaded(true)
     setAvailableClasses(result.classes)
     setUserActiveReservations(result.reservations.map((reservation) => ({
       id: reservation.id,
@@ -518,25 +521,26 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
           </div>
           <div className="grid grid-cols-2 gap-2 sm:min-w-60">
             <Card variant="standard" className="p-3 text-center">
-              <p className="text-2xl font-black text-text-primary">{filteredClasses.length}</p>
+              <p className="text-2xl font-black text-text-primary">{isLoading || !availabilityLoaded || reservationMessage ? '—' : filteredClasses.length}</p>
               <p className="text-xs font-bold text-text-muted">clases</p>
             </Card>
             <Card variant="standard" className="p-3 text-center">
-              <p className="text-2xl font-black text-success">{hasOpenAccess ? 'Sin límite' : totalSpots}</p>
+              <p className="text-2xl font-black text-success">{isLoading || !availabilityLoaded || reservationMessage ? '—' : hasOpenAccess ? 'Sin límite' : totalSpots}</p>
               <p className="text-xs font-bold text-text-muted">{hasOpenAccess ? 'acceso abierto' : 'cupos'}</p>
             </Card>
           </div>
         </div>
       </section>
 
-      <PlanStatusCard
+      {currentUser && (availabilityLoaded || isLoading) ? <PlanStatusCard
         currentUser={currentUser}
         hasActiveMembership={hasActiveMembership}
         membership={membership}
         remainingTokens={remainingTokens}
         isLoading={isLoading}
-      />
+      /> : null}
 
+      {!currentUser ? <Card className="p-5"><h2 className="text-xl font-black text-white">Inicia sesión para consultar disponibilidad y reservar</h2><Button className="mt-4" onClick={() => setActivePage('login')}>Iniciar sesión</Button></Card> : null}
       <section className="space-y-4">
         <WeekSelector weekDays={weekDays} selectedDateKey={selectedDateKey} onSelect={setSelectedDateKey} />
 
@@ -546,7 +550,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
           <ErrorState title="Atencion" description={reservationMessage} actionLabel="Actualizar cupos" onAction={refreshReservations} />
         ) : null}
 
-        {!isLoading && !reservationMessage && filteredClasses.length === 0 ? (
+        {currentUser && availabilityLoaded && !isLoading && !reservationMessage && filteredClasses.length === 0 ? (
           <EmptyState
             title={gymConfig.id === 'kupan' && selectedDay?.dayId === '6' ? 'Hybrid y CrossFit: horarios por definir' : 'No hay clases programadas para este día.'}
             description={gymConfig.id === 'kupan' && selectedDay?.dayId === '6' ? 'Sábado: máximo 10 cupos por clase. Las reservas estarán disponibles cuando se publiquen los horarios.' : 'Puedes revisar otro día de la semana para encontrar el mejor horario.'}
@@ -578,7 +582,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
           <p className="text-xs font-black uppercase tracking-[0.2em] text-text-muted">Mis reservas</p>
           <h2 className="mt-1 text-2xl font-black text-text-primary">Tu agenda</h2>
         </div>
-        <ReservationList reservations={userActiveReservations} onCancel={requestCancel} processingKey={processingClassKey} />
+        {currentUser && availabilityLoaded && !reservationMessage ? <ReservationList reservations={userActiveReservations} onCancel={requestCancel} processingKey={processingClassKey} /> : <p className="text-sm text-white/70">{!currentUser ? 'Inicia sesión para ver tu agenda.' : reservationMessage ? 'No pudimos confirmar tu agenda.' : 'Cargando tu agenda…'}</p>}
       </section>
 
       <Dialog
