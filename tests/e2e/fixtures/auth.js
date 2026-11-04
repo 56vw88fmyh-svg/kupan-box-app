@@ -51,7 +51,7 @@ export async function loginAsStudent(page) {
 }
 
 export async function logout(page) {
-  await page.goto('/perfil')
+  await page.goto('/perfil?tab=settings')
   const button = page.getByRole('button', { name: /cerrar sesión|salir/i }).first()
   if (await button.count()) await button.click()
   await expect(page).toHaveURL(/\/login|\/perfil/)

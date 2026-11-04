@@ -1,0 +1,21 @@
+<!doctype html><html lang="es"><body><div id="root"></div><script type="module">
+import React from 'react';import ReactDOM from 'react-dom/client';import {MemoryRouter,useLocation,useNavigate} from 'react-router-dom';
+import {Profile} from '/src/pages/Profile.jsx';import {ModeSwitcher} from '/src/components/ModeSwitcher.jsx';
+import {Tabs} from '/src/components/ui/Tabs.jsx';import {Dialog} from '/src/components/ui/Dialog.jsx';import {ToastProvider} from '/src/components/ui/Toast.jsx';import {PwaUpdateBanner} from '/src/components/PwaUpdateBanner.jsx';
+import {installFormProtection,captureFormSave} from '/src/utils/formProtection.js';import {destinationFor} from '/src/navigation/flowContext.js';import '/src/styles.css';
+const {useEffect,useState}=React;
+const user={id:'00000000-0000-4000-8000-000000000001',name:'Atleta de prueba',role:'admin',status:'active',level:'RX'};
+function Harness(){const location=useLocation();const navigate=useNavigate();const [tab,setTab]=useState('one');const [open,setOpen]=useState(false);const [value,setValue]=useState('');useEffect(()=>installFormProtection(),[]);
+return React.createElement(ToastProvider,null,
+ React.createElement('main',{className:'k-app-main',id:'main-content'},
+ React.createElement(ModeSwitcher,{currentUser:user}),
+ React.createElement('output',{id:'route'},location.pathname+location.search),
+ React.createElement('button',{onClick:()=>navigate('/perfil?tab=membership')},'Abrir perfil'),
+ location.pathname==='/perfil'?React.createElement(Profile,{currentUser:user,setActivePage:(id,options)=>navigate(destinationFor(id,options)),onLogout:()=>navigate('/login')}):React.createElement(React.Fragment,null,
+ React.createElement(Tabs,{label:'Pestañas de prueba',items:[{id:'one',label:'Uno'},{id:'two',label:'Dos'},{id:'three',label:'Tres'}],value:tab,onChange:setTab,panelId:'panel'}),React.createElement('div',{id:'panel',role:'tabpanel'},tab),
+ React.createElement('button',{onClick:()=>setOpen(true)},'Abrir diálogo'),
+ React.createElement('form',{onSubmit:e=>{e.preventDefault();captureFormSave(e.currentTarget)()}},React.createElement('label',null,'Dato pendiente',React.createElement('input',{value,onChange:e=>setValue(e.target.value)})),React.createElement('button',{type:'submit'},'Guardar prueba')))),
+ React.createElement(Dialog,{isOpen:open,onClose:()=>setOpen(false),title:'Prueba de foco'},React.createElement('label',null,'Texto del diálogo',React.createElement('input',{value,onChange:e=>setValue(e.target.value)}))),
+ React.createElement(PwaUpdateBanner));}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(MemoryRouter,null,React.createElement(Harness)));
+</script></body></html>

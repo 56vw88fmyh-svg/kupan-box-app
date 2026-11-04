@@ -1,5 +1,8 @@
+/* global URLSearchParams */
+import { Tabs } from '../components/ui/Tabs.jsx'
+import { TrainingSummary } from '../components/TrainingSummary.jsx'
 import { formatRecordValue, formatCalendarDate } from '../utils/displayFormats.js'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Input, LoadingState, useToast } from '../components/ui/index.js'
 import { createPersonalRecord, getWorkoutResultHistory } from '../services/personalRecordsService.ts'
 import { formatChileDisplayDate, loadTodaysWod } from '../utils/communityFeed.js'
@@ -168,38 +171,15 @@ function TrainingSection({ description = '', duration = '', items, title }) {
   )
 }
 
-function LevelSelector({ selectedLevel, onSelect }) {
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="tablist" aria-label="Seleccionar nivel del WOD">
-      {levelOptions.map((level) => {
-        const isSelected = selectedLevel === level
-        return (
-          <button
-            key={level}
-            type="button"
-            role="tab"
-            aria-selected={isSelected}
-            className={`min-h-12 rounded-xl border px-3 py-2 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red ${
-              isSelected
-                ? 'border-brand-red bg-brand-red text-white shadow-[0_0_0_3px_rgba(240,68,68,.18)]'
-                : 'border-border-default bg-bg-card text-text-secondary hover:border-border-strong hover:bg-bg-elevated hover:text-text-primary'
-            }`}
-            onClick={() => onSelect(level)}
-          >
-            {level}
-            {isSelected ? <span className="mx-auto mt-1 block h-1 w-8 rounded-full bg-white" /> : null}
-          </button>
-        )
-      })}
-    </div>
-  )
+function LevelSelector({selectedLevel,onSelect}) {
+  return <Tabs label="Seleccionar nivel del WOD" items={levelOptions.map(level=>({id:level,label:level}))} value={selectedLevel} onChange={onSelect} panelId="wod-sections" />
 }
 
 function WodSurprise({ today, hidden }) {
   return (
     <Card as="section" variant="elevated" className="mx-auto w-full max-w-3xl px-6 py-10 text-center sm:px-10 sm:py-14">
       <span className="inline-flex rounded-lg border border-kupan-border bg-white/[0.04] px-3 py-2 text-sm font-bold normal-case text-kupan-sand">{today}</span>
-      <h1 className="mt-6 text-4xl font-black leading-tight text-text-primary sm:text-5xl">{hidden ? 'WOD sorpresa' : 'WOD aún no publicado'}</h1>
+      <h2 className="mt-6 text-4xl font-black leading-tight text-text-primary sm:text-5xl">{hidden ? 'WOD sorpresa' : 'WOD aún no publicado'}</h2>
       <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-text-secondary sm:text-lg">
         {hidden ? 'La programación se revelará al comenzar la clase.' : 'El coach todavía no ha publicado la programación de hoy. Vuelve a revisar más tarde.'}
       </p>
@@ -211,7 +191,10 @@ export function Wod({ appContent, currentUser, setActivePage }) {
   const todayLabel = formatChileDisplayDate()
   const { showToast } = useToast()
   const [state, setState] = useState({ isLoading: true, message: '', wod: null })
-  const [selectedLevel, setSelectedLevel] = useState(readSavedLevel)
+  const [selectedLevel, setSelectedLevel] = useState(() => levelOptions.includes(currentUser?.level) ? currentUser.level : readSavedLevel())
+  const preparedWod = useRef(null)
+  const openedFromShortcut = useRef(false)
+  const wantsResult = new URLSearchParams(window.location.search).get('action') === 'result'
   const [isResultOpen, setIsResultOpen] = useState(false)
   const [isSubmittingResult, setIsSubmittingResult] = useState(false)
   const [resultMessage, setResultMessage] = useState('')
@@ -250,6 +233,16 @@ export function Wod({ appContent, currentUser, setActivePage }) {
     })
     return () => { active = false }
   }, [wod, currentUser, selectedLevel, resultDraft.type, isResultOpen])
+
+  useEffect(() => {
+    if (wod && preparedWod.current !== wod.id) {
+      preparedWod.current = wod.id
+      const type = String(wod.type).toLowerCase()
+      const score = ['time','rounds_reps','load','distance','calories'].includes(type) ? type : type.includes('amrap') ? 'rounds_reps' : 'time'
+      setResultDraft({ ...emptyResultDraft, type: score })
+    }
+    if (wantsResult && wod && !isSurprise && currentUser && !openedFromShortcut.current) { openedFromShortcut.current = true; setIsResultOpen(true) }
+  }, [wantsResult,wod,isSurprise,currentUser])
 
   function handleLevelChange(level) {
     setSelectedLevel(level)
@@ -312,7 +305,9 @@ export function Wod({ appContent, currentUser, setActivePage }) {
   }
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8">
+    <div className="space-y-5 pb-24 md:pb-8">
+      <TrainingSummary currentUser={currentUser} setActivePage={setActivePage} />
+      {wantsResult && !currentUser ? <Card className="p-4"><p className="text-white/80">Inicia sesión para registrar tu resultado del WOD.</p><Button className="mt-3" onClick={() => setActivePage('login')}>Iniciar sesión</Button></Card> : null}
       {state.isLoading ? <LoadingState label="Cargando WOD de hoy" lines={4} /> : null}
 
       {state.message ? (
@@ -329,7 +324,7 @@ export function Wod({ appContent, currentUser, setActivePage }) {
                 <Badge state="neutral">WOD de hoy</Badge>
                 <p className="text-sm font-semibold text-text-muted">{todayLabel}</p>
               </div>
-              <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">{wod.title}</h1>
+              <h2 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">{wod.title}</h2>
               <p className="mt-2 text-base leading-7 text-text-secondary">{wod.type}</p>
               {wod.focus ? <p className="mt-3 text-sm leading-6 text-text-muted">{wod.focus}</p> : null}
             </div>
@@ -363,15 +358,15 @@ export function Wod({ appContent, currentUser, setActivePage }) {
                   Registrar resultado
                 </Button>
                 {canUseAdminMode ? (
-                  <Button type="button" variant="secondary" size="lg" onClick={() => setActivePage?.('admin')}>
-                    Editar WOD en admin
+                  <Button type="button" variant="secondary" size="lg" onClick={() => setActivePage?.(currentUser?.role === 'admin' ? 'admin' : 'coach')}>
+                    {currentUser?.role === 'admin' ? 'Editar WOD' : 'Abrir modo Coach'}
                   </Button>
                 ) : null}
               </div>
             </div>
           </Card>
 
-          <div className="mx-auto w-full max-w-4xl space-y-3">
+          <div id="wod-sections" role="tabpanel" aria-label={`Prescripción ${selectedLevel}`} tabIndex={0} className="mx-auto w-full max-w-4xl space-y-3">
             {sections.map((section) => (
               <TrainingSection key={section.id} {...section} />
             ))}

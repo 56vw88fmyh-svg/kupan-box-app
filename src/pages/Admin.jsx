@@ -1,5 +1,6 @@
 import { RegistrationDeliveryStatus } from '../components/admin/RegistrationDeliveryStatus.jsx'
 import { gymConfig } from '../config/gymConfig.js'
+import { captureFormSave } from '../utils/formProtection.js'
 import { renewalCandidates, weeklyOccupancy as calculateWeeklyOccupancy, monthlyAttendance } from '../utils/metricDefinitions.js'
 import { formatRecordValue, formatStatus } from '../utils/displayFormats.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -789,9 +790,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function savePlan(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     if (!(await ensureFreshAdmin())) return
     const result = await persistPlan(planDraft)
     if (!result.success) return showError('No pudimos guardar el plan.')
+    acknowledgeSave()
     setPlanDraft(createEmptyPlanDraft())
     showSuccess('Plan guardado correctamente.')
     await reloadAffectedSections(result.affectedSections)
@@ -1062,10 +1065,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveWod(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     if (!(await ensureFreshAdmin())) return
     saveWodDraftNow()
     const result = await persistWod(wodDraft)
     if (!result.success) return showError('No pudimos guardar el WOD.')
+    acknowledgeSave()
     markWodRemoteSaveSuccessful()
     setWodDraft(createEmptyWodDraft())
     showSuccess('WOD guardado correctamente.')
@@ -1104,9 +1109,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveSchedule(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     if (!(await ensureFreshAdmin())) return
     const result = await persistSchedule(scheduleDraft)
     if (!result.success) return showError('No pudimos guardar el horario.')
+    acknowledgeSave()
     setScheduleDraft(createEmptyScheduleDraft())
     showSuccess('Horario guardado correctamente.')
     await reloadAffectedSections(result.affectedSections)
@@ -1139,9 +1146,11 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function savePost(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     if (!(await ensureFreshAdmin())) return
     const result = await persistPost(postDraft)
     if (!result.success) return showError('No pudimos guardar la publicacion.')
+    acknowledgeSave()
     setPostDraft(createEmptyPostDraft())
     showSuccess('Publicación guardada correctamente.')
     await reloadAffectedSections(result.affectedSections)
@@ -1187,6 +1196,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function savePolicies(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     if (!(await ensureFreshAdmin())) return
     const invalid = Object.values(policyDraft).some((value) => !Number.isInteger(Number(value)) || Number(value) < 1)
     if (invalid) return showError('Todas las políticas deben ser números enteros mayores que cero.')
@@ -1197,6 +1207,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     }
     const result = await persistTexts(policyDraft, keys)
     if (!result.success) return showError(result.message || 'No pudimos guardar las políticas.')
+    acknowledgeSave()
     showSuccess('Políticas operativas guardadas.')
     await reloadSection('settings')
   }

@@ -1,3 +1,6 @@
+/* global URLSearchParams */
+import { installFormProtection } from './utils/formProtection.js'
+import { destinationFor, safeReturnTo, loginDestination } from './navigation/flowContext.js'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { BottomNav } from './components/BottomNav.jsx'
@@ -7,7 +10,7 @@ import { MotionPage } from './components/Motion.jsx'
 import { PwaUpdateBanner } from './components/PwaUpdateBanner.jsx'
 import { gymConfig } from './config/gymConfig.js'
 import { ProtectedRoute } from './navigation/ProtectedRoute.jsx'
-import { getPathForPageId, getRouteMeta, routeAliases } from './navigation/routes.js'
+import { getRouteMeta, routeAliases } from './navigation/routes.js'
 import { isSupabaseConfigured, supabase } from './lib/supabase.js'
 import { getCurrentSupabaseUser, loginWithSupabase, logoutFromSupabase, registerWithSupabase } from './utils/auth.js'
 import { defaultAdminContent } from './utils/adminContent.js'
@@ -31,6 +34,7 @@ const Wod = lazy(() => import('./pages/Wod.jsx').then((module) => ({ default: mo
 
 export default function App() {
   const navigate = useNavigate()
+  useEffect(() => installFormProtection(), [])
   const location = useLocation()
   const [pendingReservation, setPendingReservation] = useState(null)
   const [appContent, setAppContent] = useState(defaultAdminContent)
@@ -47,8 +51,8 @@ export default function App() {
     return () => window.removeEventListener('online', retry)
   }, [currentUser?.id])
 
-  function goToPage(pageId) {
-    navigate(getPathForPageId(pageId))
+  function goToPage(pageId, options = {}) {
+    navigate(pageId === 'login' ? loginDestination(window.location.pathname + window.location.search) : destinationFor(pageId, options))
   }
 
   async function login(credentials) {
@@ -57,7 +61,11 @@ export default function App() {
     if (!result.ok) return result
 
     setCurrentUser(result.user)
-    navigate(result.user?.forcePasswordChange ? '/cambio-password-obligatorio' : '/perfil')
+    const returnTo = safeReturnTo(new URLSearchParams(location.search).get('returnTo'))
+    if (result.user?.forcePasswordChange) {
+      window.sessionStorage.setItem('kupan_return_after_password', returnTo)
+      navigate('/cambio-password-obligatorio')
+    } else navigate(returnTo, { replace: true })
     return result
   }
 
@@ -68,7 +76,7 @@ export default function App() {
 
     if (result.user) {
       setCurrentUser(result.user)
-      navigate('/perfil')
+      navigate(safeReturnTo(new URLSearchParams(location.search).get('returnTo')), { replace: true })
     }
 
     return result
@@ -137,6 +145,11 @@ export default function App() {
       isMounted = false
     }
   }, [authChecked, currentUser, location.pathname])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+    document.getElementById('main-content')?.focus({ preventScroll: true })
+  }, [location.pathname])
 
   useEffect(() => {
     const shortcut = new window.URLSearchParams(location.search).get('shortcut')
@@ -208,7 +221,7 @@ export default function App() {
                 <Route path="/wod/pr" element={gymConfig.features.wod ? <PersonalRecords currentUser={currentUser} setActivePage={goToPage} /> : <Navigate to="/" replace />} />
                 <Route path="/ranking" element={gymConfig.features.community && gymConfig.features.wod ? <Ranking /> : <Navigate to="/" replace />} />
                 <Route path="/comunidad/ranking" element={gymConfig.features.community && gymConfig.features.wod ? <Ranking /> : <Navigate to="/" replace />} />
-                <Route path="/login" element={authChecked && currentUser ? <Navigate to="/perfil" replace /> : <Auth onLogin={login} onRegister={register} />} />
+                <Route path="/login" element={authChecked && currentUser ? <Navigate to={safeReturnTo(new URLSearchParams(location.search).get('returnTo'))} replace /> : <Auth onLogin={login} onRegister={register} />} />
                 <Route path="/actualizar-password" element={<PasswordUpdate currentUser={currentUser} onUserUpdate={setCurrentUser} />} />
                 <Route
                   path="/cambio-password-obligatorio"

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v33'
+const CACHE_VERSION = 'v20261104-stage3'
 const HOST_CACHE_PREFIX = `wl-${self.location.hostname.replace(/[^a-z0-9-]/gi, '-')}`
 const STATIC_CACHE = `${HOST_CACHE_PREFIX}-static-${CACHE_VERSION}`
 const HTML_CACHE = `${HOST_CACHE_PREFIX}-html-${CACHE_VERSION}`
@@ -91,6 +91,7 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'GET_VERSION') event.ports?.[0]?.postMessage({ version: CACHE_VERSION })
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
 })
 

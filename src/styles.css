@@ -669,3 +669,24 @@ select,
 textarea {
   font-size: 16px !important;
 }
+
+/* Keep the existing KUPAN palette; give content and controls a calmer hierarchy. */
+.k-app-main h2:not(.k-display), .k-app-main h3 {
+  text-transform: none;
+  letter-spacing: normal;
+}
+.k-app-main .k-button, .k-app-main .k-button-secondary {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  box-shadow: none;
+}
+.k-app-main [class~="text-white/30"], .k-app-main [class~="text-white/40"],
+.k-app-main [class~="text-white/45"], .k-app-main [class~="text-white/50"],
+.k-app-main [class~="text-white/55"] { color: rgba(255,255,255,0.72); }
+.k-app-main [role="tablist"] { scroll-padding-inline: 1rem; }
+.k-app-main [role="tabpanel"] { min-width: 0; }
+.k-app-main :is(input,select,textarea) { min-width: 0; }
+.k-app-main :is(p,h1,h2,h3) { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

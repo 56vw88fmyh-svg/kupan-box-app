@@ -1,3 +1,4 @@
+import { Tabs } from '../components/ui/Tabs.jsx'
 import { formatRecordValue } from '../utils/displayFormats.js'
 import { useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, EmptyState, ErrorState, LoadingState, StaleDataState } from '../components/ui/index.js'
@@ -242,13 +243,13 @@ export function Community({ appContent, currentUser, setActivePage }) {
     birthdays: <BirthdaysSection birthdays={state.birthdays} />,
   }[activeTab]
 
-  if (!currentUser) return <Card className="p-5"><h1 className="text-2xl font-black text-white">Comunidad de miembros</h1><p className="mt-3 text-white/70">Inicia sesión para ver actividad y reconocimientos compartidos por los atletas.</p><Button className="mt-4" onClick={() => setActivePage('login')}>Iniciar sesión</Button></Card>
+  if (!currentUser) return <Card className="p-5"><h2 className="text-2xl font-black text-white">Comunidad de miembros</h2><p className="mt-3 text-white/70">Inicia sesión para ver actividad y reconocimientos compartidos por los atletas.</p><Button className="mt-4" onClick={() => setActivePage('login')}>Iniciar sesión</Button></Card>
   return (
     <div className="space-y-6 pb-24 md:pb-8">
       <Card as="section" variant="elevated" className="overflow-hidden p-0">
         <div className="border-b border-border-default bg-bg-secondary p-5">
           <Badge state="neutral">Comunidad {gymConfig.identity.name}</Badge>
-          <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">Comunidad en una sola pizarra.</h1>
+          <h2 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">Comunidad en una sola pizarra.</h2>
           <p className="mt-3 text-base leading-7 text-text-secondary">
             {gymConfig.features.wod ? 'Noticias, eventos y reconocimientos de quienes eligen participar.' : 'Actividad, eventos, noticias y ranking del centro de entrenamiento.'}
           </p>
@@ -259,29 +260,13 @@ export function Community({ appContent, currentUser, setActivePage }) {
         </div>
       </Card>
 
-      <div className="flex gap-2 overflow-x-auto k-scroll-x pb-1" role="tablist" aria-label="Subsecciones de comunidad">
-        {tabs.map((tab) => {
-          const selected = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              className={`min-h-11 shrink-0 rounded-xl border px-4 text-sm font-black transition ${selected ? 'border-brand-red bg-brand-red text-white' : 'border-border-default bg-bg-card text-text-secondary hover:bg-bg-elevated hover:text-text-primary'}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-              {selected ? <span className="mx-auto mt-1 block h-1 w-8 rounded-full bg-white" /> : null}
-            </button>
-          )
-        })}
-      </div>
-
+      <Tabs label="Subsecciones de comunidad" items={tabs.map(tab=>({id:tab.id,label:tab.label}))} value={activeTab} onChange={setActiveTab} panelId="community-panel" />
+      <div id="community-panel" role="tabpanel" aria-label={tabs.find(tab=>tab.id===activeTab)?.label} tabIndex={0}>
       {state.isLoading ? <LoadingState label="Cargando comunidad" lines={4} /> : null}
       {!state.isLoading && state.message ? <ErrorState title="Algunos bloques no cargaron" description={state.message} onAction={() => setReloadKey((current) => current + 1)} /> : null}
       {!state.isLoading && state.message && hasVisibleData ? <StaleDataState onRetry={() => setReloadKey((current) => current + 1)} /> : null}
       {!state.isLoading && (!state.message || hasVisibleData) ? activeContent : null}
+      </div>
     </div>
   )
 }

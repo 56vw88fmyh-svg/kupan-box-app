@@ -1,3 +1,4 @@
+import { safeReturnTo } from '../navigation/flowContext.js'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Input } from '../components/ui/index.js'
@@ -99,7 +100,9 @@ export function PasswordUpdate({ currentUser, forced = false, onUserUpdate }) {
 
     window.setTimeout(() => {
       if (forced) {
-        navigate('/perfil', { replace: true })
+        const returnTo = safeReturnTo(window.sessionStorage.getItem('kupan_return_after_password'), '/perfil')
+        window.sessionStorage.removeItem('kupan_return_after_password')
+        navigate(returnTo, { replace: true })
       } else {
         supabase.auth.signOut().finally(() => navigate('/login', { replace: true }))
       }

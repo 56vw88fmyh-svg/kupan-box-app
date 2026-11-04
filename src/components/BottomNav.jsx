@@ -78,10 +78,10 @@ export function BottomNav({ currentUser }) {
               className={({ isActive }) => {
                 const active = isActive || isActiveByGroup
                 return cn(
-                  'k-tab-item relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 text-[0.62rem] font-black transition duration-200',
+                  'k-tab-item relative flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 text-xs font-black transition duration-200',
                   active
                     ? 'border-kupan-root-hover/70 bg-kupan-ember text-kupan-bone shadow-[0_8px_20px_rgba(155,42,49,0.28)]'
-                    : 'border-transparent text-white/60 hover:border-kupan-border hover:bg-white/10 hover:text-white',
+                    : 'border-transparent text-white/80 hover:border-kupan-border hover:bg-white/10 hover:text-white',
                 )
               }}
             >
@@ -93,7 +93,7 @@ export function BottomNav({ currentUser }) {
                     <span className={cn('mt-1 flex h-7 w-7 items-center justify-center rounded-lg text-xs', active ? 'bg-white/20' : 'bg-white/10')}>
                       <NavIcon icon={page.icon} isActive={active} />
                     </span>
-                    <span className="max-w-full truncate leading-none">{page.label}</span>
+                    <span className="max-w-full leading-tight">{page.label}</span>
                   </span>
                 )
               }}

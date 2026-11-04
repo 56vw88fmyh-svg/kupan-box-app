@@ -1,3 +1,4 @@
+import { captureFormSave } from '../utils/formProtection.js'
 import { formatRecordValue as formatValue } from '../utils/displayFormats.js'
 import { parseTimeToSeconds } from '../utils/workoutResults.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -323,6 +324,7 @@ export function PersonalRecords({ currentUser, setActivePage }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     const input = buildPayload(formData)
     if (!input.ok) {
       setMessage(input.message)
@@ -343,6 +345,7 @@ export function PersonalRecords({ currentUser, setActivePage }) {
       ? current.map((record) => (record.id === result.record.id ? result.record : record))
       : [result.record, ...current]))
     showToast({ type: 'success', title: 'Guardado correctamente', description: result.message })
+    acknowledgeSave()
     resetForm()
   }
 
@@ -390,7 +393,7 @@ export function PersonalRecords({ currentUser, setActivePage }) {
       <div className="space-y-6 pb-24 md:pb-8">
         <Card as="section" variant="elevated" className="p-5">
           <Badge state="neutral">Mis PR</Badge>
-          <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary">Inicia sesión para registrar tus marcas.</h1>
+          <h2 className="mt-4 text-3xl font-black leading-tight text-text-primary">Inicia sesión para registrar tus marcas.</h2>
           <p className="mt-3 text-base leading-7 text-text-secondary">Tus PR son personales y se guardan de forma segura para que no desaparezcan al actualizar la app.</p>
           <Button type="button" className="mt-5" fullWidth onClick={() => setActivePage('login')}>Iniciar sesión</Button>
         </Card>
@@ -403,7 +406,7 @@ export function PersonalRecords({ currentUser, setActivePage }) {
       <Card as="section" variant="elevated" className="overflow-hidden p-0">
         <div className="border-b border-border-default bg-bg-secondary p-5">
           <Badge state="neutral">Récords personales</Badge>
-          <h1 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">Tus marcas quedan guardadas.</h1>
+          <h2 className="mt-4 text-3xl font-black leading-tight text-text-primary sm:text-4xl">Tus marcas quedan guardadas.</h2>
           <p className="mt-3 text-base leading-7 text-text-secondary">Tus datos guardados son la fuente principal. Si la conexión falla, mantenemos visible la última información válida y puedes reintentar.</p>
         </div>
         <div className="grid grid-cols-3 border-b border-border-default">

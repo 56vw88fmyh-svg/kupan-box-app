@@ -1,3 +1,4 @@
+import { captureFormSave } from '../utils/formProtection.js'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { Button, Card, Input } from './ui/index.js'
@@ -26,6 +27,7 @@ export function AthletePreferences({ userId, onGoalChange }) {
   }, [userId,onGoalChange,attempt])
   async function save(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     if (busy || !loaded) return
     const goal = draft.weekly_goal === '' || draft.weekly_goal === null ? null : Number(draft.weekly_goal)
     if (goal !== null && (!Number.isInteger(goal) || goal < 1 || goal > 14)) { setMessage('Elige una meta entre 1 y 14 sesiones por semana.'); return }
@@ -35,7 +37,7 @@ export function AthletePreferences({ userId, onGoalChange }) {
     const {error} = await supabase.from('athlete_preferences').upsert({ ...draft, weekly_goal:goal,community_alias:alias,profile_id:userId },{onConflict:'profile_id'})
     setBusy(false)
     setMessage(error ? 'No pudimos guardar tus preferencias. Intenta nuevamente.' : 'Preferencias guardadas.')
-    if (!error) onGoalChange(goal)
+    if (!error) { acknowledgeSave(); onGoalChange(goal) }
   }
   return <Card className="p-5">
     <h2 className="text-xl font-black text-white">Tu meta y privacidad</h2>

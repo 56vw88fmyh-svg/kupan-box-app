@@ -1,3 +1,4 @@
+/* global URLSearchParams */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, LoadingState, useToast } from '../components/ui/index.js'
 import {
@@ -56,15 +57,6 @@ function parseLocalClassDateTime(reservationDate, time) {
   return getChileDateTime(reservationDate, time)
 }
 
-function formatMembershipDate(date) {
-  if (!date) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-CL', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: CHILE_TIME_ZONE,
-  }).format(new Date(`${date}T00:00:00`))
-}
 
 function getDurationLabel(item) {
   const duration = item.durationMinutes ?? item.duration_minutes ?? item.duration
@@ -117,54 +109,13 @@ function getClassKey(item) {
   return `${item.classScheduleId}-${item.reservationDate}`
 }
 
-function PlanStatusCard({ currentUser, hasActiveMembership, membership, remainingTokens, isLoading }) {
-  const isUnlimitedPlan = Boolean(membership?.is_unlimited)
-  const planName = membership?.plan?.name ?? membership?.plan_name ?? `Plan ${gymConfig.identity.name}`
-  const expiresAt = membership?.end_date ?? membership?.expires_at
-  const hasTokens = isUnlimitedPlan || remainingTokens === null || Number(remainingTokens) > 0
-
-  return (
-    <Card variant="standard" className="p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">Tu acceso</p>
-          <h2 className="mt-1 text-lg font-black text-text-primary">
-            {isLoading
-              ? 'Actualizando plan...'
-              : !currentUser
-                ? 'Inicia sesión para reservar'
-                : hasActiveMembership
-                  ? planName
-                  : 'Sin plan activo'}
-          </h2>
-        </div>
-        <Badge status={hasActiveMembership && hasTokens ? 'success' : 'warning'}>
-          {hasActiveMembership ? (hasTokens ? 'Listo para reservar' : 'Sin tokens') : currentUser ? 'Revisar plan' : 'Sesión requerida'}
-        </Badge>
-      </div>
-      {currentUser ? (
-        <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-          <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
-            <p className="text-xs text-text-muted">Tokens</p>
-            <p className="mt-1 font-black text-text-primary">{hasActiveMembership ? (isUnlimitedPlan ? 'Full' : remainingTokens ?? 0) : '-'}</p>
-          </div>
-          <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
-            <p className="text-xs text-text-muted">Vence</p>
-            <p className="mt-1 font-black text-text-primary">{hasActiveMembership ? formatMembershipDate(expiresAt) : 'Sin fecha'}</p>
-          </div>
-          <div className="rounded-xl border border-border-default bg-bg-secondary p-3">
-            <p className="text-xs text-text-muted">Estado</p>
-            <p className="mt-1 font-black text-text-primary">{hasActiveMembership && hasTokens ? 'Activo' : 'Bloqueado'}</p>
-          </div>
-        </div>
-      ) : null}
-      {currentUser && (!hasActiveMembership || !hasTokens) ? (
-        <p className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm font-semibold text-text-secondary">
-          Para reservar necesitas un plan activo y cupos disponibles. Si ya pagaste, pide revisión en recepción.
-        </p>
-      ) : null}
-    </Card>
-  )
+function PlanStatusCard({ currentUser, hasActiveMembership, membership, remainingTokens, isLoading, onPlan }) {
+  if (!currentUser) return null
+  const unlimited = Boolean(membership?.is_unlimited ?? membership?.plan?.is_unlimited)
+  return <Card className="flex flex-wrap items-center justify-between gap-2 p-3">
+    <p className="text-sm text-white/85">{isLoading ? 'Consultando plan…' : hasActiveMembership ? `${membership?.plan?.name ?? membership?.plan_name ?? 'Plan activo'} · ${unlimited ? 'Sin descuento de clases' : `${remainingTokens ?? '—'} clases disponibles`}` : 'Necesitas un plan activo para reservar.'}</p>
+    <Button variant="tertiary" size="sm" onClick={onPlan}>Ver mi plan</Button>
+  </Card>
 }
 
 function WeekSelector({ weekDays, selectedDateKey, onSelect }) {
@@ -180,14 +131,14 @@ function WeekSelector({ weekDays, selectedDateKey, onSelect }) {
               aria-pressed={isSelected}
               aria-label={`Ver clases de ${day.label}`}
               onClick={() => onSelect(day.dateKey)}
-              className={`min-h-20 min-w-[4.75rem] rounded-2xl border px-3 py-3 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red ${
+              className={`min-h-16 min-w-[3.75rem] rounded-xl border px-2 py-2 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-red ${
                 isSelected
                   ? 'border-brand-red bg-brand-red text-white shadow-[0_0_0_3px_rgba(240,68,68,.18)]'
                   : 'border-border-default bg-bg-card text-text-secondary hover:border-border-strong hover:bg-bg-elevated hover:text-text-primary'
               }`}
             >
               <span className="block text-xs font-black uppercase tracking-[0.12em]">{day.short}</span>
-              <span className="mt-1 block text-2xl font-black leading-none">{day.number}</span>
+              <span className="mt-1 block text-xl font-black leading-none">{day.number}</span>
               <span className="mt-1 block text-[0.68rem] font-bold uppercase opacity-80">{day.month}</span>
               {isSelected ? <span className="mx-auto mt-2 block h-1.5 w-8 rounded-full bg-white" /> : null}
             </button>
@@ -341,7 +292,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   const [isLoading, setIsLoading] = useState(false)
   const [reservationMessage, setReservationMessage] = useState('')
   const [availabilityLoaded, setAvailabilityLoaded] = useState(false)
-  const [selectedDateKey, setSelectedDateKey] = useState(weekDays[0]?.dateKey ?? getChileDateKey())
+  const [selectedDateKey, setSelectedDateKey] = useState(() => { const requested = new URLSearchParams(window.location.search).get('date'); return weekDays.some(day => day.dateKey === requested) ? requested : weekDays[0]?.dateKey ?? getChileDateKey() })
   const [processingClassKey, setProcessingClassKey] = useState('')
   const [cancelTarget, setCancelTarget] = useState(null)
 
@@ -509,26 +460,17 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
   }) : null
 
   return (
-    <div className="space-y-6 pb-24 md:pb-8">
+    <div className="space-y-4 pb-24 md:pb-8">
       <section className="space-y-3">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-red">Reservas</p>
+
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="k-display text-4xl font-black leading-none text-text-primary sm:text-5xl">Reserva tu próxima clase</h2>
-            <p className="mt-2 max-w-2xl text-base leading-7 text-text-secondary">
-              {gymConfig.id === 'kupan' ? 'Elige el día y reserva tu clase de CrossFit o Hybrid. Máximo 10 cupos por clase.' : 'Elige el día y reserva. Los bloques de CrossFit y personalizado tienen acceso abierto dentro del rango publicado.'}
+            <h2 className="k-display text-2xl font-bold leading-tight text-text-primary sm:text-3xl">Reserva tu próxima clase</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">
+              Elige un día y un horario disponible.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:min-w-60">
-            <Card variant="standard" className="p-3 text-center">
-              <p className="text-2xl font-black text-text-primary">{isLoading || !availabilityLoaded || reservationMessage ? '—' : filteredClasses.length}</p>
-              <p className="text-xs font-bold text-text-muted">clases</p>
-            </Card>
-            <Card variant="standard" className="p-3 text-center">
-              <p className="text-2xl font-black text-success">{isLoading || !availabilityLoaded || reservationMessage ? '—' : hasOpenAccess ? 'Sin límite' : totalSpots}</p>
-              <p className="text-xs font-bold text-text-muted">{hasOpenAccess ? 'acceso abierto' : 'cupos'}</p>
-            </Card>
-          </div>
+          <p className="text-sm text-white/75" role="status">{isLoading || !availabilityLoaded || reservationMessage ? 'Disponibilidad por confirmar' : `${filteredClasses.length} clases · ${hasOpenAccess ? 'acceso abierto' : `${totalSpots} cupos disponibles`}`}</p>
         </div>
       </section>
 
@@ -538,11 +480,12 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
         membership={membership}
         remainingTokens={remainingTokens}
         isLoading={isLoading}
+        onPlan={() => setActivePage('my-plan')}
       /> : null}
 
       {!currentUser ? <Card className="p-5"><h2 className="text-xl font-black text-white">Inicia sesión para consultar disponibilidad y reservar</h2><Button className="mt-4" onClick={() => setActivePage('login')}>Iniciar sesión</Button></Card> : null}
       <section className="space-y-4">
-        <WeekSelector weekDays={weekDays} selectedDateKey={selectedDateKey} onSelect={setSelectedDateKey} />
+        <WeekSelector weekDays={weekDays} selectedDateKey={selectedDateKey} onSelect={date => { setSelectedDateKey(date); setActivePage('reservations',{date}) }} />
 
         {isLoading ? <LoadingState title="Cargando horarios" description={`Estamos revisando cupos reales desde ${gymConfig.identity.name}.`} /> : null}
 

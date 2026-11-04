@@ -1,6 +1,8 @@
+import { captureFormSave } from '../utils/formProtection.js'
+/* global URLSearchParams */
+import { Tabs } from '../components/ui/Tabs.jsx'
 import { AthletePreferences } from '../components/AthletePreferences.jsx'
-import { completedThisWeek, weekRange, addCalendarDays } from '../utils/metricDefinitions.js'
-import { formatRecordValue, formatCalendarDate, formatStatus } from '../utils/displayFormats.js'
+import { formatCalendarDate, formatStatus } from '../utils/displayFormats.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
@@ -18,9 +20,6 @@ import {
 } from '../utils/profileData.js'
 import { gymConfig } from '../config/gymConfig.js'
 
-const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
-const weekDayInitials = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
-
 function getChileDateString(date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Santiago',
@@ -30,21 +29,7 @@ function getChileDateString(date = new Date()) {
   }).format(date)
 }
 
-function buildWeeklyProgress(reservations) {
-  const todayKey = getChileDateString()
-  const { start } = weekRange(todayKey)
-  const attendedDates = new Set(
-    reservations
-      .filter((reservation) => reservation.status === 'attended')
-      .map((reservation) => reservation.reservation_date ?? reservation.reservationDate),
-  )
-
-  return weekDayInitials.map((day, index) => {
-    const dateKey = addCalendarDays(start, index)
-    return { day, date: dateKey, done: attendedDates.has(dateKey) }
-  })
-}
-
+const dayNames = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
 const formatDate = formatCalendarDate
 
 function formatCurrency(value) {
@@ -289,7 +274,9 @@ function StudentDashboard({
 
 export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) {
   const location = useLocation()
-  const [weeklyGoal, setWeeklyGoal] = useState(null)
+  const requestedTab = new URLSearchParams(location.search).get('tab')
+  const activeTab = ['membership','account','settings'].includes(requestedTab) ? requestedTab : 'membership'
+  const [, setWeeklyGoal] = useState(null)
   const profileRequestIdRef = useRef(0)
   const [profileData, setProfileData] = useState(null)
   const [isFetchingProfile, setIsFetchingProfile] = useState(false)
@@ -399,9 +386,6 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
   const supabaseProfile = profileData?.profile
   const activeMembership = profileData?.membership
   const supabaseReservations = useMemo(() => profileData?.reservations ?? [], [profileData?.reservations])
-  const personalRecords = useMemo(() => profileData?.records ?? [], [profileData?.records])
-  const recordsIssue = profileData?.recordsIssue ?? ''
-  const visibleReservations = supabaseReservations
   const accessRestricted = new window.URLSearchParams(location.search).get('access') === 'restricted'
 
   const profileName = supabaseProfile?.full_name ?? currentUser?.name ?? `Atleta ${gymConfig.identity.name}`
@@ -432,22 +416,6 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         return aDateTime.localeCompare(bDateTime)
       })[0] ?? null
   }, [supabaseReservations])
-
-  const weeklyProgress = useMemo(() => buildWeeklyProgress(supabaseReservations), [supabaseReservations])
-  const weeklyCompleted = completedThisWeek(supabaseReservations, getChileDateString())
-  const weeklyPercent = weeklyGoal ? Math.min(100, Math.round((weeklyCompleted / weeklyGoal) * 100)) : 0
-  const currentMonth = getChileDateString().slice(0, 7)
-  const attendance = supabaseReservations.filter((reservation) => (
-    reservation.status === 'attended'
-    && String(reservation.reservation_date ?? reservation.reservationDate ?? '').startsWith(currentMonth)
-  )).length
-  const motivation = 'Entrena fuerte, entrena acompañado. El progreso se construye apareciendo.'
-
-  const stats = useMemo(() => ([
-    { label: 'Reservas', value: visibleReservations.filter(item => item.status === 'reserved').length },
-    { label: 'Asist. mes', value: isFetchingProfile || profileData?.reservationsIssue ? '—' : attendance },
-    { label: 'Nivel', value: level },
-  ]), [attendance, level, visibleReservations, isFetchingProfile, profileData?.reservationsIssue])
 
   const hasUnsavedProfileChanges = useMemo(() => (
     formData.fullName !== (supabaseProfile?.full_name ?? currentUser?.name ?? '')
@@ -481,6 +449,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
 
   async function handleSaveProfile(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     setProfileMessage('')
     setMessageType('error')
 
@@ -498,6 +467,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
       return
     }
 
+    acknowledgeSave()
     setProfileData((current) => ({
       ...current,
       profile: result.profile,
@@ -518,6 +488,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
 
   async function handleChangePassword(event) {
     event.preventDefault()
+    const acknowledgeSave = captureFormSave(event.currentTarget)
     setPasswordMessage('')
     setPasswordMessageType('error')
 
@@ -535,6 +506,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
       return
     }
 
+    acknowledgeSave()
     setPasswordForm({ password: '', confirmPassword: '' })
     setPasswordMessageType('success')
     setPasswordMessage(result.message)
@@ -570,38 +542,21 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
       <MotionCard as="section" className="k-card overflow-hidden p-0">
         <div className="border-b border-white/10 bg-black/25 p-5">
           <div className="flex items-start gap-4">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border border-kupan-ember/50 bg-kupan-ember text-4xl font-black text-white shadow-glow">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-kupan-ember/50 bg-kupan-ember text-4xl font-black text-white shadow-glow">
               {profileName.charAt(0)}
             </div>
             <div className="min-w-0">
               <p className="k-pill inline-flex text-kupan-flame">Atleta {gymConfig.identity.name}</p>
-              <h2 className="mt-3 break-words text-4xl font-black uppercase leading-none text-white">{profileName}</h2>
+              <h2 className="mt-3 break-words text-2xl font-bold leading-tight text-white">{profileName}</h2>
               <p className="mt-2 text-sm text-white/60">{email}</p>
             </div>
           </div>
 
-          <div className="mt-5 rounded-lg border border-kupan-ember/30 bg-kupan-ember/10 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Frase de la semana</p>
-            <p className="mt-2 text-xl font-black uppercase leading-tight text-white">{motivation}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-0 border-b border-white/10">
-          {stats.map((item, index) => (
-            <div key={item.label} className={`${index > 0 ? 'border-l border-white/10' : ''} min-w-0 px-3 py-4 sm:p-4`}>
-              <p className={`${item.label === 'Nivel' ? 'text-base text-kupan-flame sm:text-xl' : 'text-3xl text-white'} break-words font-black uppercase leading-none`}>{item.value}</p>
-              <p className="mt-2 text-[0.65rem] font-black uppercase text-white/60">{item.label}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="p-5">
-          <button type="button" className="k-button-secondary w-full" onClick={onLogout}>
-            Cerrar sesión
-          </button>
         </div>
       </MotionCard>
-
+      <Tabs label="Secciones de Perfil" items={[{id:'membership',label:'Membresía'},{id:'account',label:'Cuenta'},{id:'settings',label:'Ajustes'}]} value={activeTab} onChange={tab=>setActivePage('profile',{tab})} panelId="profile-panel" />
+      <div id="profile-panel" role="tabpanel" aria-label={activeTab === 'membership' ? 'Membresía' : activeTab === 'account' ? 'Cuenta' : 'Ajustes'} tabIndex={0}>
+      <section hidden={activeTab !== 'membership'} className="space-y-5">
       <MembershipSummary
         membership={activeMembership}
         planName={planName}
@@ -624,6 +579,8 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         setActivePage={setActivePage}
       />
 
+      </section>
+      <section hidden={activeTab !== 'account'} className="space-y-5">
       <MotionCard as="section" className="k-card p-5" delay={0.03}>
         <SectionTitle eyebrow="Datos del atleta" title={`Tu ficha ${gymConfig.identity.name}`} />
         {isFetchingProfile ? <p className="mb-4 text-sm font-bold text-white/60">Cargando tus datos seguros...</p> : null}
@@ -635,7 +592,7 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
           <ProfileField label="Edad" value={age !== null ? `${age} años` : 'Sin registrar'} />
           <ProfileField label="Nivel" value={level} />
           <ProfileField label="Estado" value={status === 'active' ? 'Activo' : 'Inactivo'} />
-          <ProfileField label="Rol" value={currentUser.role === 'admin' ? 'Admin' : 'Alumno'} />
+          <ProfileField label="Rol" value={currentUser.role === 'admin' ? 'Administrador' : currentUser.role === 'coach' ? 'Coach' : 'Alumno'} />
         </div>
       </MotionCard>
 
@@ -709,6 +666,8 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
         </AnimatePresence>
       </MotionCard>
 
+      </section>
+      <section hidden={activeTab !== 'settings'} className="space-y-5">
       <MotionCard as="section" className="k-card p-5" delay={0.045}>
         <button
           type="button"
@@ -761,118 +720,10 @@ export function Profile({ setActivePage, currentUser, onLogout, onUserUpdate }) 
 
       <AthletePreferences key={currentUser.id} userId={currentUser.id} onGoalChange={setWeeklyGoal} />
 
-      <MotionCard as="section" className="k-card p-5" delay={0.06}>
-        <SectionTitle eyebrow="Progreso semanal" title={isFetchingProfile || profileData?.reservationsIssue ? 'Asistencia por confirmar' : weeklyGoal ? `${weeklyCompleted}/${weeklyGoal} sesiones` : `${weeklyCompleted} sesiones · sin meta definida`} />
-        <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10">
-          <Motion.div
-            className="h-full rounded-full bg-kupan-ember shadow-glow"
-            initial={{ width: 0 }}
-            whileInView={{ width: `${weeklyPercent}%` }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          />
-        </div>
-        <div className="mt-4 grid grid-cols-7 gap-2">
-          {weeklyProgress.map((item, index) => (
-            <Motion.div
-              key={`${item.day}-${index}`}
-              className={`rounded-lg border p-2 text-center ${
-              item.done ? 'border-kupan-ember bg-kupan-ember/15 text-white' : 'border-white/10 bg-white/5 text-white/40'
-            }`}
-              initial={{ opacity: 0, y: 8 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.035, duration: 0.2 }}
-            >
-              <p className="text-sm font-black uppercase">{item.day}</p>
-            </Motion.div>
-          ))}
-        </div>
-      </MotionCard>
-
-      <section>
-        <SectionTitle eyebrow="Reservas activas" title={`Tu agenda ${gymConfig.identity.name}`} />
-        {visibleReservations.length > 0 ? (
-          <div className="space-y-3">
-            {visibleReservations.map((item) => {
-              const classItem = item.class_schedule
-              const isSupabaseReservation = Boolean(classItem)
-              const dayLabel = isSupabaseReservation ? dayNames[classItem.day_of_week] : item.day
-
-              return (
-                <MotionCard key={item.id} as="article" className="k-panel p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">
-                        {isSupabaseReservation ? formatDate(item.reservation_date) : dayLabel}
-                      </p>
-                      <h3 className="mt-2 font-black uppercase text-white">
-                        {isSupabaseReservation ? `${classItem.time.slice(0, 5)} · ${classItem.class_name}` : `${item.time} · ${item.name}`}
-                      </h3>
-                      <p className="mt-1 text-sm text-white/60">
-                        {dayLabel} · Coach {isSupabaseReservation ? classItem.coach : item.coach} · cupo confirmado
-                      </p>
-                    </div>
-                  </div>
-                </MotionCard>
-              )
-            })}
-          </div>
-        ) : (
-          <MotionCard className="k-panel p-4">
-            <p className="font-black uppercase text-white">Aún no tienes reservas.</p>
-            <p className="mt-1 text-sm leading-6 text-white/60">Reserva tu clase y ven a darlo todo. Tu semana queda ordenada aca.</p>
-          </MotionCard>
-        )}
+      <button type="button" className="k-button-secondary" onClick={onLogout}>Cerrar sesión</button>
       </section>
-
-      {gymConfig.features.wod ? <section>
-        <SectionTitle eyebrow="Ultimos PR" title="Marcas que se celebran" />
-        <button type="button" className="k-button mb-4 w-full" onClick={() => setActivePage('prs')}>
-          Gestionar mis PR
-        </button>
-        {recordsIssue ? <p className="mb-4 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{recordsIssue}</p> : null}
-        {personalRecords.length > 0 ? (
-          <div className="space-y-3">
-            {personalRecords.map((record) => (
-              <MotionCard key={record.id} className="k-panel flex items-center justify-between gap-4 p-4">
-                <div>
-                  <p className="font-black uppercase text-white">{record.movement}</p>
-                  {record.record_date ? <p className="mt-1 text-xs font-bold uppercase text-white/45">{formatDate(record.record_date)}</p> : null}
-                </div>
-                <p className="text-lg font-black text-kupan-flame">
-                  {formatRecordValue(record)}
-                </p>
-              </MotionCard>
-            ))}
-          </div>
-        ) : (
-          <MotionCard className="k-panel p-4">
-            <p className="font-black uppercase text-white">Aún no tienes PR registrados.</p>
-            <p className="mt-1 text-sm leading-6 text-white/60">Entra a Mis PR y registra tu primera marca {gymConfig.identity.name}.</p>
-          </MotionCard>
-        )}
-      </section> : null}
-
-      {['admin', 'coach'].includes(currentUser.role) ? (
-        <MotionCard as="section" className="k-card p-5" delay={0.08}>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Gestion del box</p>
-          <h2 className="mt-2 text-2xl font-black uppercase text-white">Herramientas {gymConfig.identity.name}</h2>
-          <p className="mt-2 text-sm leading-6 text-white/60">
-            Entra al modo coach para ver la clase del día, reservas y asistencia.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {gymConfig.features.coachManagement ? <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('coach')}>
-              Entrar a modo coach
-            </button> : null}
-            {currentUser.role === 'admin' ? (
-              <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('admin')}>
-                Entrar a admin
-              </button>
-            ) : null}
-          </div>
-        </MotionCard>
-      ) : null}
+      </div>
+      {gymConfig.features.wod ? <button type="button" className="k-button-secondary w-full" onClick={() => setActivePage('wod')}>Ver mi entrenamiento y progreso</button> : null}
     </div>
   )
 }

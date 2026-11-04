@@ -120,7 +120,7 @@ function HomeHeader({ currentUser, dateLabel, onProfile }) {
     <header className="flex items-center justify-between gap-4">
       <div className="min-w-0">
         <p className="text-sm font-bold leading-5 text-white/65">Hola,</p>
-        <h1 className="k-display break-words text-4xl font-black uppercase leading-none text-white">{name}</h1>
+        <h2 className="k-display break-words text-4xl font-black uppercase leading-none text-white">{name}</h2>
         <p className="mt-2 text-sm font-bold leading-5 text-white/60">{dateLabel}</p>
       </div>
       <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-kupan-border bg-kupan-gray/80 text-sm font-black uppercase text-white shadow-2xl" aria-label="Ir a perfil" onClick={onProfile}>
@@ -224,8 +224,8 @@ function QuickActions({ setActivePage }) {
   const actions = [
     { label: 'Reservar', page: 'reservations', feature: 'reservations' },
     { label: 'Ver WOD', page: 'wod', feature: 'wod' },
-    { label: 'Mi plan', page: 'plans' },
-    { label: 'Registrar resultado', page: 'prs', feature: 'wod' },
+    { label: 'Mi plan', page: 'my-plan' },
+    { label: 'Registrar resultado', page: 'result', feature: 'wod' },
   ].filter((action) => !action.feature || gymConfig.features[action.feature])
 
   return (
@@ -319,7 +319,7 @@ export function Home({ setActivePage, currentUser }) {
       setActivePage('login')
       return
     }
-    setActivePage('reservations')
+    setActivePage('reservations', { date: nextClass?.reservationDate })
   }
 
   return (
