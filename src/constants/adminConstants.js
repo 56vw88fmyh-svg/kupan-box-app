@@ -1,3 +1,5 @@
+import { gymConfig } from '../config/gymConfig.js'
+
 export function createEmptyPlanDraft() {
   return { id: '', name: '', price: '', classes_per_week: '', is_unlimited: false, active: true }
 }
@@ -47,7 +49,7 @@ export function createEmptyScheduleDraft() {
     end_time: '',
     class_name: 'CrossFit',
     coach: 'Coach KUPAN',
-    max_spots: 12,
+    max_spots: gymConfig.operations.defaultClassCapacity,
     is_open_access: false,
     unlimited_capacity: false,
     active: true,

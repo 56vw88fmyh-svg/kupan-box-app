@@ -38,8 +38,8 @@ function buildWeeklySchedule(classes) {
         timeLabel: formatScheduleTime(item),
         name: item.class_name,
         coach: item.coach ?? `Coach ${gymConfig.identity.name}`,
-        spots: isUnlimitedSchedule(item) ? null : item.max_spots ?? 12,
-        maxSpots: isUnlimitedSchedule(item) ? null : item.max_spots ?? 12,
+        spots: isUnlimitedSchedule(item) ? null : item.max_spots ?? gymConfig.operations.defaultClassCapacity,
+        maxSpots: isUnlimitedSchedule(item) ? null : item.max_spots ?? gymConfig.operations.defaultClassCapacity,
         isOpenAccess: isOpenAccessSchedule(item),
         unlimitedCapacity: isUnlimitedSchedule(item),
       })
@@ -47,12 +47,14 @@ function buildWeeklySchedule(classes) {
 
     return {
       ...day,
-      note: blocks.AM.length > 0 || blocks.PM.length > 0
+      note: gymConfig.id === 'kupan' && day.id === 'saturday'
+        ? 'Hybrid y CrossFit: horarios por definir. Máximo 10 cupos por clase.'
+        : blocks.AM.length > 0 || blocks.PM.length > 0
         ? 'Reserva tu clase y ven a darlo todo.'
         : 'Horarios por definir.',
       blocks,
     }
-  }).filter((day) => day.blocks.AM.length > 0 || day.blocks.PM.length > 0)
+  }).filter((day) => (gymConfig.id === 'kupan' && day.id === 'saturday') || day.blocks.AM.length > 0 || day.blocks.PM.length > 0)
 }
 
 function flattenSchedule(weeklySchedule) {

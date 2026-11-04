@@ -30,7 +30,6 @@ const Wod = lazy(() => import('./pages/Wod.jsx').then((module) => ({ default: mo
 export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [isLoading, setIsLoading] = useState(true)
   const [pendingReservation, setPendingReservation] = useState(null)
   const [appContent, setAppContent] = useState(defaultAdminContent)
   const [currentUser, setCurrentUser] = useState(null)
@@ -70,13 +69,6 @@ export default function App() {
     setCurrentUser(null)
     navigate('/login')
   }
-
-  useEffect(() => {
-    // Recover from a dialog or an interrupted PWA render that left page scrolling locked.
-    document.body.style.removeProperty('overflow')
-    const timer = window.setTimeout(() => setIsLoading(false), 650)
-    return () => window.clearTimeout(timer)
-  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -165,7 +157,7 @@ export default function App() {
 
   return (
     <AppShell title={page.title} eyebrow={page.eyebrow} currentUser={currentUser} variant={isAuthSurface ? 'auth' : 'app'}>
-      {isLoading || isCheckingGuestEntry ? <LoadingScreen /> : null}
+      {isCheckingGuestEntry ? <LoadingScreen /> : null}
       <MotionPage key={location.pathname}>
         <Suspense fallback={<div className="k-card p-5 text-sm font-bold uppercase text-white/60">Cargando {gymConfig.identity.name}...</div>}>
           {mustChangePassword ? (

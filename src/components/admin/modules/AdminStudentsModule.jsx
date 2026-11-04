@@ -1,11 +1,8 @@
 import { AdminSection, SmallRow } from '../AdminUi.jsx'
-import { RosterAccessControl } from '../RosterAccessControl.jsx'
-import { activeGymId } from '../../../config/gymConfig.js'
 
 export function AdminStudentsModule({ profiles, onManagePassword }) {
   return (
     <AdminSection eyebrow="Alumnos" title="Perfiles registrados">
-      {activeGymId === 'kupan' && <RosterAccessControl />}
       {profiles.length === 0 ? (
         <SmallRow title="Sin resultados" meta="Filtro activo" detail="No encontramos alumnos con esa busqueda o filtro." />
       ) : null}

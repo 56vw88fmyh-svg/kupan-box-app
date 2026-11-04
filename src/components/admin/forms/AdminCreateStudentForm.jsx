@@ -22,9 +22,9 @@ export function AdminCreateStudentForm({
           {['Iniciado', 'Rookie', 'Scaled', 'RX'].map((level) => <option key={level} className="bg-kupan-black" value={level}>{level}</option>)}
         </SelectField>
         <SelectField label="Estado" value={draft.status} onChange={(value) => onDraftChange((current) => ({ ...current, status: value }))}>
-          {['active', 'inactive'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status}</option>)}
+          {['active', 'inactive'].map((status) => <option key={status} className="bg-kupan-black" value={status}>{status === 'active' ? 'Activo' : 'Inactivo'}</option>)}
         </SelectField>
-        <Field label="Contraseña temporal opcional" type="text" value={draft.temporary_password} onChange={(value) => onDraftChange((current) => ({ ...current, temporary_password: value }))} />
+        <Field label="Contraseña temporal opcional" type="password" value={draft.temporary_password} onChange={(value) => onDraftChange((current) => ({ ...current, temporary_password: value }))} />
         <SelectField label="Plan inicial opcional" value={draft.plan_id} onChange={(value) => onDraftChange((current) => ({ ...current, plan_id: value }))}>
           <option className="bg-kupan-black" value="">Sin plan inicial</option>
           {plans.filter((plan) => plan.active).map((plan) => <option key={plan.id} className="bg-kupan-black" value={plan.id}>{plan.name}</option>)}
@@ -34,7 +34,7 @@ export function AdminCreateStudentForm({
       </div>
       <TextArea label="Observaciones internas" value={draft.internal_notes} onChange={(value) => onDraftChange((current) => ({ ...current, internal_notes: value }))} />
       <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm leading-6 text-white/60">
-        Esta acción usa un servicio protegido. Las credenciales privadas nunca se guardan en la app.
+        El alumno podrá acceder con su correo y contraseña temporal. El envío de bienvenida depende del servicio de correo del box. Nunca compartas la contraseña en mensajes públicos.
       </div>
       <button type="submit" className="k-button w-full" disabled={isDisabled}>
         {isSubmitting ? 'Creando alumno...' : 'Crear alumno'}

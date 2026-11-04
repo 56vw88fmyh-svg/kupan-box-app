@@ -3,7 +3,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['dist', 'node_modules', '.tools', '.npm-cache'] },
+  { ignores: ['dist', 'node_modules', '.tools', '.npm-cache', '.vite-cache'] },
   js.configs.recommended,
   {
     files: ['**/*.{js,jsx}'],

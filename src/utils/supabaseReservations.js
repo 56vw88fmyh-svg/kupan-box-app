@@ -1,7 +1,7 @@
+import { getNextChileScheduleDate, loadScheduleAvailability } from './scheduleAvailability.js'
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { gymConfig } from '../config/gymConfig.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
-import { getChileDateKey } from './chileDateTime.js'
 import { formatCoachName } from './coachName.js'
 import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from './classSchedule.js'
 import { ENHANCED_SCHEDULE_FIELDS, isMissingOptionalScheduleColumn, LEGACY_SCHEDULE_FIELDS } from './scheduleCompatibility.js'
@@ -16,19 +16,6 @@ function getReservationError(message = 'No pudimos completar la reserva. Intenta
 function getSafeReservationError(scope, error, fallback) {
   logAppError(scope, error)
   return getReservationError(getHumanErrorMessage(error, fallback))
-}
-
-function toDateInput(date) {
-  return getChileDateKey(date)
-}
-
-function getNextDateForDay(dayOfWeek) {
-  const today = new Date()
-  const jsToday = today.getDay() === 0 ? 7 : today.getDay()
-  const daysToAdd = (dayOfWeek - jsToday + 7) % 7
-  const targetDate = new Date(today)
-  targetDate.setDate(today.getDate() + daysToAdd)
-  return toDateInput(targetDate)
 }
 
 function getBlock(time) {
@@ -115,39 +102,23 @@ export async function loadReservationData(profileId) {
     : { data: null }
   if (remainingTokensError) return getSafeReservationError('reservations.remaining_tokens', remainingTokensError, 'No fue posible calcular tus tokens. Intenta nuevamente.')
 
-  const classes = await Promise.all((scheduleResult.data ?? []).map(async (classItem) => {
-    const reservationDate = getNextDateForDay(classItem.day_of_week)
+  let availability
+  try {
+    availability = await loadScheduleAvailability(supabase, (scheduleResult.data ?? []).map((item) => ({
+      class_schedule_id: item.id, reservation_date: getNextChileScheduleDate(item.day_of_week),
+    })))
+  } catch (error) {
+    return getSafeReservationError('reservations.available_spots', error, 'No fue posible verificar los cupos. Reintenta antes de reservar.')
+  }
+  if (waitlistResult.error) logAppError('reservations.waitlist', waitlistResult.error)
+  const classes = (scheduleResult.data ?? []).map((classItem) => {
+    const reservationDate = getNextChileScheduleDate(classItem.day_of_week)
     const isOpenAccess = isOpenAccessSchedule(classItem)
     const unlimitedCapacity = isUnlimitedSchedule(classItem)
     const endTime = getScheduleEndTime(classItem)
     const timeLabel = formatScheduleTime(classItem)
-    const { data: availableSpots, error: availableSpotsError } = await supabase.rpc('available_spots', {
-      class_id: classItem.id,
-      target_date: reservationDate,
-    })
-    if (availableSpotsError) {
-      return {
-        id: classItem.id,
-        classScheduleId: classItem.id,
-        reservationDate,
-        dayId: String(classItem.day_of_week),
-        day: dayNames[classItem.day_of_week],
-        short: shortDayNames[classItem.day_of_week],
-        block: getBlock(classItem.time),
-        time: classItem.time.slice(0, 5),
-        endTime,
-        timeLabel,
-        name: classItem.class_name,
-        coach: formatCoachName(classItem.coach),
-        maxSpots: unlimitedCapacity ? null : classItem.max_spots ?? 12,
-        spots: unlimitedCapacity ? null : classItem.max_spots ?? 12,
-        isOpenAccess,
-        unlimitedCapacity,
-        isFull: false,
-        isReserved: false,
-      }
-    }
-    const spots = unlimitedCapacity ? null : Number(availableSpots ?? classItem.max_spots ?? 12)
+    const availableSpots = availability.get(`${classItem.id}:${reservationDate}`)
+    const spots = unlimitedCapacity ? null : Number(availableSpots ?? classItem.max_spots ?? gymConfig.operations.defaultClassCapacity)
     const isReserved = userReservations.some((reservation) => (
       reservation.class_schedule_id === classItem.id &&
       reservation.reservation_date === reservationDate &&
@@ -167,14 +138,14 @@ export async function loadReservationData(profileId) {
       timeLabel,
       name: classItem.class_name,
       coach: formatCoachName(classItem.coach),
-      maxSpots: unlimitedCapacity ? null : classItem.max_spots ?? 12,
+      maxSpots: unlimitedCapacity ? null : classItem.max_spots ?? gymConfig.operations.defaultClassCapacity,
       spots,
       isOpenAccess,
       unlimitedCapacity,
       isFull: unlimitedCapacity ? false : spots <= 0,
       isReserved,
     }
-  }))
+  })
 
   return {
     ok: true,
@@ -184,6 +155,7 @@ export async function loadReservationData(profileId) {
     hasActiveMembership,
     remainingTokens,
     waitlist: waitlistResult.error ? [] : (waitlistResult.data ?? []),
+    warning: waitlistResult.error ? 'No pudimos comprobar tu lista de espera. Actualiza antes de intentar unirte de nuevo.' : '',
   }
 }
 

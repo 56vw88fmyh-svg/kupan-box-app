@@ -65,7 +65,7 @@ function testInitialDraftFactories() {
   assert.equal(createEmptyMembershipDraft().status, 'active')
   assert.equal(createEmptyMembershipDraft().payment_status, 'paid')
   assert.equal(createEmptyMembershipEditDraft().classes_used, 0)
-  assert.equal(createEmptyScheduleDraft().max_spots, 12)
+  assert.equal(createEmptyScheduleDraft().max_spots, 10)
   assert.equal(createEmptyScheduleDraft().unlimited_capacity, false)
   assert.equal(createEmptyPostDraft().type, 'noticia')
   assert.equal(createEmptyStudentDraft().level, 'Iniciado')

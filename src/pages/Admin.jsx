@@ -1,3 +1,5 @@
+import { RegistrationDeliveryStatus } from '../components/admin/RegistrationDeliveryStatus.jsx'
+import { gymConfig } from '../config/gymConfig.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buildBirthdayGreeting, formatBirthdayDayMonth } from '../utils/birthdays.js'
 import { defaultAppText } from '../utils/adminContent.js'
@@ -224,7 +226,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [textDraft, setTextDraft] = useState(defaultAppText)
   const [policyDraft, setPolicyDraft] = useState({
     membershipDurationDays: '30', reservationWindowDays: '7', reservationClosesMinutes: '15',
-    cancellationRefundMinutes: '45', arrivalToleranceMinutes: '10', defaultClassCapacity: '12', fullDailyLimit: '1',
+    cancellationRefundMinutes: '45', arrivalToleranceMinutes: '10', defaultClassCapacity: String(gymConfig.operations.defaultClassCapacity), fullDailyLimit: '1',
   })
   const [createdCredentials, setCreatedCredentials] = useState(null)
   const [passwordStudent, setPasswordStudent] = useState(null)
@@ -373,7 +375,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
         ))
         const reserved = classReservations.length
         const attended = classReservations.filter((reservation) => reservation.status === 'attended').length
-        const maxSpots = Number(classItem.max_spots ?? 12)
+        const maxSpots = Number(classItem.max_spots ?? gymConfig.operations.defaultClassCapacity)
         const unlimitedCapacity = isUnlimitedSchedule(classItem)
         const occupancy = !unlimitedCapacity && maxSpots > 0 ? reserved / maxSpots : 0
 
@@ -492,7 +494,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     const activeClasses = adminData.schedule.filter((classItem) => classItem.active)
     const limitedClasses = activeClasses.filter((classItem) => !isUnlimitedSchedule(classItem))
     const limitedClassIds = new Set(limitedClasses.map((classItem) => classItem.id))
-    const capacity = limitedClasses.reduce((sum, classItem) => sum + Number(classItem.max_spots ?? 12), 0)
+    const capacity = limitedClasses.reduce((sum, classItem) => sum + Number(classItem.max_spots ?? gymConfig.operations.defaultClassCapacity), 0)
     const reserved = adminData.reservations.filter((reservation) => (
       limitedClassIds.has(reservation.class_schedule_id) &&
       reservation.status !== 'cancelled' && reservation.reservation_date >= todayDate
@@ -709,7 +711,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       reservationClosesMinutes: read('reservation_closes_minutes', '15'),
       cancellationRefundMinutes: read('cancellation_refund_minutes', '45'),
       arrivalToleranceMinutes: read('arrival_tolerance_minutes', '10'),
-      defaultClassCapacity: read('default_class_capacity', '12'),
+      defaultClassCapacity: read('default_class_capacity', String(gymConfig.operations.defaultClassCapacity)),
       fullDailyLimit: read('full_daily_limit', '1'),
     })
   }, [])
@@ -1263,10 +1265,15 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
     if (!result.success) {
       showError(result.message || 'No pudimos crear el alumno. Revisa la Edge Function y tu sesion admin.')
+      if (result.data?.partial) {
+        if (result.data.temporary_password) setCreatedCredentials({email:result.data.email,password:result.data.temporary_password,phone:result.data.phone})
+        setStudentDraft(createEmptyStudentDraft())
+        await reloadAffectedSections(result.affectedSections)
+      }
       return
     }
 
-    showSuccess('Alumno creado correctamente.')
+    showSuccess(result.data.warning || 'Alumno creado correctamente. Revisa el estado del correo de bienvenida.')
     setCreatedCredentials({
       email: result.data.email,
       password: result.data.temporary_password,
@@ -1507,6 +1514,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       ) : null}
 
       {activeSection === 'create-student' ? (
+        <>
+        <RegistrationDeliveryStatus />
         <AdminCreateStudentModule
           formRef={createStudentRef}
           draft={studentDraft}
@@ -1519,6 +1528,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           getWhatsAppUrl={buildWhatsAppUrl}
           addDays={addDays}
         />
+        </>
       ) : null}
 
       {activeSection === 'students' ? (

@@ -1,7 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import process from 'node:process'
-import { fileURLToPath, URL } from 'node:url'
 import { getGymConfig, resolveGymId } from './src/config/gyms.js'
 
 export default defineConfig(({ mode }) => {
@@ -11,12 +10,12 @@ export default defineConfig(({ mode }) => {
   const description = `${gymConfig.identity.name}: app para reservas, planes y comunidad del centro de entrenamiento.`
 
   return {
+    cacheDir: '.vite-cache',
     plugins: [
       react(),
       {
         name: 'white-label-index',
-        transformIndexHtml(html, context) {
-          if (context.path === '/nomina.html') return html
+        transformIndexHtml(html) {
           return html
             .replace(/<title>.*?<\/title>/, `<title>${title}</title>`)
             .replace('href="/manifest.webmanifest"', `href="/manifests/${gymConfig.id}.webmanifest"`)
@@ -33,10 +32,6 @@ export default defineConfig(({ mode }) => {
     ],
     build: {
       rollupOptions: {
-        input: {
-          app: fileURLToPath(new URL('./index.html', import.meta.url)),
-          ...(gymConfig.id === 'kupan' ? { roster: fileURLToPath(new URL('./nomina.html', import.meta.url)) } : {}),
-        },
         output: {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined

@@ -57,7 +57,7 @@ function normalizeReservedClass(reservation) {
     timeLabel: formatScheduleTime(reservation.class_schedule),
     name: reservation.class_schedule.class_name ?? `Clase ${gymConfig.identity.name}`,
     coach: reservation.class_schedule.coach ?? `Coach ${gymConfig.identity.name}`,
-    maxSpots: reservation.class_schedule.max_spots ?? 12,
+    maxSpots: reservation.class_schedule.max_spots ?? gymConfig.operations.defaultClassCapacity,
     spots: null,
     isOpenAccess: Boolean(reservation.class_schedule.is_open_access),
     unlimitedCapacity: Boolean(reservation.class_schedule.unlimited_capacity),

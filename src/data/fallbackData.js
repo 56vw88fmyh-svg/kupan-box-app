@@ -7,88 +7,26 @@ export const todayStats = [
   { label: 'Días apareciendo', value: '7' },
 ]
 
-const kupanSchedule = [
-  { time: '19:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12, level: 'Lunes a viernes' },
-  { time: '20:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12, level: 'Lunes a viernes' },
+const kupanDays = [
+  ['monday', 'Lun', 'Lunes', ['CrossFit', 'CrossFit', 'CrossFit']],
+  ['tuesday', 'Mar', 'Martes', ['CrossFit', 'Hybrid', 'CrossFit']],
+  ['wednesday', 'Mié', 'Miércoles', ['Hybrid', 'CrossFit', 'CrossFit']],
+  ['thursday', 'Jue', 'Jueves', ['CrossFit', 'Hybrid', 'CrossFit']],
+  ['friday', 'Vie', 'Viernes', ['CrossFit', 'CrossFit', 'Hybrid']],
 ]
-
-const kupanWeeklySchedule = [
-  {
-    id: 'monday',
-    short: 'Lun',
-    label: 'Lunes',
-    note: 'Reserva tu clase y ven a darlo todo. AM por definir.',
-    blocks: {
-      AM: [],
-      PM: [
-        { time: '19:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-        { time: '20:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-      ],
-    },
-  },
-  {
-    id: 'tuesday',
-    short: 'Mar',
-    label: 'Martes',
-    note: 'Entrena fuerte, entrena acompañado. AM por definir.',
-    blocks: {
-      AM: [],
-      PM: [
-        { time: '19:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-        { time: '20:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-      ],
-    },
-  },
-  {
-    id: 'wednesday',
-    short: 'Mié',
-    label: 'Miércoles',
-    note: 'Mitad de semana para empujar con la comunidad. AM por definir.',
-    blocks: {
-      AM: [],
-      PM: [
-        { time: '19:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-        { time: '20:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-      ],
-    },
-  },
-  {
-    id: 'thursday',
-    short: 'Jue',
-    label: 'Jueves',
-    note: 'No se afloja: técnica, actitud y buen ritmo. AM por definir.',
-    blocks: {
-      AM: [],
-      PM: [
-        { time: '19:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-        { time: '20:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-      ],
-    },
-  },
-  {
-    id: 'friday',
-    short: 'Vie',
-    label: 'Viernes',
-    note: 'Cierra la semana con esfuerzo, progreso y buena energía. AM por definir.',
-    blocks: {
-      AM: [],
-      PM: [
-        { time: '19:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-        { time: '20:00', name: 'CrossFit', coach: 'Por definir', spots: 12, maxSpots: 12 },
-      ],
-    },
-  },
-  {
-    id: 'saturday',
-    short: 'Sáb',
-    label: 'Sábado',
-    note: 'Sin clases regulares programadas.',
-    blocks: {
-      AM: [],
-      PM: [],
-    },
-  },
-]
+const kupanWeeklySchedule = kupanDays.map(([id, short, label, names]) => ({
+  id, short, label,
+  note: 'Máximo 10 cupos por clase.',
+  blocks: { AM: [], PM: names.map((name, index) => ({
+    time: `${18 + index}:00`, name, coach: 'Por definir', spots: 10, maxSpots: 10,
+  })) },
+}))
+kupanWeeklySchedule.push({
+  id: 'saturday', short: 'Sáb', label: 'Sábado',
+  note: 'Hybrid y CrossFit: horarios por definir. Máximo 10 cupos por clase.',
+  blocks: { AM: [], PM: [] },
+})
+const kupanSchedule = kupanWeeklySchedule[0].blocks.PM
 
 // FITTEST entregó sus horarios generales, pero no una grilla de clases. Mantener
 // estos arreglos vacíos evita publicar horas ficticias hasta que el administrador

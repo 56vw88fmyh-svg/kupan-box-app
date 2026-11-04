@@ -1,3 +1,4 @@
+import { APP_RELEASE } from '../utils/telemetry.js'
 import { useEffect, useState } from 'react'
 import { gymConfig } from '../config/gymConfig.js'
 import { NotificationBell } from './NotificationBell.jsx'
@@ -35,7 +36,7 @@ export function AppShell({ title, eyebrow, children, currentUser, variant = 'app
   }, [])
 
   return (
-    <div className={`${isAuthLayout ? 'k-auth-shell' : 'k-app-shell'} overflow-x-hidden text-kupan-bone`}>
+    <div className={`${isAuthLayout ? 'k-auth-shell' : 'k-app-shell'} text-kupan-bone`}>
       {!isAuthLayout ? <header className="k-app-header sticky top-0 z-20 border-b border-white/10 bg-kupan-black/90 px-4 pb-3 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
@@ -53,13 +54,13 @@ export function AppShell({ title, eyebrow, children, currentUser, variant = 'app
       <main className={isAuthLayout ? 'k-auth-main' : 'k-app-main mx-auto max-w-5xl py-4 sm:px-4 sm:py-5'}>
         {!isOnline ? (
           <div className={`${isAuthLayout ? 'k-auth-offline' : 'mb-4'} rounded-xl border border-kupan-warning/40 bg-kupan-warning/10 p-3 text-sm font-bold leading-6 text-white`}>
-            Estás sin conexión. Puedes seguir revisando lo visible; los cambios se sincronizarán cuando vuelva internet.
+            Estás sin conexión. Puedes revisar lo que ya cargó; vuelve a conectarte antes de reservar o guardar cambios.
           </div>
         ) : null}
         {children}
         {!isAuthLayout ? <div className="mt-8 flex flex-col items-center justify-center gap-2 text-center">
           <p className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-white/30">
-            {gymConfig.identity.name} App v2.1.2
+            {gymConfig.identity.name} App v{APP_RELEASE}
           </p>
           <button type="button" className="text-[0.65rem] font-black uppercase tracking-[0.18em] text-kupan-sand" onClick={forceAppUpdate}>
             Actualizar app

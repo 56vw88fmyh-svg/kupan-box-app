@@ -1,3 +1,4 @@
+import { reportTelemetry, safeErrorEvent } from './telemetry.js'
 const SESSION_PATTERNS = ['jwt', 'session', 'refresh token', 'auth session', 'expired']
 const PERMISSION_PATTERNS = ['permission denied', 'not authorized', 'row-level', 'rls', 'policy', 'violates row-level']
 const OFFLINE_PATTERNS = ['failed to fetch', 'network', 'offline', 'load failed', 'timeout', 'abort']
@@ -35,17 +36,10 @@ export function getHumanErrorMessage(error, fallback = 'No fue posible cargar es
   return fallback
 }
 
-export function logAppError(scope, error, extra = {}) {
-  const rawMessage = normalizeErrorText(error)
-  const safeLog = {
-    scope,
-    kind: getAppStateKind(error),
-    message: rawMessage.slice(0, 280),
-    ...extra,
-  }
-
-  // Logging seguro para desarrollo: evita stack traces, secretos y errores rojos en consola de produccion.
-  window.console.warn('[KUPAN]', safeLog)
+export function logAppError(scope, error) {
+  const event = safeErrorEvent(scope, getAppStateKind(error), error?.code)
+  if (typeof window !== 'undefined') window.console.warn('[KUPAN]', event)
+  reportTelemetry(event)
 }
 
 export function withTimeout(promise, timeoutMs = 12000, label = 'operación') {

@@ -55,7 +55,7 @@ export function NotificationBell({ currentUser }) {
 
   useEffect(() => {
     refreshNotifications()
-    const refreshInterval = window.setInterval(refreshNotifications, 60_000)
+    const refreshInterval = window.setInterval(() => { if (!document.hidden) refreshNotifications() }, 60_000)
     const refreshWhenVisible = () => {
       if (!document.hidden) refreshNotifications()
     }

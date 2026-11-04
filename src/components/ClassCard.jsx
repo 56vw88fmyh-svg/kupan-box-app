@@ -1,10 +1,11 @@
+import { gymConfig } from '../config/gymConfig.js'
 import { Badge, Button, Card } from './ui/index.js'
 import { formatScheduleTime, isUnlimitedSchedule } from '../utils/classSchedule.js'
 
 export function ClassCard({ item, onReserve }) {
   const isFull = item.spots === 0
   const isUnlimited = isUnlimitedSchedule(item)
-  const maxSpots = item.maxSpots ?? 12
+  const maxSpots = item.maxSpots ?? gymConfig.operations.defaultClassCapacity
 
   return (
     <Card as="article" className="p-4" variant="standard">

@@ -1,0 +1,710 @@
+{
+  "deployment": "dpl_6hQvVwp3k4YaXvNccM12n95BbnPy",
+  "url": "https://kupan-box-mm91bluwo-kupan-s-projects.vercel.app",
+  "files": [
+    {
+      "path": "src/.github/workflows/uptime.yml",
+      "uid": "b99d5f804ed90444401aaefc8ba9b785079528a7"
+    },
+    {
+      "path": "src/.vercelignore",
+      "uid": "596c70f31b6b2e69b02e2ec65f650a4c651f78a2"
+    },
+    {
+      "path": "src/api/telemetry.js",
+      "uid": "a9bc41c2b96a9eefda348ee8511ab67faff35f7c"
+    },
+    {
+      "path": "src/design-qa-comparison.png",
+      "uid": "cba3e95f1721482d3974969a542c04182c2f7298"
+    },
+    {
+      "path": "src/design-qa-implementation.png",
+      "uid": "62f289110cf9347113d3794be317a2daeb7e6268"
+    },
+    {
+      "path": "src/design-qa-source.png",
+      "uid": "0d32c30c536c99503d819fb285fcbf39898fbb0e"
+    },
+    {
+      "path": "src/eslint.config.js",
+      "uid": "942a404a9d0e5bd47cdb156765ae8f85dd684351"
+    },
+    {
+      "path": "src/index.html",
+      "uid": "ce5105088a1308f020129dc6009943e18362ad11"
+    },
+    {
+      "path": "src/netlify.toml",
+      "uid": "f58ee082e36b61ba434dd6cf51c745b1e1d631e3"
+    },
+    {
+      "path": "src/package-lock.json",
+      "uid": "156873afbd34ebffa1cbcc88782da0c524d71599"
+    },
+    {
+      "path": "src/package.json",
+      "uid": "eee1f7fc633be64d7a87e8f1f53fa9ded0c8e4b2"
+    },
+    {
+      "path": "src/playwright.config.js",
+      "uid": "1277fd8da4a8177e3705cf18aaf83aa9bdd1dfdd"
+    },
+    {
+      "path": "src/postcss.config.js",
+      "uid": "211016771cee108602ec598738d916b332ee0f02"
+    },
+    {
+      "path": "src/public/brand/fittest/logo-fittest-red.png",
+      "uid": "9d473a5aa1a1c95fd098b322dff15d394c7adbbd"
+    },
+    {
+      "path": "src/public/brand/fittest/tutorial-instalar-fittest-v1.jpg",
+      "uid": "bc0759dfa03ee12d17c56abf0e394046639192f8"
+    },
+    {
+      "path": "src/public/brand/fittest/tutorial-instalar-fittest-v1.png",
+      "uid": "267420bb431dff688387924f546d8a31912e94ab"
+    },
+    {
+      "path": "src/public/brand/isotipo-kupan.png",
+      "uid": "8f76cf4a08b787ebee284850fd420246b07022dd"
+    },
+    {
+      "path": "src/public/brand/login-background-kupan.jpg",
+      "uid": "c0bbe1455ad6432979483631ea3aad8e56e3b386"
+    },
+    {
+      "path": "src/public/brand/logo-kupan.png",
+      "uid": "f7ee9ccd37d5c2e958747882bbacff547061a232"
+    },
+    {
+      "path": "src/public/icons/icon-512.png",
+      "uid": "8f76cf4a08b787ebee284850fd420246b07022dd"
+    },
+    {
+      "path": "src/public/icons/maskable-512.png",
+      "uid": "8f76cf4a08b787ebee284850fd420246b07022dd"
+    },
+    {
+      "path": "src/public/icons/icon-192.png",
+      "uid": "dd4aa346f4181a63260b7925d9b0eaeb4175de54"
+    },
+    {
+      "path": "src/public/kupan-icon.svg",
+      "uid": "c0378703291201308998d28ca3e24e5a0cd072d8"
+    },
+    {
+      "path": "src/public/manifest.webmanifest",
+      "uid": "0891c7470e7aa4ac6b9fe82caa831d18be939646"
+    },
+    {
+      "path": "src/public/manifests/fittest.webmanifest",
+      "uid": "0fa7997216b77ed52dd5a0fb19ea68248f3592d3"
+    },
+    {
+      "path": "src/public/manifests/kupan.webmanifest",
+      "uid": "8e542bf1ccb35e7cd50a1547d590762decd9227b"
+    },
+    {
+      "path": "src/public/robots.txt",
+      "uid": "65990256b6ebe0149d8edfcae37274b6af3e42ae"
+    },
+    {
+      "path": "src/public/sw.js",
+      "uid": "4089f001f9667975a14f33935ea992ddce61691e"
+    },
+    {
+      "path": "src/src/App.jsx",
+      "uid": "0fa36cb86530c6bfc21df4f816a53a1917dfa0c8"
+    },
+    {
+      "path": "src/src/assets/brand/colors/palette.js",
+      "uid": "e1b2b3b27e1c8b1633e794498d3c2f99bad2e2bd"
+    },
+    {
+      "path": "src/src/assets/brand/images/backgrounds/.gitkeep",
+      "uid": "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    },
+    {
+      "path": "src/src/assets/brand/images/box/.gitkeep",
+      "uid": "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    },
+    {
+      "path": "src/src/assets/brand/logos/.gitkeep",
+      "uid": "adc83b19e793491b1c6ea0fd8b46cd9f32e592fc"
+    },
+    {
+      "path": "src/src/assets/brand/logos/3.png",
+      "uid": "1377cead410efb958a33f6f0c0ffe30a97e7ca69"
+    },
+    {
+      "path": "src/src/assets/brand/isotipo-kupan.png",
+      "uid": "0ad673eb29fffa9032102dc3fcfbd908735c60cc"
+    },
+    {
+      "path": "src/src/assets/brand/logo-kupan.png",
+      "uid": "977821043b4a666bd3de26d59ad74a7b42135982"
+    },
+    {
+      "path": "src/src/components/AppShell.jsx",
+      "uid": "ac3f9a7fa6fd7d479b6a8ee2947812c49d5db28a"
+    },
+    {
+      "path": "src/src/components/BottomNav.jsx",
+      "uid": "808bcc5cd2cfffc33aa8b60bf0903e401fc17dca"
+    },
+    {
+      "path": "src/src/components/ClassCard.jsx",
+      "uid": "d09edd0747bffdf98e13aa5460685915bd44029a"
+    },
+    {
+      "path": "src/src/components/ErrorBoundary.jsx",
+      "uid": "b35602bef10fbd0adc9dec23d102a881193a8c33"
+    },
+    {
+      "path": "src/src/components/LoadingScreen.jsx",
+      "uid": "5bb5d601569b2282575a004d3258057721e95dd6"
+    },
+    {
+      "path": "src/src/components/Motion.jsx",
+      "uid": "963299aa318db6a70b217fa0517277991f68e285"
+    },
+    {
+      "path": "src/src/components/NotificationBell.jsx",
+      "uid": "fff3009c437b5c8ad4cc3c076c36ebfe3fc8150d"
+    },
+    {
+      "path": "src/src/components/PwaUpdateBanner.jsx",
+      "uid": "22f27ecd3a9f04511a899beeb104d88fc38a12c8"
+    },
+    {
+      "path": "src/src/components/SectionTitle.jsx",
+      "uid": "a7a6cbfe7648d9297be5e9ca506bc076555c30c6"
+    },
+    {
+      "path": "src/src/components/admin/AdminDashboard.jsx",
+      "uid": "173ac302d65ebdf4ecf7bd7218c261f3ace612b9"
+    },
+    {
+      "path": "src/src/components/admin/AdminIcon.jsx",
+      "uid": "42908b06fbb32f78c0cb00cbd5dff0c8bd82c34c"
+    },
+    {
+      "path": "src/src/components/admin/AdminMembershipActionDialog.jsx",
+      "uid": "7eedd06619697e24eab99dbee233650dae34d8a6"
+    },
+    {
+      "path": "src/src/components/admin/AdminPasswordModal.jsx",
+      "uid": "e773dccbe285c48ecc3634b8348765e5b6f1b62f"
+    },
+    {
+      "path": "src/src/components/admin/AdminUi.jsx",
+      "uid": "92a117b96c2a89bfd75453cf038cc06b18f2ded6"
+    },
+    {
+      "path": "src/src/components/admin/RegistrationDeliveryStatus.jsx",
+      "uid": "032e95d7e0dbb8d7cf62b4846c5c01d5bda6c93f"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminCommunityPostForm.jsx",
+      "uid": "d52734f314b32e8025fed0f446840821e0156215"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminCreateStudentForm.jsx",
+      "uid": "bad27666044dbce91cf2b1a88d3b1ef2c2179905"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminManualReservationForm.jsx",
+      "uid": "d6ad8744792c3c3dca8220b45f174eaf7f30974f"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminMembershipActivationForm.jsx",
+      "uid": "5416cb6e1e7d03f4e5f0e7082f20a8c615f54d52"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminMembershipEditForm.jsx",
+      "uid": "a35f6b8e78abce98c7ad7f580fd121e0a8657a0c"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminPlanForm.jsx",
+      "uid": "9ecbba7b60a022cdf8fa356247c2a881cf2d0004"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminScheduleForm.jsx",
+      "uid": "4d05581712334551a826e59d4abc2558920698fa"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminSettingsForm.jsx",
+      "uid": "9a172ff58ffe023449a08ffe4b7f77a33e811a2e"
+    },
+    {
+      "path": "src/src/components/admin/forms/AdminWodForm.jsx",
+      "uid": "3198468a268149924999280b20b10d7c0535300e"
+    },
+    {
+      "path": "src/src/components/admin/forms/adminForms.test.js",
+      "uid": "4b4c7d53f54061676fe8486a881ab6c3645f59fa"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminBirthdaysModule.jsx",
+      "uid": "f8f25fa663c0cddf98f7643be0c780c130fcc4e4"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminCommunicationsModule.jsx",
+      "uid": "4282318339b05f3fcb1cb890bd25c88ee5fc727a"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminCreateStudentModule.jsx",
+      "uid": "e0275bf5290b7edeacc100db7dc95ee0fe06881e"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminMembershipsModule.jsx",
+      "uid": "5fd9c4937f42335c3ae6e4873aaa51b849560d53"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminOverviewModule.jsx",
+      "uid": "b994b90f5cd56a2b6cc5a41578b04cb3b46c8488"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminPersonalRecordsModule.jsx",
+      "uid": "4496fb8b9eefbf4b0cde12758cfe3af9528cbfc8"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminPlansModule.jsx",
+      "uid": "e8e915aa06faecc17e6ebffaf50d878aad72614d"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminReservationsModule.jsx",
+      "uid": "04270e342601c3f99557bd92b5a4023057f544dc"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminScheduleModule.jsx",
+      "uid": "e6a8687ae483899734352e2b942cfb38407d9bc3"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminSettingsModule.jsx",
+      "uid": "8e989a38d47427cc8f32d3489b542f6633290396"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminStudentsModule.jsx",
+      "uid": "641d31a1aac46aa1cf97bc5802df3270c323654f"
+    },
+    {
+      "path": "src/src/components/admin/modules/AdminWodModule.jsx",
+      "uid": "bd83d40d972a2efa1477f0578179e0b7a3f04902"
+    },
+    {
+      "path": "src/src/components/admin/modules/adminModules.test.js",
+      "uid": "3bf1de2f5f67a1a1ebb92a1fc6e63060852d0559"
+    },
+    {
+      "path": "src/src/components/ui/Badge.jsx",
+      "uid": "c4d20394a7a5497d1bc4c24e64004374549accf0"
+    },
+    {
+      "path": "src/src/components/ui/Button.jsx",
+      "uid": "d8363602c5ed92d731df48407a5b9cb8fd00fea8"
+    },
+    {
+      "path": "src/src/components/ui/Card.jsx",
+      "uid": "50fa8082063239296ec8480ecffbcc410844d33e"
+    },
+    {
+      "path": "src/src/components/ui/Dialog.jsx",
+      "uid": "7346998d2c4613f1459859203c50749e68bc68be"
+    },
+    {
+      "path": "src/src/components/ui/Input.jsx",
+      "uid": "f8acd1cb3ba3dc6620f2f48faffa8fea8570e930"
+    },
+    {
+      "path": "src/src/components/ui/States.jsx",
+      "uid": "fb0b5f0f22f39d1f2ec4aeef9b33664ba0c6dbf4"
+    },
+    {
+      "path": "src/src/components/ui/Toast.jsx",
+      "uid": "5395e68268ab06f0d1e5711b9b7b6ee24c096055"
+    },
+    {
+      "path": "src/src/components/ui/index.js",
+      "uid": "8b1d531c474711cca46de41ba88f8a90391bd5e6"
+    },
+    {
+      "path": "src/src/components/ui/utils.js",
+      "uid": "85b6b80762ad3097e36dcbad3c34e18f5dac984e"
+    },
+    {
+      "path": "src/src/config/adminNavigation.js",
+      "uid": "c12b3fa03ddcc87b594debe1a6bcf750da2d875b"
+    },
+    {
+      "path": "src/src/config/gymConfig.js",
+      "uid": "40d98cb50f0fb7a35d58b400ddb9ce543c3810e0"
+    },
+    {
+      "path": "src/src/config/gymConfig.test.js",
+      "uid": "80aaad3e682c9ddab60da0b74f04b72260c6898e"
+    },
+    {
+      "path": "src/src/config/gyms.js",
+      "uid": "d308dc837766924ce5e9dfe0ebec2bd9e5c1d565"
+    },
+    {
+      "path": "src/src/constants/adminConstants.js",
+      "uid": "58fb21ea0b9f2527c4eba45c5b6864ca4f7b7a77"
+    },
+    {
+      "path": "src/src/data/fallbackData.js",
+      "uid": "08bd908114777797b27fc232ed6dffdc53f2010a"
+    },
+    {
+      "path": "src/src/data/kupanSchedule.test.js",
+      "uid": "ec70671b46ae6fd9c404794406955b16ccc309f3"
+    },
+    {
+      "path": "src/src/data/movements.js",
+      "uid": "bb8cc4d3dd4abf37a67b1fbf967811487ad3ca70"
+    },
+    {
+      "path": "src/src/data/pages.js",
+      "uid": "8e2c4f78884b7be712cf66f141daefe521216871"
+    },
+    {
+      "path": "src/src/data/paymentLinks.js",
+      "uid": "49dbf51c5cfce47e3f5e0721c068abe528fa7611"
+    },
+    {
+      "path": "src/src/data/paymentLinks.test.js",
+      "uid": "ee951d22a7f72c8259cdefb172781b15eeed943d"
+    },
+    {
+      "path": "src/src/hooks/admin/adminMutations.test.js",
+      "uid": "ea3638ea6e9db6a5235e79dc086d18e808c90c11"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminCommunications.js",
+      "uid": "0d4a30089c640da588bed7ea4149729c3fcdb151"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminData.js",
+      "uid": "df36ec724a830b27d1d0967d672a22c9d44923ad"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminData.test.js",
+      "uid": "cf6ec8fcb5a931c151efc3ada6d5574d33502ba9"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminFeedback.js",
+      "uid": "991185ba2112ec11a008342459542f6ab03f3f01"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminFeedback.test.js",
+      "uid": "989010ba42d32fe7054f0fdd45a78dd214d14ea9"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminMemberships.js",
+      "uid": "937d0c9834ce46abc3194956460229c18718f3d8"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminMutationState.js",
+      "uid": "6300ba3b053c2b5117e2a05d4e61747314ecacea"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminPlans.js",
+      "uid": "1cab3dd5f1c98f9d01aa22e3d088131ae63d8683"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminReservations.js",
+      "uid": "d8d37b6bccdd634bb670f8bd5be707763954c173"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminSchedule.js",
+      "uid": "354f9d6c51dc0495d9d6d4e1b75bbdbf6fb194d9"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminSettings.js",
+      "uid": "54531a086eef2009aa0f8f67940c518356ab3fa2"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminStudents.js",
+      "uid": "c32693b2389f6e672a7e51728cb5a9816d38fd63"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminWod.js",
+      "uid": "59e7cd1b9fcf1324cd0569271341e65d814f5ff1"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminWodDraft.js",
+      "uid": "f5701d01dcec9b5a941c2c4a9f63db7d73317b9d"
+    },
+    {
+      "path": "src/src/hooks/admin/useAdminWodDraft.test.js",
+      "uid": "130262837643ef06ec6c04ff98c402f3ddbd0e5f"
+    },
+    {
+      "path": "src/src/lib/supabase.js",
+      "uid": "3c1f85fa394ef5d5596e175f544d3c98d08d58a8"
+    },
+    {
+      "path": "src/src/lib/supabaseConfig.test.js",
+      "uid": "be21d4f3b586107a9e3c446ddb1f98214fe3d2a7"
+    },
+    {
+      "path": "src/src/main.jsx",
+      "uid": "454ecb29ca651db70734f3726fbf5547d1f59ec0"
+    },
+    {
+      "path": "src/src/navigation/ProtectedRoute.jsx",
+      "uid": "622be0aaee76dfb55b63e2133450c32608cf24c3"
+    },
+    {
+      "path": "src/src/navigation/routes.js",
+      "uid": "ba2f740714f2625da80054efe37113743ace0092"
+    },
+    {
+      "path": "src/src/navigation/routes.test.js",
+      "uid": "1789ab8ec6d3f4a87ffd965f8273244de276bd4c"
+    },
+    {
+      "path": "src/src/pages/Admin.jsx",
+      "uid": "2282a7f4c4cb1e93a63ebe2f7b6cb2cf78ba6c55"
+    },
+    {
+      "path": "src/src/pages/Auth.jsx",
+      "uid": "a508c3b85b00f4f0e8cc84dc1dd571f8d5364563"
+    },
+    {
+      "path": "src/src/pages/Coach.jsx",
+      "uid": "b310bc176546e6ef257059024c7ce73a395cf9d2"
+    },
+    {
+      "path": "src/src/pages/Community.jsx",
+      "uid": "531307eb7ddf9e03945633b69bb4979141800e88"
+    },
+    {
+      "path": "src/src/pages/Home.jsx",
+      "uid": "5c2e9bb2ab1d5bdee59b17097c4e327c3d8a3f6a"
+    },
+    {
+      "path": "src/src/pages/PasswordUpdate.jsx",
+      "uid": "05969895b1e5bad28b9653cf9673290c4fec6018"
+    },
+    {
+      "path": "src/src/pages/PersonalRecords.jsx",
+      "uid": "70221a31769147ac5e709999f0967502fb4084d6"
+    },
+    {
+      "path": "src/src/pages/Plans.jsx",
+      "uid": "9a22c4d7fe114e0b55185ba7f09396cc9f486430"
+    },
+    {
+      "path": "src/src/pages/Profile.jsx",
+      "uid": "b455c1abfaacc9b7eb18f9d4c4dfee6374ec64ed"
+    },
+    {
+      "path": "src/src/pages/Ranking.jsx",
+      "uid": "e1300ed5479b0dd1ba504117f615f8440ba23df4"
+    },
+    {
+      "path": "src/src/pages/Reservations.jsx",
+      "uid": "5c2cae57fe077fd2f16236bf83486f0117805e8b"
+    },
+    {
+      "path": "src/src/pages/TrialClass.jsx",
+      "uid": "3536f232e09672013b17fa01199aaa022701ee03"
+    },
+    {
+      "path": "src/src/pages/Wod.jsx",
+      "uid": "6b75a5b33b92c4de49bd9e844f0564bc447ff575"
+    },
+    {
+      "path": "src/src/services/personalRecordsService.test.ts",
+      "uid": "3ee1853ad3772e930a13bce6f91984cbc482972a"
+    },
+    {
+      "path": "src/src/services/personalRecordsService.ts",
+      "uid": "592cad474da7ecfe3e77fa510ae9e53eab5d6b78"
+    },
+    {
+      "path": "src/src/services/prMigrationService.js",
+      "uid": "c935cfbe817ed25b7aa1c4420f70a87e55275413"
+    },
+    {
+      "path": "src/src/services/prMigrationService.test.js",
+      "uid": "d9db78444ed9d6939fc13c841e3bd0946398c9f8"
+    },
+    {
+      "path": "src/src/styles.css",
+      "uid": "32255d6a909762d2c5f54bd889a15ebe20dd3519"
+    },
+    {
+      "path": "src/src/utils/adminContent.js",
+      "uid": "dc6e89fd52e759e7d7dae89e848d78923cab0454"
+    },
+    {
+      "path": "src/src/utils/adminFormatters.js",
+      "uid": "a8436643b31a27bc430b8e1fc45c337aadcbe8d5"
+    },
+    {
+      "path": "src/src/utils/adminMetrics.js",
+      "uid": "e4f3de9bdc40cd5201b62339891b6645bacaa69d"
+    },
+    {
+      "path": "src/src/utils/adminMutationBuilders.js",
+      "uid": "9d8ce63e272d04deef7429d5dcdc2412ca77875e"
+    },
+    {
+      "path": "src/src/utils/adminPassword.js",
+      "uid": "734a012af9838361c7f4d530a538b71b2e17ac69"
+    },
+    {
+      "path": "src/src/utils/adminUtilities.test.js",
+      "uid": "a1913e740ee007f9b1456593188d757b8558dbd2"
+    },
+    {
+      "path": "src/src/utils/adminWodDraft.js",
+      "uid": "248e5d7b3e482de957b63503905cf71efc3aa1d1"
+    },
+    {
+      "path": "src/src/utils/adminWodDraft.test.js",
+      "uid": "480b2b9ef1a5275db7f05e25e1ff8d54078e2631"
+    },
+    {
+      "path": "src/src/utils/appState.js",
+      "uid": "9fdc5cd40173f6a4c46274e865a81450ad18cf52"
+    },
+    {
+      "path": "src/src/utils/auth.js",
+      "uid": "eb42654cd353f22cb661a70ee0926b0599769465"
+    },
+    {
+      "path": "src/src/utils/auth.test.js",
+      "uid": "d9742f50aa0eaee4c124dea7ed3569ec6cc6e8c8"
+    },
+    {
+      "path": "src/src/utils/birthdays.js",
+      "uid": "0415bd5e9037be9c2af36e1b31051b4e361183bc"
+    },
+    {
+      "path": "src/src/utils/bodyScrollLock.js",
+      "uid": "fc9c0a136a645f1630ba91dfd52bac7836635e92"
+    },
+    {
+      "path": "src/src/utils/bodyScrollLock.test.js",
+      "uid": "895876aabde228019225c89c8558dcd13b6680fe"
+    },
+    {
+      "path": "src/src/utils/chileDateTime.js",
+      "uid": "daec573637c0dd3e644dffaa05e1aabc55e05140"
+    },
+    {
+      "path": "src/src/utils/classSchedule.js",
+      "uid": "dbb25546a6886e735fe26fb84008147d9154d1f5"
+    },
+    {
+      "path": "src/src/utils/classSchedule.test.js",
+      "uid": "6a313f579a549781f27ce0a49a3c2bf7832e3495"
+    },
+    {
+      "path": "src/src/utils/coachData.js",
+      "uid": "71c12362ce605e6129bb510d5bd9a6b7e866a026"
+    },
+    {
+      "path": "src/src/utils/coachData.test.js",
+      "uid": "0848fcd975a5d63b3a1610949e9b1c7e6ce53d56"
+    },
+    {
+      "path": "src/src/utils/coachName.js",
+      "uid": "5cf6896a5920a30e4190f220514756ab03ff6d01"
+    },
+    {
+      "path": "src/src/utils/communityFeed.js",
+      "uid": "c1160c6a122dcf6ad5a0c49b43c152230036c4f5"
+    },
+    {
+      "path": "src/src/utils/notifications.js",
+      "uid": "ac2791134250a09ccf9176cd5e2ee3955dfe721b"
+    },
+    {
+      "path": "src/src/utils/passwordSecurity.js",
+      "uid": "06909130eae9cdd80132974b0dd6f3377573eb92"
+    },
+    {
+      "path": "src/src/utils/passwordSecurity.test.js",
+      "uid": "ae0d32c20c69ef914ab8319c2aeaa663242a36df"
+    },
+    {
+      "path": "src/src/utils/personalRecords.js",
+      "uid": "d436623369b4144148f19d51477c3cdfb560a662"
+    },
+    {
+      "path": "src/src/utils/profileData.js",
+      "uid": "11a0f2252ff8e74c52fbee42cac725bd28392f2f"
+    },
+    {
+      "path": "src/src/utils/profileData.test.js",
+      "uid": "9d0554a57342c1ad28d79c0e2b9a5e77c8211fee"
+    },
+    {
+      "path": "src/src/utils/ranking.js",
+      "uid": "ed125db257596894b35845a36cb6ec5908d5cbce"
+    },
+    {
+      "path": "src/src/utils/reservationPolicy.js",
+      "uid": "95f03f623c315e1218187440201069ec49a6895d"
+    },
+    {
+      "path": "src/src/utils/reservationPolicy.test.js",
+      "uid": "ca242944974f5be7db248faa22446eb0ebf8c717"
+    },
+    {
+      "path": "src/src/utils/scheduleAvailability.js",
+      "uid": "d4b5a961c3c78d98ff8b1c04ac06fba2fba5b802"
+    },
+    {
+      "path": "src/src/utils/scheduleAvailability.test.js",
+      "uid": "905e4e0074d392e93e1134f02184d0083497a211"
+    },
+    {
+      "path": "src/src/utils/scheduleCompatibility.js",
+      "uid": "9690661411730f99a66ff30dfd36436e7ed6029d"
+    },
+    {
+      "path": "src/src/utils/sharedContent.js",
+      "uid": "8f62135a6e098210136812b786129f4fd26348a7"
+    },
+    {
+      "path": "src/src/utils/supabaseReservations.js",
+      "uid": "b330eae4006c8a9cbb196b8dd0c9a9f46fcd2f64"
+    },
+    {
+      "path": "src/src/utils/telemetry.js",
+      "uid": "6806cd914a8a81f50246d2cd9958f91239e203bf"
+    },
+    {
+      "path": "src/src/utils/telemetry.test.js",
+      "uid": "33d732afc503b0711b44a95102ff728483f2057b"
+    },
+    {
+      "path": "src/src/utils/trialRequests.js",
+      "uid": "52492f6591c1a6cdfa2fd7cc26db40d0cf07a9fe"
+    },
+    {
+      "path": "src/src/utils/whatsapp.js",
+      "uid": "d554d74a7f42f5b5c8694140d4314d3b73d6e42b"
+    },
+    {
+      "path": "src/tailwind.config.js",
+      "uid": "10289c848655462f92d813fbfebc636d39f4e904"
+    },
+    {
+      "path": "src/vercel.json",
+      "uid": "0eaa6421f3cf36691bd944ca1674cd1bafecd048"
+    },
+    {
+      "path": "src/vite.config.js",
+      "uid": "b91612e429ff9ac2949fae251e812df706762158"
+    }
+  ]
+}

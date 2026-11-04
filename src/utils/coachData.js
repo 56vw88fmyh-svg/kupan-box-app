@@ -68,7 +68,7 @@ function normalizeReservation(row) {
 function decorateClass(classItem, reservations) {
   const classReservations = reservations.filter((reservation) => reservation.class_schedule_id === classItem.id)
   const usedSpots = classReservations.filter((reservation) => reservation.status !== 'cancelled').length
-  const maxSpots = classItem.max_spots ?? 12
+  const maxSpots = classItem.max_spots ?? gymConfig.operations.defaultClassCapacity
   const unlimitedCapacity = isUnlimitedSchedule(classItem)
 
   return {

@@ -386,6 +386,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     setHasActiveMembership(result.hasActiveMembership)
     setRemainingTokens(result.remainingTokens)
     setActiveWaitlist(result.waitlist ?? [])
+    if (result.warning) setReservationMessage(result.warning)
     setReservationMessage('')
   }, [currentUser?.id])
 
@@ -510,9 +511,9 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
         <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-red">Reservas</p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="k-display text-4xl font-black leading-none text-text-primary sm:text-5xl">Reserva tu próxima clase</h1>
+            <h2 className="k-display text-4xl font-black leading-none text-text-primary sm:text-5xl">Reserva tu próxima clase</h2>
             <p className="mt-2 max-w-2xl text-base leading-7 text-text-secondary">
-              Elige el día y reserva. Los bloques de CrossFit y personalizado tienen acceso abierto dentro del rango publicado.
+              {gymConfig.id === 'kupan' ? 'Elige el día y reserva tu clase de CrossFit o Hybrid. Máximo 10 cupos por clase.' : 'Elige el día y reserva. Los bloques de CrossFit y personalizado tienen acceso abierto dentro del rango publicado.'}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:min-w-60">
@@ -547,8 +548,8 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
 
         {!isLoading && !reservationMessage && filteredClasses.length === 0 ? (
           <EmptyState
-            title="No hay clases programadas para este día."
-            description="Puedes revisar otro día de la semana para encontrar el mejor horario."
+            title={gymConfig.id === 'kupan' && selectedDay?.dayId === '6' ? 'Hybrid y CrossFit: horarios por definir' : 'No hay clases programadas para este día.'}
+            description={gymConfig.id === 'kupan' && selectedDay?.dayId === '6' ? 'Sábado: máximo 10 cupos por clase. Las reservas estarán disponibles cuando se publiquen los horarios.' : 'Puedes revisar otro día de la semana para encontrar el mejor horario.'}
           />
         ) : null}
 

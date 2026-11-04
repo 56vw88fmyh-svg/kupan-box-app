@@ -1,3 +1,4 @@
+import { gymConfig } from '../config/gymConfig.js'
 import { addDays, getPlanTokenTotal } from './adminMetrics.js'
 
 export function buildPlanPayload(planDraft) {
@@ -17,9 +18,9 @@ export function buildSchedulePayload(scheduleDraft) {
     end_time: scheduleDraft.end_time || null,
     class_name: scheduleDraft.class_name,
     coach: scheduleDraft.coach,
-    max_spots: Number(scheduleDraft.max_spots),
+    max_spots: gymConfig.id === 'kupan' ? Math.min(10, Math.max(1, Number(scheduleDraft.max_spots) || 10)) : Number(scheduleDraft.max_spots),
     is_open_access: Boolean(scheduleDraft.is_open_access),
-    unlimited_capacity: Boolean(scheduleDraft.unlimited_capacity),
+    unlimited_capacity: gymConfig.id === 'kupan' ? false : Boolean(scheduleDraft.unlimited_capacity),
     active: scheduleDraft.active,
   }
 }

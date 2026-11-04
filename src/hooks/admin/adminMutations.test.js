@@ -102,9 +102,9 @@ assert.deepEqual(buildSchedulePayload({
   end_time: '20:00',
   class_name: 'CrossFit',
   coach: 'Coach KUPAN',
-  max_spots: 12,
+  max_spots: 10,
   is_open_access: true,
-  unlimited_capacity: true,
+  unlimited_capacity: false,
   active: false,
 })
 

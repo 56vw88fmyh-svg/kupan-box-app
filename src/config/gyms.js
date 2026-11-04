@@ -35,12 +35,12 @@ export const gymConfigs = Object.freeze({
     localization: { locale: 'es-CL', timezone: 'America/Santiago', currency: 'CLP' },
     operations: {
       defaultClassDurationMinutes: 60,
-      classDurations: { CrossFit: 60 },
-      defaultClassCapacity: 12,
+      classDurations: { CrossFit: 60, Hybrid: 60 },
+      defaultClassCapacity: 10,
       reservationClosesMinutes: 15,
       cancellationWindowMinutes: 45,
       membershipRenewalReminderDays: 3,
-      classTypes: ['CrossFit'],
+      classTypes: ['CrossFit', 'Hybrid'],
       generalHours: ['Lunes a viernes, horarios publicados en la app'],
       plans: [
         { name: '8 clases', price: 40000, frequency: '8 clases por 30 dias', classLimit: 8 },

@@ -15,7 +15,7 @@ export function useAdminStudents({ supabaseClient = supabase, logError = logAppE
       if (error || !data?.ok) {
         const normalizedError = error ?? new Error(data?.message || 'No pudimos crear el alumno. Revisa la Edge Function y tu sesion admin.')
         logError('admin.students.create', normalizedError, { email: studentDraft.email })
-        return createMutationResult({ success: false, error: normalizedError, data, message: data?.message || '' })
+        return createMutationResult({ success: false, error: normalizedError, data, message: data?.message || '', partial: Boolean(data?.partial), affectedSections: data?.partial ? ['profiles', 'memberships'] : [] })
       }
 
       return createMutationResult({ success: true, data, affectedSections: ['profiles', 'memberships'] })

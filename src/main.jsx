@@ -1,3 +1,4 @@
+import { initTelemetry } from './utils/telemetry.js'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
@@ -7,6 +8,7 @@ import { ToastProvider } from './components/ui/index.js'
 import { applyGymMetadata, applyGymTheme, gymConfig } from './config/gymConfig.js'
 import './styles.css'
 
+initTelemetry()
 applyGymTheme(gymConfig)
 applyGymMetadata(gymConfig)
 
