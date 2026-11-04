@@ -1,5 +1,7 @@
 # Etapa 2 — métricas, claridad y privacidad
 
+> Actualización 04-11-2026: integrada y publicada con KUPAN 2.2.1. El estado local y los pasos pendientes descritos originalmente abajo quedan resueltos en [el registro de publicación](publicacion-2026-11-04.md).
+
 Implementada sobre la etapa 1 en `fix/etapa-2-metricas-claridad`. No desplegada ni aplicada a bases remotas.
 
 ## Puntos 8–15

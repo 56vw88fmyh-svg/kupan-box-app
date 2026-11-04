@@ -1,5 +1,7 @@
 # Etapa 3 — fluidez y acabado
 
+> Actualización 04-11-2026: integrada y publicada con KUPAN 2.2.1. El estado local y los pasos pendientes descritos originalmente abajo quedan resueltos en [el registro de publicación](publicacion-2026-11-04.md).
+
 Implementada sobre las etapas 1 y 2 en `fix/etapa-3-fluidez`. No publicada en producción.
 
 ## Puntos 16–23

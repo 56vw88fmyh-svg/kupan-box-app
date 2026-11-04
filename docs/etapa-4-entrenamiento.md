@@ -1,5 +1,7 @@
 # Etapa 4 — entrenamiento y progreso
 
+> Actualización 04-11-2026: integrada y publicada con KUPAN 2.2.1. El estado local y los pasos pendientes descritos originalmente abajo quedan resueltos en [el registro de publicación](publicacion-2026-11-04.md).
+
 Implementada localmente sobre las etapas 1–3 en `feat/etapa-4-entrenamiento`. No publicada en producción; no se aplicaron migraciones remotas ni se escribieron datos reales.
 
 ## Puntos 24–30

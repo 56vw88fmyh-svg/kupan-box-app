@@ -32,7 +32,19 @@ La revisión con la sesión iniciada detectó error `42P17` en la lectura direct
 
 La migración adicional se probó localmente reproduciendo la política recursiva, con paginación, fechas pasadas/futuras, aislamiento A/B, sesión ausente y denegación anónima. En producción se compararon exactamente los IDs devueltos para dos cuentas con sus reservas reales, dentro de una transacción revertida, antes de aplicarla. Se registra como `20261104170000`.
 
-Pendiente de registrar el despliegue final de la corrección y sus comprobaciones remotas.
+La versión final 2.2.1 está publicada en https://kupan-box-app.vercel.app. Despliegue `dpl_Gxpvsb4TuPLSvXFnCvr3nFnX8nKk`, URL inmutable `https://kupan-box-doqhjk8ln-kupan-s-projects.vercel.app`, código `027f1de`. La rama completa está respaldada en `origin/release/etapas-1-4`.
+
+Comprobación remota final:
+
+- Sesión existente de Chrome conservada y actualizada a 2.2.1; activación del worker nuevo comprobada desde el aviso de actualización.
+- Hoy muestra el resumen semanal sin error; Progreso carga sus doce barras, marcas personales y calendario con datos reales. Se muestra el estado sin WOD publicado porque no existe programación para hoy; no se creó contenido ficticio.
+- Reservas carga las tres clases reales de hoy, cupos, plan y agenda. Gestión carga el resumen y ambos gráficos con sus datos reales. No se reservaron clases ni se crearon alumnos, pagos o marcas reales durante la revisión.
+- Prueba anónima independiente contra el dominio público: Entrenamiento disponible, progreso privado solicita sesión, `/admin` redirige a login, `/nomina` responde con las cabeceras privadas y el worker devuelve la versión esperada. Sin excepciones no controladas del navegador.
+- Las cuatro migraciones quedan registradas. PR, WOD y reservas existentes se conservan; las comprobaciones de guardado se revirtieron. Acceso anónimo a resultados, preferencias e historial denegado.
+
+La captura siguiente corresponde a la vista pública sin sesión; la verificación autenticada se realizó en la sesión existente de Chrome.
+
+![KUPAN 2.2.1 publicada](kupan-2.2.1-publicada.png)
 
 ## Reversión
 

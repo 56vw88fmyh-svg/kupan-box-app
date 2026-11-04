@@ -1,5 +1,7 @@
 # Etapa 1 — funcionamiento y confiabilidad
 
+> Actualización 04-11-2026: integrada y publicada con KUPAN 2.2.1. El estado local y los pasos pendientes descritos originalmente abajo quedan resueltos en [el registro de publicación](publicacion-2026-11-04.md).
+
 Implementación en la rama `fix/etapa-1-confiabilidad`, basada en `5ccc239` de `kupan-roster-release`. No publicada en producción.
 
 ## Cambios
