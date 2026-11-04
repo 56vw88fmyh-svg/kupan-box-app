@@ -14,6 +14,7 @@ export function destinationFor(pageId, options = {}) {
   if (pageId === 'result') return '/wod?action=result'
   const path = getPathForPageId(pageId)
   const query = new URLSearchParams()
+  if (pageId === 'wod' && ['today','history','progress'].includes(options.view)) query.set('view',options.view)
   if (pageId === 'profile' && ['membership','account','settings'].includes(options.tab)) query.set('tab', options.tab)
   if (pageId === 'reservations' && /^\d{4}-\d{2}-\d{2}$/.test(options.date ?? '')) query.set('date',options.date)
   return path + (query.size ? `?${query}` : '')

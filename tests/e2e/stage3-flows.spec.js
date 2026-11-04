@@ -8,7 +8,7 @@ async function mockData(page){
   if(url.includes('/get_my_profile'))return route.fulfill({json:{id,full_name:'Atleta de prueba',email:'test@example.invalid',role:'admin',status:'active',level:'RX',birth_date:'1990-01-01'}})
   if(url.includes('/athlete_preferences'))return route.fulfill({json:{weekly_goal:3,community_alias:'Alias',share_attendance:false,share_records:false,share_birthday:false}})
   if(url.includes('/get_active_membership'))return route.fulfill({json:null})
-  if(url.includes('/get_my_reservations')||url.includes('/personal_records'))return route.fulfill({json:[]})
+  if(url.includes('/get_my_reservations')||url.includes('/rest/v1/reservations')||url.includes('/personal_records'))return route.fulfill({json:[]})
   return route.fulfill({status:403,json:{message:'Mock: blocked'}})
  })
 }

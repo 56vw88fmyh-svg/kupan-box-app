@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
+import { loadTrainingAttendance } from '../services/trainingProgressService.js'
 import { completedThisWeek } from '../utils/metricDefinitions.js'
 import { getChileDateString } from '../utils/adminFormatters.js'
 import { Button, Card } from './ui/index.js'
@@ -9,9 +10,10 @@ export function TrainingSummary({ currentUser, setActivePage }) {
   useEffect(()=>{
     let active=true
     if(!currentUser?.id || !supabase) return undefined
-    Promise.all([supabase.rpc('get_my_reservations'),supabase.from('athlete_preferences').select('weekly_goal').eq('profile_id',currentUser.id).maybeSingle()]).then(([attendance,prefs])=>{
+    setState({loading:true,error:'',completed:0,goal:null})
+    Promise.all([loadTrainingAttendance(currentUser.id),supabase.from('athlete_preferences').select('weekly_goal').eq('profile_id',currentUser.id).maybeSingle()]).then(([attendance,prefs])=>{
       if(!active)return
-      setState({loading:false,error:attendance.error || prefs.error ? 'No pudimos confirmar tu progreso semanal.' : '',completed:completedThisWeek(attendance.data ?? [],getChileDateString()),goal:prefs.data?.weekly_goal ?? null})
+      setState({loading:false,error:prefs.error ? 'No pudimos confirmar tu progreso semanal.' : '',completed:completedThisWeek(attendance,getChileDateString()),goal:prefs.data?.weekly_goal ?? null})
     }).catch(()=>{if(active)setState(s=>({...s,loading:false,error:'No pudimos confirmar tu progreso semanal.'}))})
     return()=>{active=false}
   },[currentUser?.id])

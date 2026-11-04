@@ -54,7 +54,7 @@ export function buildResultInput(wod, selectedLevel, draft) {
 export function isBetterResult(input, record) {
   if (!record) return true
   if (input.unit === 'tiempo') return Number(input.value) < Number(record.value)
-  if (input.rounds !== undefined || input.reps !== undefined) {
+  if (input.rounds != null || input.reps != null) {
     const inputRounds = Number(input.rounds ?? Math.floor(Number(input.value)))
     const recordRounds = Number(record.rounds ?? Math.floor(Number(record.value)))
     if (inputRounds !== recordRounds) return inputRounds > recordRounds
@@ -66,5 +66,7 @@ export function isBetterResult(input, record) {
 
 export function resultContext(wod, level, resultType) {
   // Store the exact prescription, not a mutable display title or a weak hash.
-  return { wod_id: String(wod.id), version: JSON.stringify([wod.workout, wod.strength, wod.timeCap, wod.scaling]), level, result_type: resultType }
+  const levelPlan = wod.scaling?.find(item => item.level === level)
+  const benchmark = String(wod.benchmarkId ?? '').trim().toLowerCase()
+  return { wod_id: String(wod.id), version: JSON.stringify([wod.workout, wod.strength, wod.timeCap, wod.scaling]), level, result_type: resultType, ...(benchmark ? { benchmark_id: benchmark, comparison_key: JSON.stringify([levelPlan?.items?.length ? levelPlan.items : wod.workout, wod.strength, wod.timeCap]) } : {}) }
 }

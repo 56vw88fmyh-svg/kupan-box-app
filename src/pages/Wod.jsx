@@ -1,3 +1,4 @@
+import { TrainingProgress } from '../components/training/TrainingProgress.jsx'
 /* global URLSearchParams */
 import { Tabs } from '../components/ui/Tabs.jsx'
 import { TrainingSummary } from '../components/TrainingSummary.jsx'
@@ -13,6 +14,8 @@ const LEVEL_STORAGE_KEY = 'kupan_wod_selected_level_v1'
 const levelOptions = ['Iniciado', 'Rookie', 'Scaled', 'RX']
 
 const emptyResultDraft = {
+  rpe: '',
+  durationMinutes: '',
   calories: '',
   distance: '',
   load: '',
@@ -58,11 +61,12 @@ function normalizeWod(rawWod, fallbackWod) {
   const fallbackScaling = sameFallback && Array.isArray(fallbackWod.scaling) ? fallbackWod.scaling : []
 
   return {
+    benchmarkId: rawWod.benchmarkId,
     id: rawWod.id ?? rawWod.date ?? 'today-wod',
     date: rawWod.date ?? new Date().toISOString().slice(0, 10),
     title: rawWod.title || 'WOD KUPAN',
-    type: rawWod.type || fallbackWod?.type || 'Entrenamiento del día',
-    focus: rawWod.focus || fallbackWod?.focus || '',
+    type: rawWod.type || (sameFallback ? fallbackWod?.type : '') || 'Entrenamiento del día',
+    focus: rawWod.focus || (sameFallback ? fallbackWod?.focus : '') || '',
     timeCap: rawWod.timeCap || rawWod.time_cap || 'Por definir',
     warmup: toLines(rawWod.warmup),
     skill: toLines(rawWod.skill ?? rawWod.technique),
@@ -134,6 +138,10 @@ function ResultFields({ draft, onChange }) {
       {draft.type === 'distance' ? <Input label="Distancia" type="number" min="0" value={draft.distance} helpText="Metros" onChange={(event) => onChange({ distance: event.target.value })} /> : null}
       {draft.type === 'calories' ? <Input label="Calorías" type="number" min="0" value={draft.calories} onChange={(event) => onChange({ calories: event.target.value })} /> : null}
 
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Input label="Esfuerzo percibido (opcional)" type="number" min="1" max="10" step="1" value={draft.rpe} helpText="RPE de 1 (muy suave) a 10 (máximo)." onChange={e=>onChange({rpe:e.target.value})} />
+        <Input label="Duración en minutos (opcional)" type="number" min="1" max="600" step="1" value={draft.durationMinutes} onChange={e=>onChange({durationMinutes:e.target.value})} />
+      </div>
       <label className="block">
         <span className="text-xs font-black uppercase tracking-[0.16em] text-white/70">Notas</span>
         <textarea
@@ -187,7 +195,7 @@ function WodSurprise({ today, hidden }) {
   )
 }
 
-export function Wod({ appContent, currentUser, setActivePage }) {
+function TodayWod({ appContent, currentUser, setActivePage, onResultSaved }) {
   const todayLabel = formatChileDisplayDate()
   const { showToast } = useToast()
   const [state, setState] = useState({ isLoading: true, message: '', wod: null })
@@ -267,6 +275,11 @@ export function Wod({ appContent, currentUser, setActivePage }) {
       return
     }
 
+    const rpe = resultDraft.rpe === '' ? null : Number(resultDraft.rpe)
+    const duration = resultDraft.durationMinutes === '' ? null : Number(resultDraft.durationMinutes)
+    if (rpe !== null && (!Number.isInteger(rpe) || rpe < 1 || rpe > 10) || duration !== null && (!Number.isInteger(duration) || duration < 1 || duration > 600)) { setResultMessage('Revisa esfuerzo (1–10) y duración (1–600 minutos).'); return }
+    input.value.rpe = rpe
+    input.value.durationMinutes = duration
     setIsSubmittingResult(true)
     input.value.resultContext = resultContext(wod, selectedLevel, resultDraft.type)
     const history = await getWorkoutResultHistory(input.value.resultContext)
@@ -299,6 +312,7 @@ export function Wod({ appContent, currentUser, setActivePage }) {
       title: isNewPr && bestRecord ? 'Mejor resultado comparable' : 'Resultado registrado',
       description: isNewPr && bestRecord ? 'Buena. Este resultado supera tu marca anterior del mismo nivel.' : 'Tu resultado quedó guardado.',
     })
+    onResultSaved?.()
     setResultDraft(emptyResultDraft)
     setResultMessage('')
     setIsResultOpen(false)
@@ -406,4 +420,19 @@ export function Wod({ appContent, currentUser, setActivePage }) {
       </Dialog>
     </div>
   )
+}
+
+export function Wod(props) {
+  const query = new URLSearchParams(props.locationSearch ?? window.location.search)
+  const requestedView = query.get('action') === 'result' ? 'today' : ['history','progress'].includes(query.get('view')) ? query.get('view') : 'today'
+  const [localView,setView] = useState(requestedView)
+  const view = props.locationSearch === undefined ? localView : requestedView
+  const [revision,setRevision] = useState(0)
+  return <div className="space-y-5">
+    <Tabs label="Secciones de Entrenamiento" items={[{id:'today',label:'Hoy'},{id:'history',label:'Historial'},{id:'progress',label:'Progreso'}]} value={view} onChange={next=>{setView(next);props.setActivePage?.('wod',{view:next})}} panelId="training-panel" />
+    <div id="training-panel" role="tabpanel" aria-label={view==='today'?'Entrenamiento de hoy':view==='history'?'Historial de entrenamiento':'Progreso de entrenamiento'} tabIndex={0}>
+      <section hidden={view!=='today'}><TodayWod {...props} onResultSaved={()=>setRevision(n=>n+1)} /></section>
+      {view!=='today'?<TrainingProgress key={props.currentUser?.id??'guest'} currentUser={props.currentUser} view={view} revision={revision}/>:null}
+    </div>
+  </div>
 }

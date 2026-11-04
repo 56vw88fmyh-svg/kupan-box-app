@@ -8,7 +8,7 @@ const WOD_COMPARISON_FIELDS = ['date', ...WOD_CONTENT_FIELDS]
 export function hasMeaningfulWodDraftContent(draft) {
   if (!draft || typeof draft !== 'object') return false
 
-  return WOD_CONTENT_FIELDS.some((field) => (field === 'training_details' ? Boolean(draft[field]?.scaling?.some(item => item.items?.length) || draft[field]?.skill || draft[field]?.cooldown || draft[field]?.type) : String(draft[field] ?? '').trim().length > 0))
+  return WOD_CONTENT_FIELDS.some((field) => (field === 'training_details' ? Boolean(draft[field]?.scaling?.some(item => item.items?.length) || draft[field]?.skill || draft[field]?.cooldown || draft[field]?.type || draft[field]?.benchmarkId) : String(draft[field] ?? '').trim().length > 0))
 }
 
 export function cloneSerializableWodDraft(draft) {

@@ -1,3 +1,4 @@
+import { comparisonKey } from '../utils/trainingProgress.js'
 import { supabase } from '../lib/supabase.js'
 
 export type PersonalRecordUnit = 'kg' | 'reps' | 'tiempo' | 'metros' | 'calorias'
@@ -9,7 +10,9 @@ export interface PersonalRecordInput {
   value: string | number
   unit: PersonalRecordUnit | string
   recordDate: string
-  resultContext?: { wod_id: string; version: string; level: string; result_type: string }
+  resultContext?: { wod_id: string; version: string; level: string; result_type: string; benchmark_id?: string; comparison_key?: string }
+  rpe?: number | null
+  durationMinutes?: number | null
   notes?: string | null
   rounds?: string | number | null
   reps?: string | number | null
@@ -59,6 +62,7 @@ interface SupabaseQuery<T> extends PromiseLike<QueryResponse<T>> {
   insert(payload: unknown): SupabaseQuery<T>
   update(payload: unknown): SupabaseQuery<T>
   delete(): SupabaseQuery<T>
+  range?(from: number, to: number): SupabaseQuery<T>
   single(): Promise<QueryResponse<T>>
 }
 
@@ -199,12 +203,14 @@ function normalizeInput(input: PersonalRecordInput): PersonalRecordResult<Omit<P
   const reps = toNumber(input.reps)
   const timeSeconds = toNumber(input.timeSeconds)
   const notes = normalizeText(input.notes)
+  if (input.rpe != null && (!Number.isInteger(input.rpe) || input.rpe < 1 || input.rpe > 10)) return fail('error','El esfuerzo debe estar entre 1 y 10.')
+  if (input.durationMinutes != null && (!Number.isFinite(input.durationMinutes) || input.durationMinutes <= 0 || input.durationMinutes > 600)) return fail('error','La duración debe estar entre 1 y 600 minutos.')
 
   if (!movement || !recordDate || value === null || value < 0) return fail('error', 'Revisa los datos del récord.')
   if ((rounds !== null && rounds < 0) || (reps !== null && reps < 0) || (timeSeconds !== null && timeSeconds < 0)) return fail('error', 'Revisa los datos del récord.')
 
   return ok({
-    ...(input.resultContext ? { result_context: input.resultContext } : {}),
+    ...(input.resultContext ? { result_context: input.resultContext, rpe: input.rpe ?? null, duration_minutes: input.durationMinutes ?? null } : {}),
     movement,
     value,
     unit,
@@ -230,7 +236,7 @@ function mapRecord(row: unknown): PersonalRecord {
     updated_at: record.updated_at ? String(record.updated_at) : null,
     rounds: record.rounds === null || record.rounds === undefined ? null : Number(record.rounds),
     reps: record.reps === null || record.reps === undefined ? null : Number(record.reps),
-    ...(record.result_context ? { result_context: record.result_context } : {}),
+    ...(record.result_context ? { result_context: record.result_context, rpe: record.rpe ?? null, duration_minutes: record.duration_minutes ?? null } : {}),
     time_seconds: record.time_seconds === null || record.time_seconds === undefined ? null : Number(record.time_seconds),
   }
 }
@@ -282,7 +288,7 @@ function tableFor(input?: PersonalRecordInput): string {
 }
 
 function columnsFor(input?: PersonalRecordInput): string {
-  return SELECT_COLUMNS + (input?.resultContext ? ', result_context' : '')
+  return SELECT_COLUMNS + (input?.resultContext ? ', result_context, rpe, duration_minutes' : '')
 }
 
 export async function getPersonalRecords(client?: SupabaseClientLike | null): Promise<PersonalRecordResult<PersonalRecord[]>> {
@@ -415,11 +421,18 @@ export function retryPendingPersonalRecords(client?: SupabaseClientLike | null, 
 export async function getWorkoutResultHistory(context: NonNullable<PersonalRecordInput['resultContext']>, client?: SupabaseClientLike | null) {
   const auth = await getAuthenticatedUserId(client)
   if (!auth.ok || !auth.data) return fail<PersonalRecord[]>(auth.status, auth.message)
-  const { data, error } = await getClient(client)!.from<unknown[]>('workout_results').select(SELECT_COLUMNS + ', result_context').eq('profile_id', auth.data).order('record_date', { ascending: false })
-  if (error) return fail<PersonalRecord[]>(isNetworkLikeError(error) ? 'offline' : 'error', PUBLIC_MESSAGE)
+  const data: unknown[] = []
+  for (let page = 0; page < 40; page++) {
+    const query = getClient(client)!.from<unknown[]>('workout_results').select(SELECT_COLUMNS + ', result_context, rpe, duration_minutes').eq('profile_id', auth.data).order('record_date', { ascending: false }).order('id', { ascending: false })
+    const response = await (query.range ? query.range(page * 250, page * 250 + 249) : query)
+    if (response.error) return fail<PersonalRecord[]>(isNetworkLikeError(response.error) ? 'offline' : 'error', PUBLIC_MESSAGE)
+    data.push(...(response.data ?? []))
+    if (!query.range || (response.data ?? []).length < 250) break
+    if (page === 39) return fail<PersonalRecord[]>('error', 'El historial supera el límite de lectura; no podemos confirmar la mejor marca.')
+  }
   return ok((data ?? []).filter(row => {
     const saved = (row as { result_context: typeof context }).result_context
-    return saved && saved.wod_id === context.wod_id && saved.version === context.version && saved.level === context.level && saved.result_type === context.result_type
+    return saved && comparisonKey(saved) === comparisonKey(context)
   }).map(mapRecord))
 }
 

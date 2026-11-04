@@ -1,5 +1,6 @@
 import { RegistrationDeliveryStatus } from '../components/admin/RegistrationDeliveryStatus.jsx'
 import { gymConfig } from '../config/gymConfig.js'
+import { ManagementInsights } from '../components/admin/ManagementInsights.jsx'
 import { captureFormSave } from '../utils/formProtection.js'
 import { renewalCandidates, weeklyOccupancy as calculateWeeklyOccupancy, monthlyAttendance } from '../utils/metricDefinitions.js'
 import { formatRecordValue, formatStatus } from '../utils/displayFormats.js'
@@ -1516,6 +1517,8 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
           onDismissAlert={(alertId) => setDismissedAlertIds((current) => [...current, alertId])}
         />
       ) : null}
+
+      {activeSection === 'overview' ? <ManagementInsights data={adminData} errors={sectionErrors} loading={isLoading} /> : null}
 
       {activeSection === 'create-student' ? (
         <>

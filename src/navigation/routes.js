@@ -3,7 +3,7 @@ import { gymConfig } from '../config/gymConfig.js'
 export const primaryNavItems = [
   { id: 'home', path: '/', label: 'Inicio', title: gymConfig.identity.name, eyebrow: gymConfig.identity.tagline ?? gymConfig.identity.slogan, icon: 'home' },
   { id: 'reservations', path: '/reservas', label: 'Reservas', title: 'Reservas', eyebrow: 'Calendario, horarios y tus clases', icon: 'calendar', feature: 'reservations' },
-  { id: 'wod', path: '/wod', label: 'WOD', title: 'WOD', eyebrow: 'WOD, resultados y PR', icon: 'wod', feature: 'wod' },
+  { id: 'wod', path: '/wod', label: 'Entrenamiento', title: 'Entrenamiento', eyebrow: 'Hoy, historial y progreso', icon: 'wod', feature: 'wod' },
   { id: 'community', path: '/comunidad', label: 'Comunidad', title: 'Comunidad', eyebrow: 'Actividad, ranking y noticias', icon: 'community', feature: 'community' },
   { id: 'profile', path: '/perfil', label: 'Perfil', title: 'Perfil', eyebrow: 'Plan, datos y configuración', icon: 'profile' },
 ]

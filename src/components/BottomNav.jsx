@@ -93,7 +93,7 @@ export function BottomNav({ currentUser }) {
                     <span className={cn('mt-1 flex h-7 w-7 items-center justify-center rounded-lg text-xs', active ? 'bg-white/20' : 'bg-white/10')}>
                       <NavIcon icon={page.icon} isActive={active} />
                     </span>
-                    <span className="max-w-full leading-tight">{page.label}</span>
+                    <span className="max-w-full break-words text-[0.65rem] leading-tight">{page.label}</span>
                   </span>
                 )
               }}
