@@ -17,7 +17,7 @@ async function mockTraining(page,{empty=false,broken=false}={}){
  await page.route('**/*.supabase.co/**',route=>{
   const req=route.request(),url=req.url()
   if(url.includes('/get_public_todays_wod_v2'))return route.fulfill({json:{id:context.wod_id,date:today,title:'Fran',workout:'21-15-9',strength:'',time_cap:'10',training_details:{benchmarkId:'fran',type:'time'}}})
-  if(url.includes('/rest/v1/reservations'))return route.fulfill({json:empty?[]:[{id:'past',reservation_date:addCalendarDays(today,-7),status:'attended',class_schedule:{class_name:'CrossFit anterior',time:'18:00'}},{id:'a',reservation_date:today,status:'attended',class_schedule:{class_name:'CrossFit',time:'18:00'}},{id:'r',reservation_date:today,status:'reserved',class_schedule:{class_name:'CrossFit',time:'19:00'}}]})
+  if(url.includes('/get_my_training_attendance'))return route.fulfill({json:empty?[]:[{id:'past',reservation_date:addCalendarDays(today,-7),status:'attended',class_schedule:{class_name:'CrossFit anterior',time:'18:00'}},{id:'a',reservation_date:today,status:'attended',class_schedule:{class_name:'CrossFit',time:'18:00'}},{id:'r',reservation_date:today,status:'reserved',class_schedule:{class_name:'CrossFit',time:'19:00'}}]})
   if(url.includes('/athlete_preferences'))return route.fulfill({json:{weekly_goal:3}})
   if(url.includes('/workout_results')){
    if(broken)return route.fulfill({status:403,json:{message:'permission denied'}})

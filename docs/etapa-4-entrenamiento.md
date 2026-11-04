@@ -15,7 +15,7 @@ Implementada localmente sobre las etapas 1–3 en `feat/etapa-4-entrenamiento`. 
 ## Datos y límites
 
 - La identidad autenticada se verifica antes de leer el historial personal. Sesiones, marcas, asistencias y meta tienen estados de error independientes: un fallo no se transforma en cero ni en un historial vacío.
-- Sesiones, marcas y reservas personales se paginan en bloques de 250, con orden estable. El límite de seguridad es 10.000 registros por fuente; al alcanzarlo se muestra error en lugar de presentar un resumen parcial como completo. La asistencia se consulta en las reservas del propio alumno bajo las políticas existentes, porque `get_my_reservations` filtra desde hoy y no ofrece historial. El resumen semanal de Hoy usa la misma fuente histórica. No se reconstruyen registros eliminados.
+- Sesiones, marcas y reservas personales se paginan en bloques de 250, con orden estable. El límite de seguridad es 10.000 registros por fuente; al alcanzarlo se muestra error en lugar de presentar un resumen parcial como completo. La asistencia se consulta mediante `get_my_training_attendance`, una proyección privada ligada a `auth.uid()`: `get_my_reservations` filtra desde hoy y la lectura directa de reservas falla con la política recursiva de perfiles vigente. El resumen semanal de Hoy usa la misma fuente histórica. No se reconstruyen registros eliminados.
 - Los puntos representan registros reales de las fuentes, sin líneas que interpolen días sin datos. Un solo punto no se presenta como tendencia. En rondas, la altura representa rondas completas y el detalle conserva las repeticiones adicionales.
 - Los nuevos campos conservan las políticas de acceso por propietario de la etapa 1. Gestión no añade acceso a perfiles o resultados personales de otros atletas.
 - No se añaden dependencias de gráficos ni datos de demostración al producto. Las capturas de abajo proceden de fixtures aislados con respuestas simuladas.
@@ -37,8 +37,9 @@ Aplicar y validar en staging las migraciones, en este orden, antes del frontend:
 1. `20261104120000_training_reliability.sql` — resultados y contexto del entrenamiento.
 2. `20261104140000_metrics_and_member_privacy.sql` — preferencias y privacidad.
 3. `20261104160000_training_session_metrics.sql` — esfuerzo y duración opcionales.
+4. `20261104170000_training_attendance_history.sql` — historial privado de asistencia compatible con la política existente.
 
-El service worker identifica esta versión como `v20261104-stage4`. Antes de producción, verificar cuentas por rol, registros reales, más de una página de historial, un benchmark repetido con referencia coherente y actualización de una instalación anterior. La reversión del frontend no requiere borrar datos de entrenamiento ni preferencias.
+El service worker identifica esta versión como `v20261104-stage4-history`. Antes de producción, verificar cuentas por rol, registros reales, más de una página de historial, un benchmark repetido con referencia coherente y actualización de una instalación anterior. La reversión del frontend no requiere borrar datos de entrenamiento ni preferencias.
 
 ## Capturas con datos de prueba
 

@@ -1,7 +1,7 @@
 {
   "name": "kupan-pwa",
   "private": true,
-  "version": "2.2.0",
+  "version": "2.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -45,7 +45,7 @@
     "test:stage1": "node src/utils/workoutResults.test.js && node src/services/pendingRecords.test.ts && node scripts/schema/trainingReliability.test.mjs",
     "test:stage2": "node src/utils/metricDefinitions.test.js && node scripts/schema/memberPrivacy.test.mjs",
     "test:stage3": "node src/navigation/flowContext.test.js",
-    "test:stage4": "node src/utils/trainingProgress.test.js && node src/services/trainingProgressService.test.js && node scripts/schema/trainingSessionMetrics.test.mjs",
+    "test:stage4": "node src/utils/trainingProgress.test.js && node src/services/trainingProgressService.test.js && node scripts/schema/trainingSessionMetrics.test.mjs && node scripts/schema/trainingAttendanceHistory.test.mjs",
     "test:registration-worker": "node supabase/functions/deliver-registration-emails/delivery.test.mjs && node supabase/functions/deliver-registration-emails/gmail.test.mjs && node supabase/functions/deliver-registration-emails/worker-auth.test.mjs && node supabase/functions/deliver-registration-emails/scheduler-auth.test.mjs"
   },
   "dependencies": {

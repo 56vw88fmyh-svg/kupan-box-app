@@ -13,7 +13,16 @@ async function readAll(client,table,profileId,columns,dateField='record_date'){
 }
 export async function loadTrainingAttendance(profileId,client=supabase){
  if(!client||!profileId)throw new Error('Inicia sesión para consultar la asistencia.')
- return readAll(client,'reservations',profileId,'id,profile_id,class_schedule_id,reservation_date,status,class_schedule(time,class_name)','reservation_date')
+ const auth=await client.auth.getUser()
+ if(auth.error||auth.data?.user?.id!==profileId)throw new Error('Tu sesión venció. Inicia sesión nuevamente.')
+ const rows=[]
+ for(let page=0;page<40;page++){
+  const {data,error}=await client.rpc('get_my_training_attendance',{page_offset:page*250,page_size:250})
+  if(error||!Array.isArray(data))throw new Error('No pudimos cargar la asistencia.')
+  rows.push(...data)
+  if(data.length<250)return rows
+ }
+ throw new Error('El historial de asistencia excede el límite de lectura.')
 }
 export async function loadTrainingProgress(profileId,client=supabase){
  if(!client||!profileId)return {ok:false,message:'Inicia sesión para consultar tu entrenamiento.'}

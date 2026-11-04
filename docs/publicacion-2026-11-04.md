@@ -1,4 +1,4 @@
-# KUPAN 2.2.0 — integración y publicación
+# KUPAN 2.2.1 — integración y publicación
 
 ## Fuente e integración
 
@@ -8,7 +8,7 @@ Se recuperaron 176 archivos del despliegue y se verificó el SHA-1 de cada uno c
 
 Se restaura además la compilación y ruta independiente de `/nomina`, sus cabeceras privadas y exclusión de caché, y su acceso en Alumnos. Sus funciones ya estaban presentes en la base de producción; no se vuelve a aplicar la migración de nómina.
 
-La versión de interfaz, paquete y telemetría pasa a 2.2.0. El worker usa `v20261104-stage4`. No se modifican ni despliegan las Edge Functions existentes ni se altera FITTEST.
+La versión de interfaz, paquete y telemetría pasa a 2.2.1. El worker usa `v20261104-stage4-history`. No se modifican ni despliegan las Edge Functions existentes ni se altera FITTEST.
 
 ## Verificación antes de activar
 
@@ -26,7 +26,13 @@ El procedimiento comprueba permisos antes de confirmar. No actualiza ni elimina 
 
 ## Activación y comprobación posterior
 
-Pendiente de registrar el identificador del despliegue final y sus comprobaciones remotas.
+La publicación inicial 2.2.0 (`dpl_2EG48mCJLTzC3vYmxHURC5FJ3VmP`) confirmó las tres migraciones, preservó 8 PR, 2 WOD y 91 reservas, y permitió comprobar la actualización de la PWA desde la instalación 2.1.3. Un guardado y lectura propios, la denegación entre alumnos, la validación de RPE y el feed de miembros se verificaron con roles reales en una transacción revertida, sin conservar pruebas.
+
+La revisión con la sesión iniciada detectó error `42P17` en la lectura directa de asistencia: la política existente de reservas recurre a una política de perfiles que entra en recursión. La corrección 2.2.1 incorpora `20261104170000_training_attendance_history.sql`: una proyección paginada, privada y ligada exclusivamente a `auth.uid()`, sin aceptar un identificador de alumno. No modifica las políticas globales de reservas/perfiles ni el contrato de reservas futuras. El resumen de Hoy y Progreso comparten esta consulta histórica.
+
+La migración adicional se probó localmente reproduciendo la política recursiva, con paginación, fechas pasadas/futuras, aislamiento A/B, sesión ausente y denegación anónima. En producción se compararon exactamente los IDs devueltos para dos cuentas con sus reservas reales, dentro de una transacción revertida, antes de aplicarla. Se registra como `20261104170000`.
+
+Pendiente de registrar el despliegue final de la corrección y sus comprobaciones remotas.
 
 ## Reversión
 
