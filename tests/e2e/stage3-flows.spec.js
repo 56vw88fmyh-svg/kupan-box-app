@@ -71,6 +71,7 @@ async function mockApp(page){
   if(url.includes('/auth/v1/user'))return route.fulfill({json:user})
   if(url.includes('/get_my_profile'))return route.fulfill({json:{id,full_name:'Atleta de prueba',email:user.email,role:'student',status:'active',level:'RX',birth_date:'1990-01-01'}})
   if(url.includes('/get_active_membership'))return route.fulfill({json:{id:'plan-test',status:'active',payment_status:'paid',classes_total:8,classes_used:1,plan_name:'8 clases',end_date:'2099-01-01'}})
+  if(url.includes('/get_schedule_availability'))return route.fulfill({json:route.request().postDataJSON().target_requests.map(row=>({...row,available_spots:10}))})
   if(url.includes('/available_spots'))return route.fulfill({json:10})
   if(url.includes('/membership_remaining_tokens'))return route.fulfill({json:7})
   if(url.includes('/class_schedule'))return route.fulfill({json:[{id:'class-test',day_of_week:day,time:'23:59:00',class_name:'CrossFit',coach:'Coach de prueba',max_spots:10,active:true}]})

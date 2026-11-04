@@ -8,6 +8,7 @@ const APP_SHELL = [
 ]
 
 const PRIVATE_PATTERNS = [
+  '/nomina',
   'supabase.co',
   '/auth/v1/',
   '/rest/v1/',

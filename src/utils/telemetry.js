@@ -1,5 +1,5 @@
 /* global Blob, PerformanceObserver */
-export const APP_RELEASE = '2.1.3'
+export const APP_RELEASE = '2.2.0'
 const routes = new Set(['/', '/login', '/perfil', '/reservas', '/admin', '/coach', '/wod', '/comunidad', '/planes', '/ranking', '/pr'])
 export function safeErrorEvent(scope, kind, code) {
   return { type: 'error', scope: /^[a-z_][a-z0-9_.]{0,79}$/i.test(scope) ? scope : 'unknown',

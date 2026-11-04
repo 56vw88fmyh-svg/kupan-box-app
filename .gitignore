@@ -18,3 +18,5 @@ playwright/.auth/
 artifacts/
 .vercel
 .env*
+
+.vite-cache/

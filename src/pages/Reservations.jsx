@@ -340,8 +340,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
     setHasActiveMembership(result.hasActiveMembership)
     setRemainingTokens(result.remainingTokens)
     setActiveWaitlist(result.waitlist ?? [])
-    if (result.warning) setReservationMessage(result.warning)
-    setReservationMessage('')
+    setReservationMessage(result.warning ?? '')
   }, [currentUser?.id])
 
   useEffect(() => {
@@ -467,7 +466,7 @@ export function Reservations({ pendingReservation, currentUser, onClearPendingRe
           <div>
             <h2 className="k-display text-2xl font-bold leading-tight text-text-primary sm:text-3xl">Reserva tu próxima clase</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">
-              Elige un día y un horario disponible.
+              {gymConfig.id === 'kupan' ? 'CrossFit y Hybrid · hasta 10 cupos por clase.' : 'Elige un día y un horario disponible.'}
             </p>
           </div>
           <p className="text-sm text-white/75" role="status">{isLoading || !availabilityLoaded || reservationMessage ? 'Disponibilidad por confirmar' : `${filteredClasses.length} clases · ${hasOpenAccess ? 'acceso abierto' : `${totalSpots} cupos disponibles`}`}</p>
