@@ -1,12 +1,27 @@
 import { APP_RELEASE } from '../utils/telemetry.js'
 import { ModeSwitcher } from './ModeSwitcher.jsx'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { gymConfig } from '../config/gymConfig.js'
 import { NotificationBell } from './NotificationBell.jsx'
 
 export function AppShell({ title, eyebrow, children, currentUser, variant = 'app' }) {
   const [isOnline, setIsOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine))
   const isAuthLayout = variant === 'auth'
+  const headerRef = useRef(null)
+
+  useEffect(() => {
+    const header = headerRef.current
+    if (!header) return
+    const updateHeight = () => {
+      const height = window.getComputedStyle(header).position === 'sticky' ? header.getBoundingClientRect().height : 0
+      header.parentElement.style.setProperty('--app-header-height', `${height}px`)
+    }
+    updateHeight()
+    const observer = new window.ResizeObserver(updateHeight)
+    observer.observe(header)
+    window.addEventListener('resize', updateHeight)
+    return () => { observer.disconnect(); window.removeEventListener('resize', updateHeight) }
+  }, [isAuthLayout])
 
   useEffect(() => {
     function updateOnlineState() {
@@ -23,7 +38,7 @@ export function AppShell({ title, eyebrow, children, currentUser, variant = 'app
 
   return (
     <div className={`${isAuthLayout ? 'k-auth-shell' : 'k-app-shell'} text-kupan-bone`}>
-      {!isAuthLayout ? <header className="k-app-header sticky top-0 z-20 border-b border-white/10 bg-kupan-black/90 px-4 pb-3 backdrop-blur-2xl">
+      {!isAuthLayout ? <header ref={headerRef} className="k-app-header sticky top-0 z-20 border-b border-white/10 bg-kupan-black/90 px-4 pb-3 backdrop-blur-2xl">
         <a className="sr-only focus:not-sr-only focus:block focus:p-3 focus:text-white" href="#main-content">Ir al contenido principal</a>
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1">

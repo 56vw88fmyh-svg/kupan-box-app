@@ -84,9 +84,9 @@ export function SmallRow({ title, meta, detail, action }) {
   )
 }
 
-export function AdminSidebar({ modules, openModules, onToggleModule, activeSection, activeModuleId, onNavigate, isCollapsed, onToggleCollapse }) {
+export function AdminSidebar({ modules, openModules, onToggleModule, activeSection, activeModuleId, onNavigate, isCollapsed, onToggleCollapse, isMobileOpen }) {
   return (
-    <aside className={`k-card sticky top-[calc(4.75rem+env(safe-area-inset-top))] z-10 max-h-[calc(100dvh-7rem)] overflow-hidden p-3 transition-all duration-300 lg:self-start ${
+    <aside id="admin-quick-access" aria-label="Accesos rápidos de Gestión" className={`k-card ${isMobileOpen ? 'block' : 'hidden'} p-3 lg:sticky lg:top-[calc(var(--app-header-height,9rem)+1rem)] lg:z-10 lg:block lg:max-h-[calc(100dvh-var(--app-header-height,9rem)-2rem)] lg:overflow-hidden lg:self-start ${
       isCollapsed ? 'lg:w-20' : 'lg:w-72'
     }`}
     >
@@ -105,7 +105,7 @@ export function AdminSidebar({ modules, openModules, onToggleModule, activeSecti
         </button>
       </div>
 
-      <div className="max-h-[calc(100dvh-12rem)] space-y-2 overflow-y-auto pr-1">
+      <div className="space-y-2 lg:max-h-[calc(100dvh-var(--app-header-height,9rem)-7rem)] lg:overflow-y-auto lg:pr-1">
         {modules.map((module) => {
           const isOpen = openModules.includes(module.id)
           const moduleHasActive = module.id === activeModuleId
@@ -116,6 +116,7 @@ export function AdminSidebar({ modules, openModules, onToggleModule, activeSecti
                 type="button"
                 className={`flex min-h-12 w-full items-center gap-3 px-3 text-left transition ${moduleHasActive ? 'text-white' : 'text-white/70 hover:text-white'}`}
                 onClick={() => onToggleModule(module.id)}
+                aria-label={module.label}
                 aria-expanded={isOpen}
                 aria-controls={`admin-module-${module.id}`}
               >
@@ -123,7 +124,7 @@ export function AdminSidebar({ modules, openModules, onToggleModule, activeSecti
                   <AdminIcon code={module.icon} className="h-4 w-4" />
                 </span>
                 <span className={`min-w-0 flex-1 text-sm font-black uppercase ${isCollapsed ? 'lg:hidden' : ''}`}>{module.label}</span>
-                <span className={`text-xs font-black transition ${isOpen ? 'rotate-90' : ''} ${isCollapsed ? 'lg:hidden' : ''}`}>{'>'}</span>
+                <span aria-hidden="true" className={`text-xs font-black transition ${isOpen ? 'rotate-90' : ''} ${isCollapsed ? 'lg:hidden' : ''}`}>{'>'}</span>
               </button>
 
               {isOpen ? (
@@ -134,7 +135,7 @@ export function AdminSidebar({ modules, openModules, onToggleModule, activeSecti
                       <button
                         key={`${module.id}-${item.label}-${item.target ?? item.id}`}
                         type="button"
-                        className={`w-full rounded-md px-3 py-2 text-left transition ${
+                        className={`min-h-11 w-full rounded-md px-3 py-2 text-left transition ${
                           isActive ? 'bg-kupan-ember/95 text-white shadow-glow' : 'text-white/60 hover:bg-white/10 hover:text-white'
                         }`}
                         onClick={() => onNavigate({ ...item, moduleId: module.id })}

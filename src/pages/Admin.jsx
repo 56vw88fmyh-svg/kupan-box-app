@@ -147,6 +147,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [activeModuleId, setActiveModuleId] = useState('inicio')
   const [openModules, setOpenModules] = useState(['inicio'])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(true)
   const [globalQuery, setGlobalQuery] = useState('')
   const [pendingFocusTarget, setPendingFocusTarget] = useState('')
   const [dismissedAlertIds, setDismissedAlertIds] = useState([])
@@ -238,6 +239,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [membershipReceipt, setMembershipReceipt] = useState(null)
   const [isConfirmingMembership, setIsConfirmingMembership] = useState(false)
   const contentTopRef = useRef(null)
+  const mobileNavigationRef = useRef(null)
   const createStudentRef = useRef(null)
   const membershipsOverviewRef = useRef(null)
   const membershipActivateRef = useRef(null)
@@ -632,6 +634,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   function scrollToTarget(target) {
     const targetMap = {
       top: contentTopRef,
+      menu: mobileNavigationRef,
       'create-student-form': createStudentRef,
       'memberships-overview': membershipsOverviewRef,
       'membership-activate': membershipActivateRef,
@@ -646,7 +649,13 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
     if (scrollTimeoutRef.current) window.clearTimeout(scrollTimeoutRef.current)
     scrollTimeoutRef.current = window.setTimeout(() => {
       const targetNode = targetRef.current
-      targetNode?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (targetNode) {
+        const header = document.querySelector('.k-app-header')
+        const headerHeight = header && window.getComputedStyle(header).position === 'sticky' ? header.getBoundingClientRect().height : 0
+        const toolbarHeight = target !== 'menu' && window.matchMedia('(max-width: 1023px)').matches
+          ? mobileNavigationRef.current?.getBoundingClientRect().height ?? 0 : 0
+        window.scrollTo({ top: window.scrollY + targetNode.getBoundingClientRect().top - headerHeight - toolbarHeight - 12, behavior: 'instant' })
+      }
       targetNode?.focus?.({ preventScroll: true })
       if (targetNode) {
         targetNode.classList.add('k-admin-target-highlight')
@@ -667,11 +676,17 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       )))?.id
       ?? getAdminModuleId(item.id)
 
+    setIsMobileMenuOpen(false)
     setActiveSection(item.id)
     setActiveModuleId(resolvedModuleId)
     setOpenModules([resolvedModuleId])
     setPendingFocusTarget(item.target ?? (item.id === 'create-student' ? 'create-student-form' : 'top'))
     setGlobalQuery('')
+  }
+
+  function toggleMobileMenu() {
+    setIsMobileMenuOpen((current) => !current)
+    setPendingFocusTarget(isMobileMenuOpen ? 'top' : 'menu')
   }
 
   function toggleAdminModule(moduleId) {
@@ -1353,87 +1368,25 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   }
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-0">
+    <div className="flex flex-col gap-6 pb-24 lg:pb-0">
+      <div className={activeSection === 'overview' ? '' : 'hidden lg:block'}>
       <AdminPageHeader
         dateLabel={`${todayLabel} · ${formatDate(todayDate)}`}
         greeting={`Hola ${activeUser?.name ?? 'equipo KUPAN'}, revisa lo importante de hoy y resuelve rápido lo pendiente.`}
         status={todayClasses === null ? 'No pudimos cargar clases o reservas. Actualiza datos para reintentar.' : todayClasses.length > 0 ? `${todayClasses.length} clase(s) programadas hoy · ${totals.todayReservations} reservas` : 'Hoy no hay clases activas programadas.'}
         onAction={navigateAdmin}
       />
+      </div>
 
-      <section className="k-card p-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Datos en vivo</p>
-            <p className="mt-1 text-sm font-bold leading-6 text-white/65">Panel conectado a los datos del box y protegido por permisos de acceso.</p>
-          </div>
-          <button type="button" className="k-button min-h-12 w-full lg:w-auto" onClick={refreshData} disabled={isLoading || isRefreshing}>
-            {isLoading || isRefreshing ? 'Actualizando...' : 'Actualizar datos'}
-          </button>
-        </div>
-        {lastUpdated ? (
-          <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-white/50">
-            Ultima actualizacion: {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(lastUpdated)}
-          </p>
-        ) : null}
-        {message ? (
-          <p className={`mt-3 rounded-lg border p-3 text-sm font-bold text-white ${
-            messageType === 'success' ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-kupan-flame/30 bg-kupan-flame/10'
-          }`}
-          role="status"
-          aria-live="polite"
-          >
-            {message}
-          </p>
-        ) : null}
-        {sectionErrors.length > 0 ? (
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {sectionErrors.map((error) => (
-              <div key={`${error.key}-${error.label}`} className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-xs font-bold leading-5 text-white">
-                <p>{error.message}</p>
-                <button
-                  type="button"
-                  className="mt-2 rounded-md border border-white/15 bg-white/10 px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.12em] text-white disabled:opacity-50"
-                  disabled={Boolean(sectionLoading[error.key])}
-                  onClick={() => reloadSection(error.key)}
-                >
-                  {sectionLoading[error.key] ? 'Reintentando...' : 'Reintentar'}
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="k-card p-4">
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
-          <label className="block">
-            <span className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Buscar alumno</span>
-            <input
-              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-base font-bold text-white outline-none transition placeholder:text-white/55 focus:border-kupan-ember"
-              type="search"
-              value={studentQuery}
-              placeholder="Nombre, email o telefono..."
-              onChange={(event) => setStudentQuery(event.target.value)}
-            />
-          </label>
-          <p className="text-sm font-black uppercase text-white/60">{filteredProfiles.length} resultados</p>
-        </div>
-        <div className="mt-3 flex gap-2 overflow-x-auto k-scroll-x pb-1">
-          {studentFilters.map((filter) => (
-            <button
-              key={filter.id}
-              type="button"
-              className={`min-w-max rounded-lg px-3 py-2 text-xs font-black uppercase transition ${
-                studentFilter === filter.id ? 'bg-kupan-ember text-white shadow-glow' : 'border border-white/10 bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
-              }`}
-              onClick={() => setStudentFilter(filter.id)}
-            >
-              {filter.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      <div ref={mobileNavigationRef} tabIndex={-1} className="sticky top-[var(--app-header-height,9rem)] z-10 flex min-h-14 items-center gap-2 rounded-xl border border-white/10 bg-kupan-black/95 p-2 backdrop-blur-2xl lg:hidden" aria-label="Sección de Gestión">
+        <button type="button" className="min-h-11 shrink-0 rounded-lg bg-white/10 px-3 text-sm font-bold text-white" onClick={toggleMobileMenu} aria-label={isMobileMenuOpen ? 'Volver a la sección' : 'Volver a accesos rápidos'}>
+          <span aria-hidden="true">←</span> Volver
+        </button>
+        <p className="min-w-0 flex-1 text-sm font-black uppercase text-white">{isMobileMenuOpen ? 'Accesos rápidos' : currentSectionMeta.label}</p>
+        <button type="button" className="min-h-11 shrink-0 rounded-lg border border-white/15 px-3 text-sm font-bold text-white" aria-expanded={isMobileMenuOpen} aria-controls="admin-quick-access" onClick={toggleMobileMenu}>
+          {isMobileMenuOpen ? 'Cerrar' : 'Menú'}
+        </button>
+      </div>
 
       <div className="grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
 	        <AdminSidebar
@@ -1444,11 +1397,12 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 	          activeModuleId={activeModuleId}
 	          onNavigate={navigateAdmin}
 	          isCollapsed={isSidebarCollapsed}
+	          isMobileOpen={isMobileMenuOpen}
 	          onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
         />
 
-        <div ref={contentTopRef} className="min-w-0 space-y-5 scroll-mt-28 outline-none" tabIndex={-1}>
-          <div className="k-card p-4">
+        <div id="admin-workspace" ref={contentTopRef} className={`min-w-0 space-y-5 outline-none ${isMobileMenuOpen ? 'hidden lg:block' : ''}`} tabIndex={-1}>
+          <div className="k-card hidden p-4 lg:block">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">
@@ -1495,6 +1449,80 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
               ) : null}
             </div>
           </div>
+
+      <section className="k-card p-4">
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="hidden lg:block">
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Datos en vivo</p>
+            <p className="mt-1 text-sm font-bold leading-6 text-white/65">Panel conectado a los datos del box y protegido por permisos de acceso.</p>
+          </div>
+          <button type="button" className="k-button min-h-12 w-full lg:w-auto" onClick={refreshData} disabled={isLoading || isRefreshing}>
+            {isLoading || isRefreshing ? 'Actualizando...' : 'Actualizar datos'}
+          </button>
+        </div>
+        {lastUpdated ? (
+          <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-white/50">
+            Ultima actualizacion: {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(lastUpdated)}
+          </p>
+        ) : null}
+        {message ? (
+          <p className={`mt-3 rounded-lg border p-3 text-sm font-bold text-white ${
+            messageType === 'success' ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-kupan-flame/30 bg-kupan-flame/10'
+          }`}
+          role="status"
+          aria-live="polite"
+          >
+            {message}
+          </p>
+        ) : null}
+        {sectionErrors.length > 0 ? (
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {sectionErrors.map((error) => (
+              <div key={`${error.key}-${error.label}`} className="rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-xs font-bold leading-5 text-white">
+                <p>{error.message}</p>
+                <button
+                  type="button"
+                  className="mt-2 rounded-md border border-white/15 bg-white/10 px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.12em] text-white disabled:opacity-50"
+                  disabled={Boolean(sectionLoading[error.key])}
+                  onClick={() => reloadSection(error.key)}
+                >
+                  {sectionLoading[error.key] ? 'Reintentando...' : 'Reintentar'}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <section className={`k-card p-4 ${['overview', 'students', 'memberships'].includes(activeSection) ? '' : 'hidden lg:block'}`}>
+        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+          <label className="block">
+            <span className="text-xs font-black uppercase tracking-[0.18em] text-kupan-flame">Buscar alumno</span>
+            <input
+              className="mt-2 w-full rounded-lg border border-white/10 bg-black/35 px-4 py-3 text-base font-bold text-white outline-none transition placeholder:text-white/55 focus:border-kupan-ember"
+              type="search"
+              value={studentQuery}
+              placeholder="Nombre, email o telefono..."
+              onChange={(event) => setStudentQuery(event.target.value)}
+            />
+          </label>
+          <p className="text-sm font-black uppercase text-white/60">{filteredProfiles.length} resultados</p>
+        </div>
+        <div className="mt-3 flex gap-2 overflow-x-auto k-scroll-x pb-1">
+          {studentFilters.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              className={`min-w-max rounded-lg px-3 py-2 text-xs font-black uppercase transition ${
+                studentFilter === filter.id ? 'bg-kupan-ember text-white shadow-glow' : 'border border-white/10 bg-white/10 text-white/60 hover:bg-white/15 hover:text-white'
+              }`}
+              onClick={() => setStudentFilter(filter.id)}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       {activeSection === 'overview' ? (
         <AdminOverviewModule

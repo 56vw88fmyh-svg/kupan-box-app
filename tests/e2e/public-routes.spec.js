@@ -22,8 +22,8 @@ for (const route of routes) {
     await expect(page.locator('h1, h2').first()).toBeVisible()
 
     if (['/admin', '/coach'].includes(route)) {
-      await expect(page).toHaveURL(/\/login\?access=required/)
-      await expect(page.getByText(/acceso kupan/i).first()).toBeVisible()
+      await expect(page).toHaveURL(`/login?returnTo=${encodeURIComponent(route)}`)
+      await expect(page.getByRole('heading', { name: 'Bienvenido a KUPAN' })).toBeVisible()
     }
 
     await safeGoto(page, route)
@@ -35,7 +35,7 @@ for (const route of routes) {
 test('registro presenta una bienvenida simple y deja la escala técnica al coach', async ({ page }, testInfo) => {
   const assertCleanConsole = attachConsoleGuard(page, testInfo)
   await safeGoto(page, '/login')
-  await page.getByRole('button', { name: 'Registrarme' }).click()
+  await page.getByRole('button', { name: 'Registrarse' }).click()
 
   await expect(page.getByText('Estoy comenzando', { exact: true })).toBeVisible()
   await expect(page.getByText(/tu coach evaluará contigo la escala técnica adecuada/i)).toBeVisible()
