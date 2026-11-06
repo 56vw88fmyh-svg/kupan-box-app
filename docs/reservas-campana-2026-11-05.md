@@ -39,4 +39,14 @@ Solo se conservan las funciones y el registro de migración; no se conservó nin
 
 ## Interfaz
 
-Versión 2.2.4, worker `v20261105-staff-notifications`. Activación y comprobación remota se registran después del despliegue.
+Versión 2.2.4, worker `v20261105-staff-notifications`. Publicada en https://kupan-box-app.vercel.app.
+
+## Comprobación final en producción
+
+- Código `fbb4c36`; despliegue `dpl_81PM6jCS5E5cPwMBNrmKutsUP3VR`, URL inmutable https://kupan-box-okjkegsyz-kupan-s-projects.vercel.app.
+- Los doce recorridos se repiten contra el dominio público, con Supabase interceptado y datos ficticios: doce aprobados.
+- Sesión administrativa de Chrome conservada tras activar el aviso de actualización a 2.2.4. Campana real completamente dentro de 390×844: x=12 a x=378, y=55.52 a y=832. No se marcaron notificaciones como leídas durante la comprobación.
+- Coach carga sus catorce perfiles reales y habilita Confirmar alumno. No se envió una reserva real desde el navegador.
+- La captura siguiente procede de la prueba remota WebKit con avisos ficticios, sin datos personales.
+
+![Campana corregida, datos de prueba](notificaciones-2.2.4.png)
