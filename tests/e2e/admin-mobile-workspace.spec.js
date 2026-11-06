@@ -57,6 +57,11 @@ async function assertWorkspace(page) {
   expect(metrics.width).toBeGreaterThan((page.viewportSize().width - 40))
   expect(metrics.position).not.toBe('fixed')
   expect(metrics.overflow).not.toBe('hidden')
+  const navigation = page.getByRole('navigation', { name: 'Navegación del panel administrativo' })
+  await expect(navigation).toBeInViewport({ ratio: 1 })
+  const navBox = await navigation.boundingBox()
+  expect(navBox.y + navBox.height).toBeLessThanOrEqual(page.viewportSize().height)
+  expect(navBox.y).toBeGreaterThan(page.viewportSize().height - 110)
 }
 
 for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {

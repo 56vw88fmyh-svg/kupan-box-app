@@ -147,7 +147,7 @@
 
 @layer components {
   .animate-page-enter {
-    animation: page-enter 180ms ease-out both;
+    animation: page-enter 180ms ease-out backwards;
   }
 
   .k-card {

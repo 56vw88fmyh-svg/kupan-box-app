@@ -1,4 +1,4 @@
-# KUPAN 2.2.2 — navegación móvil de Gestión
+# KUPAN 2.2.3 — navegación móvil de Gestión
 
 ## Corrección
 
@@ -17,6 +17,10 @@ El desplazamiento a formularios e historial descuenta la altura real de la cabec
 
 ## Publicación
 
-Versión 2.2.2 y worker `v20261105-mobile-workspace`. Solo frontend; no requiere migraciones de base de datos ni desplegar funciones.
+Versión 2.2.3 y worker `v20261105-mobile-navigation`. Solo frontend; no requiere migraciones de base de datos ni desplegar funciones.
 
 El despliegue anterior de reversión es `dpl_Gxpvsb4TuPLSvXFnCvr3nFnX8nKk`, versión 2.2.1. La publicación y comprobación del dominio se registran al finalizar.
+
+## Anclaje de navegación inferior
+
+La comprobación autenticada tras la publicación inicial 2.2.2 identificó un problema previo adicional: la animación de entrada retenía una transformación identidad y convertía el contenedor de página en referencia de posición para la barra fija. Se elimina la retención del último fotograma usando `backwards`. La prueba reforzada reproduce primero el fallo contra 2.2.2 y exige después que la barra quede completamente dentro del viewport en cada sección, a menos de 110 px del borde inferior. El ajuste se entrega como 2.2.3.
