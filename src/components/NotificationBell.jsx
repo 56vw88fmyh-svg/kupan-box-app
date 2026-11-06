@@ -5,6 +5,7 @@ import {
   markNotificationRead,
 } from '../utils/notifications.js'
 import { gymConfig } from '../config/gymConfig.js'
+import { Dialog } from './ui/Dialog.jsx'
 
 const typeLabels = {
   plan_expiring: 'Plan por vencer',
@@ -68,7 +69,9 @@ export function NotificationBell({ currentUser }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id])
 
-  async function handleOpen() {
+  async function handleOpen(event) {
+    // Safari does not focus buttons on a pointer click; retain a reliable return target.
+    event.currentTarget.focus()
     setIsOpen((current) => !current)
     if (!isOpen) refreshNotifications()
   }
@@ -104,6 +107,7 @@ export function NotificationBell({ currentUser }) {
         className="relative flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-black/45 text-lg font-black text-white transition hover:border-kupan-ember/60 hover:bg-kupan-ember/10"
         aria-label={`Notificaciones ${gymConfig.identity.name}`}
         aria-expanded={isOpen}
+        aria-haspopup="dialog"
         onClick={handleOpen}
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -117,50 +121,47 @@ export function NotificationBell({ currentUser }) {
         ) : null}
       </button>
 
-      {isOpen ? (
-        <div className="absolute right-0 top-full z-50 mt-3 w-[min(88vw,22rem)] overflow-hidden rounded-lg border border-white/10 bg-kupan-gray shadow-2xl">
-          <div className="border-b border-white/10 bg-black/25 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-kupan-flame">Notificaciones</p>
-                <h2 className="mt-1 text-lg font-black uppercase text-white">{gymConfig.identity.name} al día</h2>
-              </div>
-              <button type="button" className="text-xs font-black uppercase text-white/55 hover:text-white" onClick={handleMarkAllRead}>
-                Leer todo
-              </button>
+      <Dialog isOpen={isOpen} onClose={() => setIsOpen(false)} title="Notificaciones" className="!bg-kupan-gray" closeLabel="Cerrar notificaciones">
+        <div className="border-b border-white/10 pb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-white">{gymConfig.identity.name} al día</p>
             </div>
-          </div>
-
-          <div className="max-h-[24rem] overflow-y-auto p-3">
-            {isLoading ? <p className="p-3 text-sm font-bold text-white/60">Cargando...</p> : null}
-            {message ? <p className="mb-2 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-xs font-bold text-white">{message}</p> : null}
-            {!isLoading && notifications.length === 0 ? (
-              <p className="p-3 text-sm font-bold leading-6 text-white/60">No tienes notificaciones por ahora.</p>
-            ) : null}
-            <div className="space-y-2">
-              {notifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  type="button"
-                  className={`w-full rounded-lg border p-3 text-left transition ${
-                    notification.read
-                      ? 'border-white/10 bg-white/[0.03] text-white/65'
-                      : 'border-kupan-ember/35 bg-kupan-ember/10 text-white'
-                  }`}
-                  onClick={() => handleMarkRead(notification.id)}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-kupan-flame">{typeLabels[notification.type] ?? notification.type}</p>
-                    <span className="text-[0.62rem] font-bold uppercase text-white/40">{formatNotificationDate(notification.created_at)}</span>
-                  </div>
-                  <h3 className="mt-2 text-sm font-black uppercase text-white">{notification.title}</h3>
-                  <p className="mt-1 text-sm leading-5 text-white/60">{notification.message}</p>
-                </button>
-              ))}
-            </div>
+            <button type="button" className="min-h-11 shrink-0 rounded-lg px-3 text-xs font-black uppercase text-white/70 hover:bg-white/10 hover:text-white" onClick={handleMarkAllRead}>
+              Leer todo
+            </button>
           </div>
         </div>
-      ) : null}
+
+        <div className="min-w-0 pt-3">
+          {isLoading ? <p className="p-3 text-sm font-bold text-white/60">Cargando...</p> : null}
+          {message ? <p className="mb-2 rounded-lg border border-kupan-flame/30 bg-kupan-flame/10 p-3 text-xs font-bold text-white">{message}</p> : null}
+          {!isLoading && notifications.length === 0 ? (
+            <p className="p-3 text-sm font-bold leading-6 text-white/60">No tienes notificaciones por ahora.</p>
+          ) : null}
+          <div className="space-y-2">
+            {notifications.map((notification) => (
+              <button
+                key={notification.id}
+                type="button"
+                className={`min-w-0 w-full rounded-lg border p-3 text-left [overflow-wrap:anywhere] transition ${
+                  notification.read
+                    ? 'border-white/10 bg-white/[0.03] text-white/65'
+                    : 'border-kupan-ember/35 bg-kupan-ember/10 text-white'
+                }`}
+                onClick={() => handleMarkRead(notification.id)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-kupan-flame">{typeLabels[notification.type] ?? notification.type}</p>
+                  <span className="text-[0.62rem] font-bold uppercase text-white/40">{formatNotificationDate(notification.created_at)}</span>
+                </div>
+                <h3 className="mt-2 text-sm font-black uppercase text-white">{notification.title}</h3>
+                <p className="mt-1 text-sm leading-5 text-white/60">{notification.message}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </Dialog>
     </div>
   )
 }

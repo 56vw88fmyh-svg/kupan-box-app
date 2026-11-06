@@ -121,6 +121,10 @@ export function Coach({ currentUser, setActivePage }) {
   const [manualOptions, setManualOptions] = useState({ profiles: [], memberships: [] })
   const [manualDraft, setManualDraft] = useState({ profileId: '', query: '', note: '', allowWithoutMembership: false })
   const [isManualSaving, setIsManualSaving] = useState(false)
+  const [manualError, setManualError] = useState('')
+  const [manualOptionsError, setManualOptionsError] = useState('')
+  const [isLoadingManualOptions, setIsLoadingManualOptions] = useState(false)
+  const [manualOptionsReload, setManualOptionsReload] = useState(0)
   const [noteTarget, setNoteTarget] = useState(null)
   const [noteDraft, setNoteDraft] = useState({ noteType: 'scaling', content: '' })
   const [privateNotes, setPrivateNotes] = useState([])
@@ -163,12 +167,14 @@ export function Coach({ currentUser, setActivePage }) {
 
     async function fetchManualOptions() {
       if (!canAccess || !isManualOpen) return
+      setIsLoadingManualOptions(true)
+      setManualOptionsError('')
       const result = await loadCoachManualReservationOptions()
       if (!isMounted) return
+      setIsLoadingManualOptions(false)
 
       if (!result.ok) {
-        setMessageType('error')
-        setMessage(result.message)
+        setManualOptionsError(result.message)
         return
       }
 
@@ -180,7 +186,7 @@ export function Coach({ currentUser, setActivePage }) {
     return () => {
       isMounted = false
     }
-  }, [canAccess, isManualOpen])
+  }, [canAccess, isManualOpen, manualOptionsReload])
 
   async function handleMark(reservationId, status) {
     if (status === 'reserved' && !window.confirm('¿Corregir esta asistencia? El cambio quedará en el historial.')) return
@@ -265,10 +271,11 @@ export function Coach({ currentUser, setActivePage }) {
 
   async function handleManualReservation(event) {
     event.preventDefault()
+    setManualError('')
+    setMessage('')
     if (!selectedClass) {
-      setMessageType('error')
-      setMessage('Selecciona una clase antes de agregar alumno.')
-      focusCoachSection(feedbackRef)
+      setManualError('Selecciona una clase antes de agregar alumno.')
+      focusCoachSection(manualFormRef)
       return
     }
 
@@ -281,7 +288,13 @@ export function Coach({ currentUser, setActivePage }) {
       note: manualDraft.note,
     })
     setIsManualSaving(false)
-    setMessageType(result.ok ? 'success' : 'error')
+
+    if (!result.ok) {
+      setManualError(result.message)
+      focusCoachSection(manualFormRef)
+      return
+    }
+    setMessageType('success')
     setMessage(result.message)
 
     if (result.ok) {
@@ -396,6 +409,10 @@ export function Coach({ currentUser, setActivePage }) {
                   {selectedClass ? `${selectedClass.className} · ${selectedClass.timeLabel || selectedClass.time} · ${dashboard.today}` : 'Selecciona una clase para continuar.'}
                 </p>
               </div>
+              <p className="text-sm leading-6 text-white/65">El equipo puede agregar alumnos a las clases de hoy aunque ya hayan comenzado. Se mantienen los controles de plan, tokens y cupos.</p>
+              {isLoadingManualOptions ? <p role="status" className="text-sm text-white/70">Cargando alumnos y planes…</p> : null}
+              {manualOptionsError ? <ErrorState title="No pudimos cargar los alumnos" description={manualOptionsError} actionLabel="Volver a cargar alumnos" onAction={() => setManualOptionsReload((current) => current + 1)} /> : null}
+              {manualError ? <p role="alert" className="rounded-lg border border-kupan-flame/40 bg-kupan-flame/10 p-3 text-sm font-bold text-white">{manualError}</p> : null}
               <label className="block">
                 <span className="text-xs font-black uppercase text-white/60">Buscar alumno</span>
                 <input
@@ -444,7 +461,7 @@ export function Coach({ currentUser, setActivePage }) {
                   />
                 </label>
               ) : null}
-              <button type="submit" className="k-button w-full" disabled={isManualSaving}>
+              <button type="submit" className="k-button w-full" disabled={isManualSaving || isLoadingManualOptions || Boolean(manualOptionsError)}>
                 {isManualSaving ? 'Agregando...' : 'Confirmar alumno'}
               </button>
             </form>

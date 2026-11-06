@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs'
 import {PGlite} from '@electric-sql/pglite'
 const db=new PGlite()
 try {
-await db.exec(`create role anon; create role authenticated; create schema auth;
+await db.exec(`set timezone = 'America/Santiago'; create role anon; create role authenticated; create schema auth;
  create table auth.users(id uuid primary key);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to authenticated;

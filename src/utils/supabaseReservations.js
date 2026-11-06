@@ -1,6 +1,7 @@
 import { getNextChileScheduleDate, loadScheduleAvailability } from './scheduleAvailability.js'
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 import { gymConfig } from '../config/gymConfig.js'
+import { getManualReservationError } from './manualReservationErrors.js'
 import { getHumanErrorMessage, logAppError } from './appState.js'
 import { formatCoachName } from './coachName.js'
 import { formatScheduleTime, getScheduleEndTime, isOpenAccessSchedule, isUnlimitedSchedule } from './classSchedule.js'
@@ -238,7 +239,10 @@ export async function adminReserveForStudent({
     admin_note: note || null,
   })
 
-  if (error) return getSafeReservationError('reservations.admin_reserve_for_student', error, 'No pudimos agregar el alumno a la clase. Intenta nuevamente.')
+  if (error) {
+    logAppError('reservations.admin_reserve_for_student', error)
+    return getReservationError(getManualReservationError(error))
+  }
 
   return {
     ok: true,

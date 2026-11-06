@@ -2,6 +2,7 @@ import { Field, SelectField, TextArea, ToggleField } from '../AdminUi.jsx'
 import { formatScheduleTime } from '../../../utils/classSchedule.js'
 
 export function AdminManualReservationForm({
+  errorMessage,
   formRef,
   draft,
   scheduleItems,
@@ -23,8 +24,10 @@ export function AdminManualReservationForm({
         <p className="text-xs font-black uppercase tracking-[0.22em] text-kupan-flame">Agregar alumno a clase</p>
         <p className="mt-1 text-sm leading-6 text-white/60">
           Toma reserva por un alumno desde el box. Si tiene plan activo se descuenta token; si es Full no descuenta.
+          {' '}Puedes agregarlo a una clase de hoy aunque ya haya comenzado.
         </p>
       </div>
+      {errorMessage ? <p role="alert" className="rounded-lg border border-kupan-flame/40 bg-kupan-flame/10 p-3 text-sm font-bold text-white sm:col-span-2">{errorMessage}</p> : null}
       <Field
         label="Fecha"
         type="date"

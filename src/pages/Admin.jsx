@@ -148,6 +148,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
   const [openModules, setOpenModules] = useState(['inicio'])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(true)
+  const [manualReservationError, setManualReservationError] = useState('')
   const [globalQuery, setGlobalQuery] = useState('')
   const [pendingFocusTarget, setPendingFocusTarget] = useState('')
   const [dismissedAlertIds, setDismissedAlertIds] = useState([])
@@ -1243,12 +1244,15 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
   async function saveManualReservation(event) {
     event.preventDefault()
+    setManualReservationError('')
     if (!(await ensureFreshAdmin())) return
     clearFeedback()
     const result = await persistManualReservation(manualReservationDraft)
 
     if (!result.success) {
+      setManualReservationError(result.message)
       showError(result.message)
+      scrollToTarget('manual-reservation')
       return
     }
 
@@ -1259,6 +1263,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
       class_schedule_id: current.class_schedule_id,
     }))
     await reloadAffectedSections(result.affectedSections)
+    scrollToTarget('top')
   }
 
   function simulateApprovedPayment() {
@@ -1630,6 +1635,7 @@ export function Admin({ currentUser, setActivePage, onContentChange }) {
 
       {activeSection === 'reservations' ? (
         <AdminReservationsModule
+          errorMessage={manualReservationError}
           formRef={manualReservationRef}
           draft={manualReservationDraft}
           scheduleItems={adminData.schedule}

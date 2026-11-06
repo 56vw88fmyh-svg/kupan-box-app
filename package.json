@@ -1,7 +1,7 @@
 {
   "name": "kupan-pwa",
   "private": true,
-  "version": "2.2.3",
+  "version": "2.2.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "check": "eslint . && vite build",
-    "test": "node src/config/gymConfig.test.js && node src/lib/supabaseConfig.test.js && node src/navigation/routes.test.js && node src/data/paymentLinks.test.js && node src/data/kupanSchedule.test.js && node src/services/prMigrationService.test.js && node src/services/personalRecordsService.test.ts && node src/utils/auth.test.js && node src/utils/profileData.test.js && node src/utils/classSchedule.test.js && node src/utils/coachData.test.js && node src/utils/reservationPolicy.test.js && node src/utils/passwordSecurity.test.js && node src/utils/adminUtilities.test.js && node src/utils/adminWodDraft.test.js && node src/hooks/admin/useAdminData.test.js && node src/hooks/admin/useAdminFeedback.test.js && node src/hooks/admin/useAdminWodDraft.test.js && node src/components/admin/modules/adminModules.test.js && node src/components/admin/forms/adminForms.test.js && node src/hooks/admin/adminMutations.test.js && node scripts/staging/stagingScripts.test.mjs && node scripts/schema/schemaSecurity.test.mjs && node scripts/schema/kupan21Migration.test.mjs && node scripts/schema/notificationAutomation.test.mjs && node src/utils/bodyScrollLock.test.js && node src/utils/scheduleAvailability.test.js && node src/utils/telemetry.test.js && npm run test:stage1 && npm run test:stage2 && npm run test:stage3 && npm run test:stage4",
+    "test": "node src/config/gymConfig.test.js && node src/lib/supabaseConfig.test.js && node src/navigation/routes.test.js && node src/data/paymentLinks.test.js && node src/data/kupanSchedule.test.js && node src/services/prMigrationService.test.js && node src/services/personalRecordsService.test.ts && node src/utils/auth.test.js && node src/utils/profileData.test.js && node src/utils/classSchedule.test.js && node src/utils/coachData.test.js && node src/utils/reservationPolicy.test.js && node src/utils/passwordSecurity.test.js && node src/utils/adminUtilities.test.js && node src/utils/adminWodDraft.test.js && node src/hooks/admin/useAdminData.test.js && node src/hooks/admin/useAdminFeedback.test.js && node src/hooks/admin/useAdminWodDraft.test.js && node src/components/admin/modules/adminModules.test.js && node src/components/admin/forms/adminForms.test.js && node src/hooks/admin/adminMutations.test.js && node scripts/staging/stagingScripts.test.mjs && node scripts/schema/schemaSecurity.test.mjs && node scripts/schema/kupan21Migration.test.mjs && node scripts/schema/notificationAutomation.test.mjs && node src/utils/bodyScrollLock.test.js && node src/utils/scheduleAvailability.test.js && node src/utils/telemetry.test.js && npm run test:stage1 && npm run test:stage2 && npm run test:stage3 && npm run test:stage4 && node src/utils/manualReservationErrors.test.js && node scripts/schema/manualStaffReservations.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:mobile-admin": "playwright test --config playwright.mobile.config.js",
     "test:e2e:ui": "playwright test --ui",
@@ -47,7 +47,8 @@
     "test:stage2": "node src/utils/metricDefinitions.test.js && node scripts/schema/memberPrivacy.test.mjs",
     "test:stage3": "node src/navigation/flowContext.test.js",
     "test:stage4": "node src/utils/trainingProgress.test.js && node src/services/trainingProgressService.test.js && node scripts/schema/trainingSessionMetrics.test.mjs && node scripts/schema/trainingAttendanceHistory.test.mjs",
-    "test:registration-worker": "node supabase/functions/deliver-registration-emails/delivery.test.mjs && node supabase/functions/deliver-registration-emails/gmail.test.mjs && node supabase/functions/deliver-registration-emails/worker-auth.test.mjs && node supabase/functions/deliver-registration-emails/scheduler-auth.test.mjs"
+    "test:registration-worker": "node supabase/functions/deliver-registration-emails/delivery.test.mjs && node supabase/functions/deliver-registration-emails/gmail.test.mjs && node supabase/functions/deliver-registration-emails/worker-auth.test.mjs && node supabase/functions/deliver-registration-emails/scheduler-auth.test.mjs",
+    "test:e2e:staff": "playwright test --config playwright.staff.config.js"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

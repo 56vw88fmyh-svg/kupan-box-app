@@ -2,6 +2,7 @@ import { AdminManualReservationForm } from '../forms/AdminManualReservationForm.
 import { AdminSection, SmallRow } from '../AdminUi.jsx'
 
 export function AdminReservationsModule({
+  errorMessage,
   formRef,
   draft,
   scheduleItems,
@@ -20,6 +21,7 @@ export function AdminReservationsModule({
   return (
     <AdminSection eyebrow="Reservas" title="Reservas activas">
       <AdminManualReservationForm
+        errorMessage={errorMessage}
         formRef={formRef}
         draft={draft}
         scheduleItems={scheduleItems}
